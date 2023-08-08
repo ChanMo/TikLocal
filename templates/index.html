@@ -51,7 +51,7 @@
     {% elif media_type == "image" %}
     <div class="gallery">
       {% for row in recent %}
-      <div class="gallery-item">
+      <div class="gallery-item" data-value="/media/{{row.name}}?subdir={{subdir}}"">
         <figure>
           <img style="display:block" src="/media/{{row.name}}?subdir={{subdir}}" />
         </figure>
@@ -64,4 +64,33 @@
     {% endif %}
   </div>
 </section>
+<div class="modal" id="modal">
+  <div class="modal-background"></div>
+  <div class="modal-content">
+    <p class="image">
+      <img src="" alt="">
+    </p>
+  </div>
+  <button class="modal-close is-large" aria-label="close"></button>
+</div>
+<script>
+  (() => {
+    const modal = document.getElementById("modal");
+    document.querySelectorAll(".gallery-item").forEach(ele => {
+      ele.addEventListener("click", () => {
+        modal.classList.add('is-active');
+        modal.querySelector("img").setAttribute("src", ele.dataset.value);
+      })
+    });
+   
+    // Add a click event on various child elements to close the parent modal
+    document.querySelectorAll('.modal-background, .modal-close, .modal-card-head .delete, .modal-card-foot .button').forEach(($close) => {
+      const $target = $close.closest('.modal');
+    
+      $close.addEventListener('click', () => {
+        $target.classList.remove("is-active");
+      });
+    });
+  })();
+</script>
 {% endblock %}
