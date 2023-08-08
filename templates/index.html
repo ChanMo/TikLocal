@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section px-3 py-5">
+  <div class="container">
+    {% if subdirs %}
+    <nav class="breadcrumb" aria-label="breadcrumbs">
+      <ul>
+        <li><a href="/">Root</a></li>
+        {% for row in subdirs %}
+        {% if not loop.last %}
+        <li><a href="?subdir={{row}}">{{row}}</a></li>
+        {% else %}
+        <li class="is-active"><a href="#" aria-current="page">{{row}}</a></li>
+        {% endif %}
+        {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
+    <h3 class="title">File List</h3>
+    <div class="tabs is-toggle">
+      <ul>
+        <li {% if media_type == 'video' %}class="is-active"{% endif %}><a href="?media_type=video&subdir={{subdir}}">Video</a></li>
+        <li {% if media_type == 'image' %}class="is-active"{% endif %}><a href="?media_type=image&subdir={{subdir}}">Image</a></li>
+      </ul>
+    </div>
+
+    {% if directories %}
+    <div class="buttons are-small">
+      {% for row in directories %}
+      <a class="button is-link is-light" href="?media_type={{media_type}}&subdir={% if subdir %}{{subdir}}/{% endif %}{{row.name}}">{{row.name}}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if recent %}
+    {% if media_type == "video" %}
+    <div class="columns is-multiline is-variable is-1">
+      {% for row in recent %}
+      <div class="column is-one-quarter-tablet is-one-fifth-desktop py-1">
+        <div class="card" style="overflow:hidden;">
+          <video controls style="width:100%;">
+            <source src="/media/{{row.name}}?subdir={{subdir}}" />
+          </video>
+          <div class="card-content py-2 px-3">
+            <p class="is-size-7">{{row.name}}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% elif media_type == "image" %}
+    <div class="gallery">
+      {% for row in recent %}
+      <div class="gallery-item">
+        <figure>
+          <img style="display:block" src="/media/{{row.name}}?subdir={{subdir}}" />
+        </figure>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="block py-6 has-text-grey has-text-centered">Empty.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
