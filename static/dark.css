@@ -1,0 +1,28 @@
+html, body {
+  background: black;
+}
+
+.footer {
+  background: black;
+}
+
+.card {
+  background: #121212;
+  color: #999;
+}
+
+.button {
+  background: #121212 !important;
+}
+
+.title {
+  color: #aaa;
+}
+
+.tabs.is-toggle a {
+  border-color: transparent !important;
+}
+.tabs.is-toggle a:hover {
+  background: #121212 !important;
+  color: #999;
+}

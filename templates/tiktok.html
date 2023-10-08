@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+html,body {
+  height: 100%;
+}
+#container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+video {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+}
+
+</style>
+{% endblock %}
+{% block content %}
+<div id="container">
+  {% for row in files %}
+  <video controls class="video" muted>
+    <source src="/media/{{row.name}}?subdir=" />
+  </video>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block extra_body %}
+<script src="{{url_for('static', filename='hammer.min.js')}}"></script>
+<script>
+  (() => {
+    const container = document.querySelector('#container');
+    const videos = container.querySelectorAll('video');
+    let index = 0;
+  
+    videos[0].style.display = 'block';
+    videos[0].play();
+
+    var manager = new Hammer.Manager(container);
+    var Swipe = new Hammer.Swipe();
+    manager.add(Swipe);
+    manager.on('swipedown', (e) => {
+      //previous;
+    });
+    manager.on('swipeup', (e) => {
+      //next;
+      index += 1;
+      let previous;
+      if (index == videos.length) {
+        previous = videos.length - 1;
+        index = 0;
+      } else {
+        previous = index - 1;
+      }
+      videos[previous].style.display = 'none';
+      videos[previous].pause();
+      videos[index].style.display = 'block';
+      videos[index].play();
+    });
+  })()
+</script>
+{% endblock %}
