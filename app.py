@@ -1,6 +1,7 @@
 import os
 import io
 import mimetypes
+import random
 from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, session
 # from PIL import Image
@@ -50,8 +51,9 @@ def index():
 def tiktok():
     theme = request.args.get('theme', session.get('theme', 'light'))
     session['theme'] = theme
-    files = os.scandir(media_folder)
-    res = sorted(files, key=lambda row:row.stat().st_mtime, reverse=True)
+    res = os.scandir(media_folder)
+    #res = sorted(files, key=lambda row:row.stat().st_mtime, reverse=True)
+    #res = random.shuffle(files)
     files = []
     for file in res:
         if os.path.isfile(os.path.join(media_folder, file)):
@@ -59,6 +61,9 @@ def tiktok():
             mime_type = mimetypes.guess_type(file)[0]
             if mime_type and mime_type.startswith('video'):
                 files.append(file)
+
+    print(files)
+    random.shuffle(files)
 
     return render_template(
         'tiktok.html',

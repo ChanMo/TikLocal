@@ -45,6 +45,19 @@ video {
     manager.add(Swipe);
     manager.on('swipedown', (e) => {
       //previous;
+      index -= 1;
+      let previous;
+      if (index == -1) {
+        previous = 0;
+        index = videos.length - 1;
+      } else {
+        previous = index + 1;
+      }
+      videos[previous].style.display = 'none';
+      videos[previous].pause();
+      videos[index].style.display = 'block';
+      videos[index].muted = false;
+      videos[index].play();
     });
     manager.on('swipeup', (e) => {
       //next;
@@ -59,6 +72,7 @@ video {
       videos[previous].style.display = 'none';
       videos[previous].pause();
       videos[index].style.display = 'block';
+      videos[index].muted = false;
       videos[index].play();
     });
   })()
