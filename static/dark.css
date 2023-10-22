@@ -26,3 +26,21 @@ html, body {
   background: #121212 !important;
   color: #999;
 }
+
+/* settings.html */
+.media {
+  color: #eee;
+}
+.media-right .is-white {
+  color: #aaa;
+}
+.media + .media {
+  border-color: #333;
+}
+
+/* browse */
+.pagination-next, .pagination-previous, .pagination-link {
+  border-color: transparent;
+  background: #121212;
+  color: #afafaf
+}

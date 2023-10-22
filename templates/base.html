@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh" class="has-navbar-fixed-bottom">
   <head>
     <meta charset="utf-8" />
     <title>Fast Media</title>
@@ -12,6 +12,18 @@
   </head>
   <body>
     {% block content %}{% endblock %}
+    <nav class="navbar is-fixed-bottom is-black px-4" role="navigation" aria-label="main navigation">
+      <div class="level is-mobile">
+        <a href="/" class="level-item {% if menu == 'index' %}is-active{% endif %}">Home</a>
+        <a href="/browse" class="level-item {% if menu == 'browse' %}is-active{% endif %}">Videos</a>
+        <a href="/gallery" class="level-item {% if menu == 'gallery' %}is-active{% endif %}">Gallery</a>
+        <a href="/settings" class="level-item {% if menu == 'settings' %}is-active{% endif %}">Settings</a>
+      </div>
+    </nav>
     {% block extra_body %}{% endblock %}
+    <script src="{{url_for('static', filename='feather.min.js')}}"></script>
+    <script>
+      feather.replace();
+    </script>
   </body>
 </html>

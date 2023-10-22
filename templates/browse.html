@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section px-3">
+  <div class="container">
+    <div class="columns is-multiline is-variable is-1 is-mobile">
+      {% for row in files %}
+      <div class="column is-half-mobile is-one-quarter-tablet is-one-fifth-desktop py-1">
+        <div class="card" style="overflow:hidden;">
+          <video controls style="width:100%;">
+            <source src="/media/{{row.name}}?subdir={{subdir}}" />
+          </video>
+          <div class="card-content py-2 px-3">
+            <p class="is-size-7">{{row.name}}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <nav class="pagination mb-5" role="navigation" aria-label="pagination">
+      {% if has_previous %}
+      <a class="pagination-previous" href="?page={{page-1}}">Previous</a>
+      {% endif %}
+      {% if has_next %}
+      <a class="pagination-next" href="?page={{page+1}}">Next page</a>
+      {% endif %}
+      <ul class="pagination-list">
+        {% if has_previous %}
+        <li>
+          <a class="pagination-link" href="?page={{page - 1}}">{{page - 1}}</a>
+        </li>
+        {% endif %}
+        <li>
+          <a class="pagination-link is-current">{{page}}</a>
+        </li>
+        {% if has_next %}
+        <li>
+          <a class="pagination-link" href="?page={{page + 1}}">{{page + 1}}</a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+</section>
+{% endblock %}

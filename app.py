@@ -11,13 +11,12 @@ app.secret_key = b'8af3e391e6cbba8c812a6d3942b12f758a3'
 
 media_folder = Path(os.environ.get('FLASK_MEDIA', '.'))
 
-@app.route('/')
-def index():
-    theme = request.args.get('theme', session.get('theme', 'light'))
-    session['theme'] = theme
+
+@app.route('/gallery')
+def gallery():
     subdir = request.args.get('subdir', '')
     directory = media_folder / subdir
-    media_type = request.args.get('media_type', 'image')
+    media_type = 'image'
     files = os.scandir(directory)
     directories = []
     recent = []
@@ -37,41 +36,94 @@ def index():
                 files.append(file)
 
     return render_template(
-        'index.html',
-        theme=theme,
+        'gallery.html',
         directories=directories,
         recent=files,
         media_type = media_type,
         subdir = subdir,
-        subdirs = subdir.split('/')
+        subdirs = subdir.split('/'),
+        menu = 'gallery',
+        theme = session['theme']
     )
 
 
-@app.route('/tiktok')
+def get_files(directory, media_type='video'):
+    files = []
+    for file in os.scandir(directory):
+        if file.is_dir():
+            files += get_files(file)
+        if os.path.isfile(os.path.join(directory, file)):
+            file_extension = os.path.splitext(file)[-1]
+            mime_type = mimetypes.guess_type(file)[0]
+            if mime_type and mime_type.startswith(media_type):
+                files.append(file)
+    return files
+
+@app.route('/browse')
+def browse():
+    files = get_files(media_folder)
+    files = sorted(files, key=lambda row:row.stat().st_mtime, reverse=True)
+    count = len(files)
+    page = int(request.args.get('page', 1))
+    length = 8
+    offset = length * (page - 1)
+    res = files[offset:offset + length]
+    return render_template(
+        'browse.html',
+        page = page,
+        count = count,
+        length = length,
+        files = res,
+        menu = 'browse',
+        has_previous = page > 1,
+        has_next = len(files[offset+length:])>length,
+        theme = session['theme']
+    )
+
+
+@app.route('/')
 def tiktok():
-    theme = request.args.get('theme', session.get('theme', 'light'))
-    session['theme'] = theme
     res = os.scandir(media_folder)
     #res = sorted(files, key=lambda row:row.stat().st_mtime, reverse=True)
     #res = random.shuffle(files)
     files = []
+    count = 0
     for file in res:
-        if os.path.isfile(os.path.join(media_folder, file)):
-            file_extension = os.path.splitext(file)[-1]
-            mime_type = mimetypes.guess_type(file)[0]
-            if mime_type and mime_type.startswith('video'):
-                files.append(file)
+        if not os.path.isfile(os.path.join(media_folder, file)):
+            continue
+        file_extension = os.path.splitext(file)[-1]
+        mime_type = mimetypes.guess_type(file)[0]
+        if mime_type and mime_type.startswith('video'):
+            files.append(file)
 
-    print(files)
-    random.shuffle(files)
+    res = []
+    if len(files) > 50:
+        newest = files[0:10]
+        others = files[11:]
+        random.shuffle(others)
+        res = newest + others[0:40]
+        random.shuffle(res)
+    else:
+        res = files
+        random.shuffle(res)
 
     return render_template(
         'tiktok.html',
-        theme=theme,
-        files=files
+        files=res,
+        menu = 'index',
+        theme = session['theme']
     )
 
 
+@app.route('/settings')
+def settings_view():
+    theme = request.args.get('theme', session.get('theme', 'light'))
+    session['theme'] = theme
+    return render_template(
+        'settings.html',
+        menu = 'settings',
+        theme = theme
+    )
 
 @app.route("/media/<name>")
 def video_view(name):

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block extra_head %}
+{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container" style="max-width:720px;">
+    <div class="media is-align-items-center">
+      <div class="media-content">Toggle Theme</div>
+      <div class="media-right">
+        <a class="button is-white" href="?theme={% if theme == 'light' %}dark{% else %}light{% endif %}">
+          <span class="icon">
+            {% if theme == "light" %}
+            <i data-feather="sun"></i>
+            {% else %}
+            <i data-feather="moon"></i>
+            {% endif %}
+          </span>
+        </a>
+      </div>
+    </div>
+    <div class="media is-align-items-center">
+      <div class="media-content">Github</div>
+      <div class="media-right">
+        <a href="https://github.com/ChanMo/fastmedia/">ChanMo</a>
+      </div>
+    </div>
+    <div class="media is-align-items-center">
+      <div class="media-content">Email</div>
+      <div class="media-right">
+        <a href="mailto:chan.mo@outlook.com">chan.mo@outlook.com</a>
+      </div>
+    </div>
+    <div class="media is-align-items-center">
+      <div class="media-content">Version</div>
+      <div class="media-right">
+        <span>v1.0</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

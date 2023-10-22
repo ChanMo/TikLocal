@@ -8068,3 +8068,12 @@ html, body {
 .gallery-item img {
   width: 100%;
 }
+
+.navbar .level-item {
+  height: 3.75rem;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+}
+.navbar .level-item.is-active {
+  color: rgba(255,255,255,0.85);
+}
