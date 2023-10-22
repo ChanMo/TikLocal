@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section">
+  <div class="container" style="max-width:720px;">
+    <div class="content">
+      <h3>{{file}}</h3>
+      <p>MTime: {{mtime}}</p>
+      <p>Size: {{size|filesizeformat}}</p>
+    </div>
+    <div class="buttons">
+      <a href="/delete/{{file}}" class="button">Delete</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

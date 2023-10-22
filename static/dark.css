@@ -13,8 +13,9 @@ html, body {
 
 .button {
   background: #121212 !important;
+  color: #eee;
+  border-color: transparent;
 }
-
 .title {
   color: #aaa;
 }
@@ -43,4 +44,11 @@ html, body {
   border-color: transparent;
   background: #121212;
   color: #afafaf
+}
+
+.content {
+  color: #afafaf;
+}
+.content h3 {
+  color: #eee;
 }

@@ -3,7 +3,7 @@ import io
 import mimetypes
 import random
 from pathlib import Path
-from flask import Flask, render_template, send_from_directory, request, session
+from flask import Flask, render_template, send_from_directory, request, session, redirect
 # from PIL import Image
 
 app = Flask(__name__)
@@ -65,7 +65,7 @@ def browse():
     files = sorted(files, key=lambda row:row.stat().st_mtime, reverse=True)
     count = len(files)
     page = int(request.args.get('page', 1))
-    length = 8
+    length = 20
     offset = length * (page - 1)
     res = files[offset:offset + length]
     return render_template(
@@ -76,7 +76,7 @@ def browse():
         files = res,
         menu = 'browse',
         has_previous = page > 1,
-        has_next = len(files[offset+length:])>length,
+        has_next = len(files[offset+length:])>1,
         theme = session['theme']
     )
 
@@ -125,7 +125,34 @@ def settings_view():
         theme = theme
     )
 
+@app.route('/detail/<name>')
+def detail_view(name):
+    #subdir = request.args.get('subdir', '/')
+    f = media_folder / name
+    return render_template(
+        'detail.html',
+        file = name,
+        mtime = os.path.getmtime(f),
+        size = os.path.getsize(f),
+        theme = session['theme']
+    )
+
+@app.route("/delete/<name>", methods=['POST', 'GET'])
+def delete_view(name):
+    subdir = request.args.get('subdir', '/')
+    if request.method == 'POST':
+        os.unlink(media_folder / name)
+        return redirect('/browse')
+
+    return render_template(
+        'delete_confirm.html',
+        file = name,
+        theme = session['theme']
+    )
+
 @app.route("/media/<name>")
 def video_view(name):
     subdir = request.args.get('subdir', '/')
     return send_from_directory(media_folder / subdir, name)
+
+

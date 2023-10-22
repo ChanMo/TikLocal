@@ -2,15 +2,15 @@
 {% block content %}
 <section class="section px-3">
   <div class="container">
-    <div class="columns is-multiline is-variable is-1 is-mobile">
+    <div class="gallery">
       {% for row in files %}
-      <div class="column is-half-mobile is-one-quarter-tablet is-one-fifth-desktop py-1">
+      <div class="gallery-item">
         <div class="card" style="overflow:hidden;">
           <video controls style="width:100%;">
             <source src="/media/{{row.name}}?subdir={{subdir}}" />
           </video>
           <div class="card-content py-2 px-3">
-            <p class="is-size-7">{{row.name}}</p>
+            <p class="is-size-7"><a href="/detail/{{row.name}}">{{row.name}}</a></p>
           </div>
         </div>
       </div>
