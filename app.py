@@ -43,7 +43,7 @@ def gallery():
         subdir = subdir,
         subdirs = subdir.split('/'),
         menu = 'gallery',
-        theme = session['theme']
+        theme = session.get('theme', 'light')
     )
 
 
@@ -77,7 +77,7 @@ def browse():
         menu = 'browse',
         has_previous = page > 1,
         has_next = len(files[offset+length:])>1,
-        theme = session['theme']
+        theme = session.get('theme', 'light')
     )
 
 
@@ -97,7 +97,7 @@ def tiktok():
             files.append(file)
 
     res = []
-    if len(files) > 50:
+    if len(files) > 80:
         newest = files[0:10]
         others = files[11:]
         random.shuffle(others)
@@ -111,7 +111,7 @@ def tiktok():
         'tiktok.html',
         files=res,
         menu = 'index',
-        theme = session['theme']
+        theme = session.get('theme', 'light')
     )
 
 
@@ -134,7 +134,7 @@ def detail_view(name):
         file = name,
         mtime = os.path.getmtime(f),
         size = os.path.getsize(f),
-        theme = session['theme']
+        theme = session.get('theme', 'light')
     )
 
 @app.route("/delete/<name>", methods=['POST', 'GET'])
@@ -147,7 +147,7 @@ def delete_view(name):
     return render_template(
         'delete_confirm.html',
         file = name,
-        theme = session['theme']
+        theme = session.get('theme', 'light')
     )
 
 @app.route("/media/<name>")
