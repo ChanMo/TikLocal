@@ -19,7 +19,6 @@ def gallery():
     media_type = 'image'
     files = os.scandir(directory)
     directories = []
-    recent = []
     for row in files:
         if row.is_dir():
             directories.append(row)
@@ -30,7 +29,6 @@ def gallery():
     files = []
     for file in res:
         if os.path.isfile(os.path.join(directory, file)):
-            file_extension = os.path.splitext(file)[-1]
             mime_type = mimetypes.guess_type(file)[0]
             if mime_type and mime_type.startswith(media_type):
                 files.append(file)

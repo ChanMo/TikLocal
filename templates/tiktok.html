@@ -23,7 +23,7 @@ video {
 {% block content %}
 <div id="container">
   {% for row in files %}
-  <video controls class="video" muted>
+  <video controls class="video" muted loop>
     <source src="/media/{{row.name}}?subdir=" />
   </video>
   {% endfor %}

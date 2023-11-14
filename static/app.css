@@ -8048,6 +8048,9 @@ html, body {
 .avatar-editable:hover label {
   display: inline-flex !important; }
 
+  .gallery {
+    column-gap: 0;
+  }
 /** custom style **/
 @media screen and (min-width:769px) {
   .gallery {
@@ -8067,6 +8070,7 @@ html, body {
 }
 .gallery-item img {
   width: 100%;
+  border-radius: 1rem;
 }
 
 .navbar .level-item {

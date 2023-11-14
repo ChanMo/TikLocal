@@ -1,52 +1,47 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="section">
-  <div class="container">
-    <div class="columns">
-      <div class="column is-narrow">
-        <div style="max-width:100%;width:320px;position:sticky;top:3rem;">
-          {% if subdirs %}
-          <nav class="breadcrumb" aria-label="breadcrumbs">
-            <ul>
-              <li><a href="/gallery">Root</a></li>
-              {% for row in subdirs %}
+  <section class="section py-5">
+    <div class="container">
+      {% if subdirs %}
+	<nav class="breadcrumb" aria-label="breadcrumbs">
+          <ul>
+            <li><a href="/gallery">Root</a></li>
+            {% for row in subdirs %}
               {% if not loop.last %}
-              <li><a href="?subdir={{row}}">{{row}}</a></li>
+		<li><a href="?subdir={{row}}">{{row}}</a></li>
               {% else %}
-              <li class="is-active"><a href="#" aria-current="page">{{row}}</a></li>
+		<li class="is-active"><a href="#" aria-current="page">{{row}}</a></li>
               {% endif %}
-              {% endfor %}
-            </ul>
-          </nav>
-          {% endif %}
-          {% if directories %}
-          <div class="buttons are-small">
-            {% for row in directories %}
-            <a class="button is-link is-light" href="?media_type={{media_type}}&subdir={% if subdir %}{{subdir}}/{% endif %}{{row.name}}">{{row.name}}</a>
             {% endfor %}
-          </div>
-          {% endif %}
-        </div>
-      </div>
-      <div class="column">
-    {% if recent %}
-    <div class="gallery mb-5">
-      {% for row in recent %}
-      <div class="gallery-item" data-value="/media/{{row.name}}?subdir={{subdir}}"">
-        <figure>
-          <img style="display:block" src="/media/{{row.name}}?subdir={{subdir}}" />
-        </figure>
-      </div>
-      {% endfor %}
+          </ul>
+	</nav>
+      {% endif %}
+      {% if directories %}
+	<div class="buttons are-small">
+          {% for row in directories %}
+            <a class="button is-link is-light" href="?media_type={{media_type}}&subdir={% if subdir %}{{subdir}}/{% endif %}{{row.name}}">{{row.name}}</a>
+          {% endfor %}
+	</div>
+      {% endif %}
     </div>
-    {% else %}
-    <p class="block py-6 has-text-grey has-text-centered">Empty.</p>
-    {% endif %}
-      </div>
+  </section>
+  <section class="section px-1 pt-0">
+    <div class="container">      
+      {% if recent %}
+	<div class="gallery mb-5">
+	  {% for row in recent %}
+	    <div class="gallery-item" data-value="/media/{{row.name}}?subdir={{subdir}}"">
+              <figure>
+		<img style="display:block" src="/media/{{row.name}}?subdir={{subdir}}" />
+              </figure>
+	    </div>
+	  {% endfor %}
+	</div>
+      {% else %}
+	<p class="block py-6 has-text-grey has-text-centered">Empty.</p>
+      {% endif %}
     </div>
-
-  </div>
-</section>
+  </section>
 <div class="modal" id="modal">
   <div class="modal-background"></div>
   <div class="modal-content">
