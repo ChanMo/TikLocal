@@ -1,63 +1,78 @@
 # TikLocal
 
-**TikLocal** 是一个基于 **Flask** 的 **手机和 Pad 端** 的 **Web 应用程序**。它可以让您在本地浏览和管理您的短视频和图片文件。
+**TikLocal** is a **mobile and tablet** **web application** built on **Flask**. It allows you to browse and manage your local videos and images in a way similar to TikTok and Pinterest.
 
-## 介绍
+[中文](./README_zh.md)
 
-TikLocal 的主要功能包括：
+## Introduction
 
-* 提供类似 **Tiktok** 的 **上下滑动浏览** 体验，让您可以轻松快速地浏览本地短视频文件。
-* 提供类似 **普通文件管理器** 的 **目录浏览** 功能，让您可以方便地查找和管理本地短视频文件。
-* 提供类似 **Pinterest** 的 **网格布局** 功能，让您可以欣赏本地图片。
-* 支持 **浅色和暗色模式**，满足您的个人喜好。
+TikLocal's main features include:
 
-## 使用场景
+* **A TikTok-like swipe-up browsing experience** that allows you to easily and quickly browse local video files.
+* **A file manager-like directory browsing** feature that allows you to easily find and manage local video files.
+* **A Pinterest-like grid layout** feature that allows you to enjoy local images.
+* **Support for light and dark modes** to suit your personal preferences.
 
-TikLocal 适用于以下场景：
+## Use cases
 
-* 您想在本地浏览和管理您的短视频和图片文件，但不想使用第三方云服务。
-* 您想在手机或 Pad 上使用 Tiktok 式的短视频浏览体验。
-* 您想在手机或 Pad 上使用 Pinterest 式的图片浏览体验。
+TikLocal is suitable for the following use cases:
 
-## 如何使用
+* You don't trust TikTok's teen mode and want to provide your child with completely controllable video content.
+* You want to browse and manage your local videos and images locally, but don't want to use third-party cloud services.
+* You want to use a TikTok-style video browsing experience on your phone or tablet.
+* You want to use a Pinterest-style image browsing experience on your phone or tablet.
 
-### 安装
+## How to use
 
-TikLocal 是一个 Web 应用程序，您可以通过以下方式安装：
+### Installation
 
-* 在安卓手机上，您可以将脚本运行在 **Termux** 中。
-* 您可以运行在局域网电脑上，然后通过手机或 Pad 访问。
+TikLocal is a Python application that you can install using the following command:
 
-### 使用
+```
+pip install tiklocal
+```
 
-TikLocal 的使用非常简单，只需按照以下步骤即可：
+### Usage
 
-1. 打开 TikLocal 的网页。
-2. 选择您要浏览的文件类型。
-3. 使用上下滑动来浏览文件。
+Starting TikLocal is very simple, just run the following command:
 
-您可以点击文件名来查看或下载文件。
+```
+tiklocal ~/Videos/
+```
 
-### 配置
+You can specify any media folder.
 
-TikLocal 提供了一些配置选项，您可以根据自己的需要进行调整。
+To close, press `Ctrl + C`.
 
-* 浅色模式/暗色模式：您可以选择使用浅色模式或暗色模式。
-* 视频播放速度：您可以调整视频播放速度。
+### Configuration
 
-## 贡献
+TikLocal provides some configuration options that you can adjust to your needs.
 
-TikLocal 是一个开源项目，您可以通过以下方式进行贡献：
-
-* 提交代码或文档的改进。
-* 报告 Bug。
-* 提出新功能的建议。
-
-## 联系我们
-
-如果您有任何问题或建议，可以通过以下方式与我们联系：
-
-* GitHub 项目地址：[https://github.com/ChanMo/TikLocal/](https://github.com/ChanMo/TikLocal/)
-* 邮箱：[chan.mo@outlook.com]
+* **Light and dark modes:** You can choose to use light or dark mode.
+* **Video playback speed:** You can adjust the video playback speed.
 
 
+## TODO
+
+* [ ] Add search
+* [ ] Add more management operations, such as moving files and creating folders
+* [ ] Add basic login control
+* [ ] Add a bookmarking feature
+* [ ] Add a Docker image
+* [ ] Add a tagging feature
+* [ ] Use recommendation algorithms
+
+## Contribution
+
+TikLocal is an open source project that you can contribute to in the following ways:
+
+* Submit code or documentation improvements.
+* Report bugs.
+* Suggest new features.
+
+## Contact us
+
+If you have any questions or suggestions, you can contact us in the following ways:
+
+* GitHub project page: [https://github.com/ChanMo/TikLocal/](https://github.com/ChanMo/TikLocal/)
+* Email: [chan.mo@outlook.com]

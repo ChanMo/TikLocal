@@ -1,0 +1,28 @@
+[project]
+name = "TikLocal"
+version = "0.1.0"
+authors = [
+  { name="ChanMo", email="chan.mo@outlook.com" },
+]
+description = "A local media server that combines the features of TikTok and Pinterest"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "flask",
+    "waitress"
+]
+[project.scripts]
+tiklocal = 'TikLocal:main'
+
+[project.urls]
+Homepage = "https://github.com/ChanMo/TikLocal"
+Issues = "https://github.com/ChanMo/TikLocal/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,15 +1,30 @@
 import os
 import io
+import sys
+import argparse
 import mimetypes
 import random
 from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, session, redirect
+from waitress import serve
 # from PIL import Image
 
 app = Flask(__name__)
 app.secret_key = b'8af3e391e6cbba8c812a6d3942b12f758a3'
 
-media_folder = Path(os.environ.get('FLASK_MEDIA', '.'))
+parser = argparse.ArgumentParser(
+    prog='TikLocal',
+    description='像Tiktok和Pinterest一样浏览您的媒体库',
+    epilog='Contact: chan.mo@outlook.com'
+)
+
+parser.add_argument('media_folder')
+
+args = parser.parse_args()
+media_folder = Path(args.media_folder)
+
+if not media_folder.exists() or not media_folder.is_dir():
+    sys.exit('Error: The media root does not exist or is not a directory.')
 
 
 @app.route('/gallery')
@@ -153,4 +168,8 @@ def video_view(name):
     subdir = request.args.get('subdir', '/')
     return send_from_directory(media_folder / subdir, name)
 
+def main():
+    serve(app, host='0.0.0.0', port=8000)
 
+if __name__ == '__main__':
+    main()
