@@ -1,6 +1,7 @@
 import os
 import io
 import sys
+import json
 import argparse
 import mimetypes
 import random
@@ -22,6 +23,7 @@ parser.add_argument('media_folder')
 
 args = parser.parse_args()
 media_folder = Path(args.media_folder)
+#media_folder = Path('/home/chen/Videos')
 
 if not media_folder.exists() or not media_folder.is_dir():
     sys.exit('Error: The media root does not exist or is not a directory.')
@@ -167,6 +169,44 @@ def delete_view(name):
 def video_view(name):
     subdir = request.args.get('subdir', '/')
     return send_from_directory(media_folder / subdir, name)
+
+@app.route('/favorite')
+def favorite_view():
+    db = media_folder / 'favorite.json'
+    text = []
+    if db.exists():
+        with db.open() as f:
+            text = json.loads(f.read())
+
+    return render_template(
+        'favorite.html',
+        theme = session.get('theme', 'light'),
+        files = text
+    )
+
+
+
+
+@app.route('/api/favorite/<name>', methods=['GET', 'POST'])
+def favorite_api(name):
+    #name = request.get_json().get('value')
+    db = media_folder / 'favorite.json'
+    text = []
+    if db.exists():
+        with db.open() as f:
+            text = json.loads(f.read())
+    if request.method == 'GET':
+        return {'favorite': name in text}
+
+    if name not in text:
+        text.append(name)
+    else:
+        text.remove(name)
+
+    with db.open(mode='w') as f:
+        f.write(json.dumps(text))
+    return {'success':True}
+
 
 def main():
     serve(app, host='0.0.0.0', port=8000)

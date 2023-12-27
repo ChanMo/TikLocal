@@ -10,7 +10,43 @@
     </div>
     <div class="buttons">
       <a href="/delete/{{file}}" class="button">Delete</a>
+      <button class="button" id="favorite-btn">
+        <span class="icon">
+          <i data-feather="heart"></i>
+        </span>
+      </button>
     </div>
   </div>
 </section>
+{% endblock %}
+{% block extra_body %}
+<script>
+  (async() => {
+
+    var value = "{{file}}";
+    const favoriteBtn = document.getElementById("favorite-btn");
+
+    const favoriteRes = await checkFavorite(value);
+    if(favoriteRes) {
+      favoriteBtn.classList.add("is-danger");
+    } else {
+      favoriteBtn.classList.remove("is-danger");
+    }
+
+
+    async function checkFavorite() {
+      const res = await fetch(`/api/favorite/${value}`);
+      const resJson = await res.json();
+      return resJson.favorite;
+    }
+
+    favoriteBtn.addEventListener("click", async(e) => {
+      e.preventDefault();
+      const res = await fetch(`/api/favorite/${value}`, {
+        method: 'POST'
+      });
+      favoriteBtn.classList.toggle("is-danger");
+    });
+  })()
+</script>
 {% endblock %}

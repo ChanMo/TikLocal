@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section px-3">
+  <div class="container">
+    <div class="columns is-multiline">
+      {% for row in files %}
+      <div class="column is-half-tablet is-one-third-desktop is-one-quarter-fullhd">
+        <div class="card" style="overflow:hidden;">
+          <video controls style="width:100%;height:200px;">
+            <source src="/media/{{row}}?subdir=" />
+          </video>
+          <div class="card-content py-2 px-3">
+            <p class="is-size-7"><a href="/detail/{{row}}">{{row}}</a></p>
+          </div>
+        </div>	  
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -22,11 +22,17 @@ video {
   position: fixed;
   bottom: 4rem;
   right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .fab svg {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   color: #e3e3e3;
+}
+.is-active svg {
+  fill: #ff0000;
 }
 </style>
 {% endblock %}
@@ -37,16 +43,22 @@ video {
     <source src="/media/{{row.name}}?subdir=" />
   </video>
   {% endfor %}
-  <a class="fab" href="">
-    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-  </a>
+  <div class="fab">
+    <a id="favorite-btn" data-value="">
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    </a>
+    <a id="info-btn" href="">
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    </a>
+  </div>
 </div>
 {% endblock %}
 {% block extra_body %}
 <script src="{{url_for('static', filename='hammer.min.js')}}"></script>
 <script>
-  (() => {
-    const fab = document.querySelector(".fab");
+  (async() => {
+    const infoBtn = document.querySelector("#info-btn");
+    const favoriteBtn = document.getElementById("favorite-btn");
     const container = document.querySelector('#container');
     const videos = container.querySelectorAll('video');
     let index = 0;
@@ -54,13 +66,21 @@ video {
     videos[0].style.display = 'block';
     videos[0].play();
 
-    fab.href = `/detail/${videos[0].dataset.name}`;
+    infoBtn.href = `/detail/${videos[0].dataset.name}`;
+    favoriteBtn.dataset.value = videos[0].dataset.name;
+    const favoriteRes = await checkFavorite(videos[0].dataset.name);
+    if(favoriteRes) {
+      favoriteBtn.classList.add("is-active");
+    } else {
+      favoriteBtn.classList.remove("is-active");
+    }
 
     var manager = new Hammer.Manager(container);
     var Swipe = new Hammer.Swipe();
     manager.add(Swipe);
-    manager.on('swipedown', (e) => {
+    manager.on('swipedown', async(e) => {
       //previous;
+      const value = videos[index].dataset.name;
       index -= 1;
       let previous;
       if (index == -1) {
@@ -74,10 +94,18 @@ video {
       videos[index].style.display = 'block';
       videos[index].muted = false;
       videos[index].play();
-      fab.href = `/detail/${videos[index].dataset.name}`;
+      infoBtn.href = `/detail/${value}`;
+      const favoriteRes = await checkFavorite(value);
+      favoriteBtn.dataset.value = value;
+      if(favoriteRes) {
+        favoriteBtn.classList.add("is-active");
+      } else {
+        favoriteBtn.classList.remove("is-active");
+      }
     });
-    manager.on('swipeup', (e) => {
+    manager.on('swipeup', async(e) => {
       //next;
+      const value = videos[index].dataset.name;
       index += 1;
       let previous;
       if (index == videos.length) {
@@ -91,7 +119,30 @@ video {
       videos[index].style.display = 'block';
       videos[index].muted = false;
       videos[index].play();
-      fab.href = `/detail/${videos[index].dataset.name}`;
+      infoBtn.href = `/detail/${value}`;
+      const favoriteRes = await checkFavorite(value);
+      favoriteBtn.dataset.value = value;
+      if(favoriteRes) {
+        favoriteBtn.classList.add("is-active");
+      } else {
+        favoriteBtn.classList.remove("is-active");
+      }
+
+    });
+
+    async function checkFavorite(name) {
+      const res = await fetch(`/api/favorite/${name}`);
+      const resJson = await res.json();
+      return resJson.favorite;
+    }
+
+    favoriteBtn.addEventListener("click", async(e) => {
+      e.preventDefault();
+      const value = favoriteBtn.dataset.value;
+      const res = await fetch(`/api/favorite/${value}`, {
+        method: 'POST'
+      });
+      favoriteBtn.classList.toggle("is-active");
     });
   })()
 </script>
