@@ -75,7 +75,7 @@ def get_files(directory, media_type='video'):
 @app.route('/browse')
 def browse():
     files = get_files(media_folder)
-    files = sorted(files, key=lambda row:row.stat().st_mtime, reverse=True)
+    files = sorted(files, key=lambda row:row.stat().st_ctime, reverse=True)
     count = len(files)
     page = int(request.args.get('page', 1))
     length = 20
