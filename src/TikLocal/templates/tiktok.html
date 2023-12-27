@@ -3,6 +3,7 @@
 <style>
 html,body {
   height: 100%;
+  background: black;
 }
 #container {
   width: 100%;
@@ -17,28 +18,43 @@ video {
   left: 0;
   display: none;
 }
-
+.fab {
+  position: fixed;
+  bottom: 7rem;
+  right: 1.25rem;
+}
+.fab svg {
+  width: 40px;
+  height: 40px;
+  color: #e3e3e3;
+}
 </style>
 {% endblock %}
 {% block content %}
 <div id="container">
   {% for row in files %}
-  <video controls class="video" muted loop>
+  <video controls class="video" muted loop data-name="{{row.name}}">
     <source src="/media/{{row.name}}?subdir=" />
   </video>
   {% endfor %}
+  <a class="fab" href="">
+    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+  </a>
 </div>
 {% endblock %}
 {% block extra_body %}
 <script src="{{url_for('static', filename='hammer.min.js')}}"></script>
 <script>
   (() => {
+    const fab = document.querySelector(".fab");
     const container = document.querySelector('#container');
     const videos = container.querySelectorAll('video');
     let index = 0;
   
     videos[0].style.display = 'block';
     videos[0].play();
+
+    fab.href = `/detail/${videos[0].dataset.name}`;
 
     var manager = new Hammer.Manager(container);
     var Swipe = new Hammer.Swipe();
@@ -58,6 +74,7 @@ video {
       videos[index].style.display = 'block';
       videos[index].muted = false;
       videos[index].play();
+      fab.href = `/detail/${videos[index].dataset.name}`;
     });
     manager.on('swipeup', (e) => {
       //next;
@@ -74,6 +91,7 @@ video {
       videos[index].style.display = 'block';
       videos[index].muted = false;
       videos[index].play();
+      fab.href = `/detail/${videos[index].dataset.name}`;
     });
   })()
 </script>
