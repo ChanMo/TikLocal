@@ -5,6 +5,8 @@ import json
 import argparse
 import mimetypes
 import random
+import subprocess as sp
+
 from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, session, redirect
 from waitress import serve
@@ -23,7 +25,7 @@ parser.add_argument('media_folder')
 
 args = parser.parse_args()
 media_folder = Path(args.media_folder)
-#media_folder = Path('/home/chen/Videos')
+## media_folder = Path('/home/chen/Videos')
 
 if not media_folder.exists() or not media_folder.is_dir():
     sys.exit('Error: The media root does not exist or is not a directory.')
@@ -83,6 +85,25 @@ def browse():
     length = 20
     offset = length * (page - 1)
     res = files[offset:offset + length]
+    # res = []
+    # for f in files[offset:offset + length]:
+    #     f = Path(f)
+    #     if not f.exists():
+    #         continue
+    #     try:
+    #         stdout = sp.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', str(f)], check=True, capture_output=True)
+    #         stdout = json.loads(stdout.stdout.decode('utf8'))
+    #         width = stdout['streams'][0]['width']
+    #         height = stdout['streams'][0]['height']
+    #         res.append({
+    #             'file': f,
+    #             'width': width,
+    #             'height': height,
+    #             'horizontal': width > height
+    #         })
+    #     except Exception as e:
+    #         print(e)
+                
     return render_template(
         'browse.html',
         page = page,

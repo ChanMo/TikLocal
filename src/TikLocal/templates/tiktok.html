@@ -27,8 +27,8 @@ video {
   gap: 4px;
 }
 .fab svg {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   color: #e3e3e3;
 }
 .is-active svg {
@@ -39,7 +39,7 @@ video {
 {% block content %}
 <div id="container">
   {% for row in files %}
-  <video controls class="video" muted loop data-name="{{row.name}}">
+  <video controls class="video" muted loop data-name="{{row.name}}" preload="metadata">
     <source src="/media/{{row.name}}?subdir=" />
   </video>
   {% endfor %}
@@ -80,7 +80,7 @@ video {
     manager.add(Swipe);
     manager.on('swipedown', async(e) => {
       //previous;
-      const value = videos[index].dataset.name;
+
       index -= 1;
       let previous;
       if (index == -1) {
@@ -94,6 +94,8 @@ video {
       videos[index].style.display = 'block';
       videos[index].muted = false;
       videos[index].play();
+      
+      const value = videos[index].dataset.name;      
       infoBtn.href = `/detail/${value}`;
       const favoriteRes = await checkFavorite(value);
       favoriteBtn.dataset.value = value;
@@ -105,7 +107,7 @@ video {
     });
     manager.on('swipeup', async(e) => {
       //next;
-      const value = videos[index].dataset.name;
+
       index += 1;
       let previous;
       if (index == videos.length) {
@@ -119,6 +121,8 @@ video {
       videos[index].style.display = 'block';
       videos[index].muted = false;
       videos[index].play();
+      
+      const value = videos[index].dataset.name;      
       infoBtn.href = `/detail/${value}`;
       const favoriteRes = await checkFavorite(value);
       favoriteBtn.dataset.value = value;
