@@ -5,6 +5,7 @@ import json
 import argparse
 import mimetypes
 import random
+import datetime
 import subprocess as sp
 
 from pathlib import Path
@@ -103,7 +104,7 @@ def browse():
     #         })
     #     except Exception as e:
     #         print(e)
-                
+
     return render_template(
         'browse.html',
         page = page,
@@ -165,12 +166,20 @@ def settings_view():
 def detail_view(name):
     #subdir = request.args.get('subdir', '/')
     f = media_folder / name
+    files = get_files(media_folder)
+    files = sorted(files, key=lambda row:row.stat().st_ctime, reverse=True)
+    files = [i.name for i in files]
+    index = files.index(name)
+    previous_item = files[index-1] if index > 0 else None
+    next_item = files[index+1] if index < len(files) else None
     return render_template(
         'detail.html',
         file = name,
-        mtime = os.path.getmtime(f),
+        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(f)).strftime('%Y-%m-%d %H:%M'),
         size = os.path.getsize(f),
-        theme = session.get('theme', 'light')
+        theme = session.get('theme', 'light'),
+        previous_item = previous_item,
+        next_item = next_item
     )
 
 @app.route("/delete/<name>", methods=['POST', 'GET'])

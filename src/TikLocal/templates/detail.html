@@ -9,6 +9,12 @@
       <p>Size: {{size|filesizeformat}}</p>
     </div>
     <div class="buttons">
+      {% if previous_item %}
+        <a href="/detail/{{previous_item}}" class="button">Previous</a>
+      {% endif %}
+      {% if next_item %}
+        <a href="/detail/{{next_item}}" class="button">Next</a>
+      {% endif %}
       <a href="/delete/{{file}}" class="button">Delete</a>
       <button class="button" id="favorite-btn">
         <span class="icon">

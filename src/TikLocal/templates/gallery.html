@@ -1,74 +1,120 @@
 {% extends "base.html" %}
 {% block content %}
-  <section class="section py-5">
-    <div class="container">
-      {% if subdirs %}
-	<nav class="breadcrumb" aria-label="breadcrumbs">
-          <ul>
-            <li><a href="/gallery">Root</a></li>
-            {% for row in subdirs %}
-              {% if not loop.last %}
-		<li><a href="?subdir={{row}}">{{row}}</a></li>
-              {% else %}
-		<li class="is-active"><a href="#" aria-current="page">{{row}}</a></li>
-              {% endif %}
-            {% endfor %}
-          </ul>
-	</nav>
-      {% endif %}
-      {% if directories %}
-	<div class="buttons are-small">
-          {% for row in directories %}
-            <a class="button is-link is-light" href="?media_type={{media_type}}&subdir={% if subdir %}{{subdir}}/{% endif %}{{row.name}}">{{row.name}}</a>
-          {% endfor %}
-	</div>
-      {% endif %}
+<section class="section py-5">
+  <div class="container">
+    {% if subdirs %}
+    <nav class="breadcrumb" aria-label="breadcrumbs">
+      <ul>
+        <li><a href="/gallery">Root</a></li>
+        {% for row in subdirs %}
+        {% if not loop.last %}
+        <li><a href="?subdir={{row}}">{{row}}</a></li>
+        {% else %}
+        <li class="is-active"><a href="#" aria-current="page">{{row}}</a></li>
+        {% endif %}
+        {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
+    {% if directories %}
+    <div class="buttons are-small">
+      {% for row in directories %}
+      <a class="button is-link is-light" href="?media_type={{media_type}}&subdir={% if subdir %}{{subdir}}/{% endif %}{{row.name}}">{{row.name}}</a>
+      {% endfor %}
     </div>
-  </section>
-  <section class="section px-1 pt-0">
-    <div class="container">      
-      {% if recent %}
-	<div class="gallery mb-5">
-	  {% for row in recent %}
-	    <div class="gallery-item" data-value="/media/{{row.name}}?subdir={{subdir}}"">
-              <figure>
-		<img style="display:block" src="/media/{{row.name}}?subdir={{subdir}}" />
-              </figure>
-	    </div>
-	  {% endfor %}
-	</div>
-      {% else %}
-	<p class="block py-6 has-text-grey has-text-centered">Empty.</p>
-      {% endif %}
+    {% endif %}
+  </div>
+</section>
+<section class="section px-1 pt-0">
+  <div class="container">      
+    {% if recent %}
+    <div class="gallery mb-5">
+      {% for row in recent %}
+      <div class="gallery-item" data-value="/media/{{row.name}}?subdir={{subdir}}"">
+        <figure>
+          <img style="display:block" src="/media/{{row.name}}?subdir={{subdir}}" />
+        </figure>
+      </div>
+      {% endfor %}
     </div>
-  </section>
+    {% else %}
+    <p class="block py-6 has-text-grey has-text-centered">Empty.</p>
+    {% endif %}
+  </div>
+</section>
 <div class="modal" id="modal">
   <div class="modal-background"></div>
   <div class="modal-content">
     <p class="image">
-      <img src="" alt="">
+    <img src="" alt="">
     </p>
   </div>
+  <button class="button previous-image is-rounded px-4">
+    <span class="icon">
+      <i data-feather="arrow-left"></i>
+    </span>
+  </button>
+  <button class="button next-image is-rounded px-4">
+    <span class="icon">
+      <i data-feather="arrow-right"></i>
+    </span>
+  </button>
   <button class="modal-close is-large" aria-label="close"></button>
 </div>
 <script>
   (() => {
+    var index = -1;
     const modal = document.getElementById("modal");
-    document.querySelectorAll(".gallery-item").forEach(ele => {
+    const itemList = document.querySelectorAll(".gallery-item");
+    itemList.forEach(ele => {
       ele.addEventListener("click", () => {
+        index = Array.from(itemList).indexOf(ele);
+        if(index >= itemList.length - 1) {
+          document.querySelector(".next-image").setAttribute("disabled", true);
+        } else if(index <= 0) {
+          document.querySelector(".previous-image").setAttribute("disabled", true);
+        }
+
         modal.classList.add('is-active');
         modal.querySelector("img").setAttribute("src", ele.dataset.value);
       })
     });
-   
+
     // Add a click event on various child elements to close the parent modal
     document.querySelectorAll('.modal-background, .modal-close, .modal-card-head .delete, .modal-card-foot .button').forEach(($close) => {
       const $target = $close.closest('.modal');
-    
+
       $close.addEventListener('click', () => {
         $target.classList.remove("is-active");
+        document.querySelectorAll(".previous-image, .next-image").forEach(e => {
+          e.removeAttribute("disabled")
+        })
       });
     });
+
+    document.querySelector(".previous-image").addEventListener("click", (e) => {
+      e.preventDefault();
+      index--;
+      ele = itemList.item(index);
+      modal.querySelector("img").setAttribute("src", ele.dataset.value);
+      if(index <= 0) {
+        e.currentTarget.setAttribute("disabled", true);
+      } else {
+        document.querySelector(".next-image").removeAttribute("disabled");
+      }
+    });
+
+    document.querySelector(".next-image").addEventListener("click", (e) => {
+      e.preventDefault();
+      index++;
+      ele = itemList.item(index);
+      modal.querySelector("img").setAttribute("src", ele.dataset.value);
+      if(index >= itemList.length - 1) {
+        e.currentTarget.setAttribute("disabled", true);
+      } else {
+        document.querySelector(".previous-image").removeAttribute("disabled");
+      }
+    })
   })();
 </script>
 {% endblock %}

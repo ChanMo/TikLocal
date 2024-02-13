@@ -8081,3 +8081,15 @@ html, body {
 .navbar .level-item.is-active {
   color: rgba(255,255,255,0.85);
 }
+
+.previous-image, .next-image {
+  position: absolute;
+  top: 50%;
+  transform: translate(0, -50%);
+}
+.previous-image {
+  left: .5rem;
+}
+.next-image {
+  right: .5rem;
+}

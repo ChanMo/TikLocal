@@ -4,13 +4,13 @@
   <div class="container">
     <div class="gallery">
       {% for row in files %}
-	<div class="gallery-item">
-	  <a href="/detail/{{row.name}}">
-            <video preload="metadata">
-              <source src="/media/{{row.name}}?subdir={{subdir}}" />
-            </video>
-	  </a>
-	</div>
+      <div class="gallery-item">
+        <a href="/detail/{{row.name}}">
+          <video preload="metadata">
+            <source src="/media/{{row.name}}?subdir={{subdir}}" />
+          </video>
+        </a>
+      </div>
       {% endfor %}
     </div>
 
