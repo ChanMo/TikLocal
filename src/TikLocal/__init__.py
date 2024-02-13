@@ -138,7 +138,7 @@ def tiktok():
         newest = files[0:10]
         others = files[11:]
         random.shuffle(others)
-        res = newest + others[0:40]
+        res = newest + others[0:70]
         random.shuffle(res)
     else:
         res = files
@@ -159,7 +159,8 @@ def settings_view():
     return render_template(
         'settings.html',
         menu = 'settings',
-        theme = theme
+        theme = theme,
+        videos = len(get_files(media_folder))
     )
 
 @app.route('/detail/<name>')

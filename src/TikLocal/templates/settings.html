@@ -5,7 +5,7 @@
 <section class="section">
   <div class="container" style="max-width:720px;">
     <div class="media is-align-items-center">
-      <div class="media-content">Toggle Theme</div>
+      <div class="media-content">Toggle theme</div>
       <div class="media-right">
         <a class="button is-white" href="?theme={% if theme == 'light' %}dark{% else %}light{% endif %}">
           <span class="icon">
@@ -26,6 +26,12 @@
             <i data-feather="chevron-right"></i>
           </span>
         </a>
+      </div>
+    </div>
+    <div class="media is-align-items-center">
+      <div class="media-content">Total videos</div>
+      <div class="media-right">
+        <span>{{videos}}</span>
       </div>
     </div>
     <div class="media is-align-items-center">
