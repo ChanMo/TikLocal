@@ -8082,6 +8082,13 @@ html, body {
   color: rgba(255,255,255,0.85);
 }
 
+.info-btn {
+  position: fixed;
+  top: 20px;
+  right: 60px;
+  height: 32px;
+  width: 32px;
+}
 .previous-image, .next-image {
   position: absolute;
   top: 50%;

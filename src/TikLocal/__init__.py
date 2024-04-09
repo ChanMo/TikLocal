@@ -7,6 +7,7 @@ import mimetypes
 import random
 import datetime
 import subprocess as sp
+from urllib.parse import quote, unquote
 
 from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, session, redirect
@@ -23,19 +24,53 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument('media_folder')
+parser.add_argument('--port', type=int, default=8000)
 
 args = parser.parse_args()
 media_folder = Path(args.media_folder)
-## media_folder = Path('/home/chen/Videos')
 
 if not media_folder.exists() or not media_folder.is_dir():
     sys.exit('Error: The media root does not exist or is not a directory.')
+
+
+@app.route("/delete2", methods=['POST', 'GET'])
+def delete2_view():
+    target = media_folder / unquote(request.args.get('uri'))
+    if request.method == 'POST':
+        target.unlink()
+        return redirect('/browse')
+
+    return render_template(
+        'delete_confirm.html',
+        theme = session.get('theme', 'light'),
+        target = target,
+        file = target.name
+    )
+
+@app.route("/media2")
+def media_view():
+    target = media_folder / unquote(request.args.get('uri'))
+    return send_from_directory(target.parent, target.name)
+
+
+@app.route('/image')
+def image_view():
+    uri = request.args.get('uri')
+    target = media_folder / unquote(uri)
+    return render_template(
+        'image_detail.html',
+        theme = session.get('theme', 'light'),
+        image = target,
+        uri = uri,
+        stat = target.stat()
+    )
 
 
 @app.route('/gallery')
 def gallery():
     subdir = request.args.get('subdir', '')
     directory = media_folder / subdir
+    uri = quote(subdir + '/') if subdir else ''
     media_type = 'image'
     files = os.scandir(directory)
     directories = []
@@ -61,7 +96,8 @@ def gallery():
         subdir = subdir,
         subdirs = subdir.split('/'),
         menu = 'gallery',
-        theme = session.get('theme', 'light')
+        theme = session.get('theme', 'light'),
+        uri = uri
     )
 
 
@@ -240,7 +276,7 @@ def favorite_api(name):
 
 
 def main():
-    serve(app, host='0.0.0.0', port=8000)
+    serve(app, host='0.0.0.0', port=args.port)
 
 if __name__ == '__main__':
     main()

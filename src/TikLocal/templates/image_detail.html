@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section">
+  <div class="container mb-5" style="max-width:720px;">
+    <div class="content">
+      <img src="/media2?uri={{uri}}" />
+      <h3 style="word-break:break-all;">{{image.name}}</h3>
+      <p>MTime: {{stat.st_mtime}}</p>
+      <p>Size: {{stat.st_size|filesizeformat}}</p>
+    </div>
+    <div class="buttons">
+      <a href="/delete2?uri={{uri}}" class="button">Delete</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

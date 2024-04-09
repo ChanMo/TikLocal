@@ -30,7 +30,7 @@
     {% if recent %}
     <div class="gallery mb-5">
       {% for row in recent %}
-      <div class="gallery-item" data-value="/media/{{row.name}}?subdir={{subdir}}"">
+      <div class="gallery-item" data-value="/media/{{row.name}}?subdir={{subdir}}"" data-uri="{{uri}}{{row.name}}">
         <figure>
           <img style="display:block" src="/media/{{row.name}}?subdir={{subdir}}" />
         </figure>
@@ -59,6 +59,11 @@
       <i data-feather="arrow-right"></i>
     </span>
   </button>
+  <a class="button is-rounded is-dark info-btn px-4">
+    <span class="icon">
+      <i data-feather="info" width="28" height="28"></i>
+    </span>
+  </a>
   <button class="modal-close is-large" aria-label="close"></button>
 </div>
 <script>
@@ -77,6 +82,7 @@
 
         modal.classList.add('is-active');
         modal.querySelector("img").setAttribute("src", ele.dataset.value);
+        modal.querySelector(".info-btn").href = "/image?uri=" + ele.dataset.uri;
       })
     });
 
