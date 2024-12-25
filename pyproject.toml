@@ -1,28 +1,27 @@
-[project]
+[tool.poetry]
 name = "TikLocal"
-version = "0.1.5"
-authors = [
-  { name="ChanMo", email="chan.mo@outlook.com" },
-]
+version = "0.1.6"
 description = "A local media server that combines the features of TikTok and Pinterest"
+authors = ["ChanMo <chan.mo@outlook.com>"]
 readme = "README.md"
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
-dependencies = [
-    "flask",
-    "waitress"
-]
-[project.scripts]
-tiklocal = 'TikLocal:main'
+license = "MIT"
+homepage = "https://github.com/ChanMo/TikLocal"
+repository = "https://github.com/ChanMo/TikLocal"
+keywords = ["tiklocal", "tiktok", "douyin", "jellyfin", "vlc"]
 
-[project.urls]
-Homepage = "https://github.com/ChanMo/TikLocal"
-Issues = "https://github.com/ChanMo/TikLocal/issues"
+[tool.poetry.scripts]
+tiklocal = 'tiklocal:main'
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+flask = "^3.1.0"
+waitress = "^3.0.2"
+
+[[tool.poetry.source]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple"
+priority = "primary"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
