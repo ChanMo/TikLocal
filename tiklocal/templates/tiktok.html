@@ -39,8 +39,7 @@ video {
 {% block content %}
 <div id="container">
   {% for row in files %}
-  <video controls class="video" muted loop data-name="{{row.name}}" preload="metadata">
-    <source src="/media/{{row.name}}?subdir=" />
+  <video controls class="video" muted loop data-name="{{row.name}}" data-src="/media?uri={{row}}">
   </video>
   {% endfor %}
   <div class="fab">
@@ -64,6 +63,8 @@ video {
     let index = 0;
   
     videos[0].style.display = 'block';
+    videos[0].src = videos[0].dataset.src;
+    videos[0].load();
     videos[0].play();
 
     infoBtn.href = `/detail/${videos[0].dataset.name}`;
@@ -119,6 +120,8 @@ video {
       videos[previous].style.display = 'none';
       videos[previous].pause();
       videos[index].style.display = 'block';
+      videos[index].src = videos[index].dataset.src;
+      videos[index].load();
       videos[index].muted = false;
       videos[index].play();
       

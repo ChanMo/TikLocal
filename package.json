@@ -1,0 +1,9 @@
+{
+    "scripts": {
+        "tw": "npx tailwindcss -i ./tiklocal/static/input.css -o ./tiklocal/static/output.css --watch",
+        "tw-build": "npx tailwindcss -i ./tiklocal/static/input.css -o ./tiklocal/static/output.css --minify"
+    },
+    "devDependencies": {
+        "tailwindcss": "^3.4.17"
+    }
+}
