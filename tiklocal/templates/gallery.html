@@ -1,126 +1,166 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="section py-5">
-  <div class="container">
+<div class="container mx-auto px-4 py-5">
     {% if subdirs %}
-    <nav class="breadcrumb" aria-label="breadcrumbs">
-      <ul>
-        <li><a href="/gallery">Root</a></li>
+    <nav class="mb-4" aria-label="breadcrumbs">
+      <ol class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+        <li><a href="/gallery" class="hover:text-gray-700 dark:hover:text-gray-200">Root</a></li>
         {% for row in subdirs %}
+        <li>
+          <span class="mx-2">/</span>
+        </li>
         {% if not loop.last %}
-        <li><a href="?subdir={{row}}">{{row}}</a></li>
+        <li><a href="?subdir={{row}}" class="hover:text-gray-700 dark:hover:text-gray-200">{{row}}</a></li>
         {% else %}
-        <li class="is-active"><a href="#" aria-current="page">{{row}}</a></li>
+        <li class="text-gray-700 dark:text-gray-200" aria-current="page">{{row}}</li>
         {% endif %}
         {% endfor %}
-      </ul>
+      </ol>
     </nav>
     {% endif %}
+
     {% if directories %}
-    <div class="buttons are-small">
+    <div class="flex flex-wrap gap-2 mb-4">
       {% for row in directories %}
-      <a class="button is-link is-light" href="?media_type={{media_type}}&subdir={% if subdir %}{{subdir}}/{% endif %}{{row.name}}">{{row.name}}</a>
+      <a class="bg-gray-200 text-gray-800 hover:bg-gray-300 px-3 py-1 rounded-full text-sm dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600" href="?media_type={{media_type}}&subdir={% if subdir %}{{subdir}}/{% endif %}{{row.name}}">{{row.name}}</a>
       {% endfor %}
     </div>
     {% endif %}
-  </div>
-</section>
-<section class="section px-1 pt-0">
-  <div class="container">      
+
     {% if recent %}
-    <div class="gallery mb-5">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-5">
       {% for row in recent %}
-      <div class="gallery-item" data-value="/media/{{row.name}}?subdir={{subdir}}"" data-uri="{{uri}}{{row.name}}">
-        <figure>
-          <img style="display:block" src="/media/{{row.name}}?subdir={{subdir}}" />
-        </figure>
+      <div class="gallery-item group relative cursor-pointer" data-value="/media/{{row.name}}?subdir={{subdir}}" data-uri="{{uri}}{{row.name}}">
+        <img class="block w-full h-48 rounded-lg object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" src="/media/{{row.name}}?subdir={{subdir}}" />
+        <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-25 transition-all duration-300 rounded-lg -z-1"></div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p class="block py-6 has-text-grey has-text-centered">Empty.</p>
+    <p class="block py-6 text-gray-500 dark:text-gray-400 text-center">Empty.</p>
     {% endif %}
-  </div>
-</section>
-<div class="modal" id="modal">
-  <div class="modal-background"></div>
-  <div class="modal-content">
-    <p class="image">
-    <img src="" alt="">
-    </p>
-  </div>
-  <button class="button previous-image is-rounded px-4">
-    <span class="icon">
-      <i data-feather="arrow-left"></i>
-    </span>
-  </button>
-  <button class="button next-image is-rounded px-4">
-    <span class="icon">
-      <i data-feather="arrow-right"></i>
-    </span>
-  </button>
-  <a class="button is-rounded is-dark info-btn px-4">
-    <span class="icon">
-      <i data-feather="info" width="28" height="28"></i>
-    </span>
-  </a>
-  <button class="modal-close is-large" aria-label="close"></button>
 </div>
+
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-80" id="modal">
+  <div class="relative w-full max-w-screen-lg h-full flex items-center justify-center p-4">
+    <img src="" alt="" class="max-w-full max-h-full object-contain rounded-lg">
+  </div>
+
+  <button class="previous-image absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed">
+    <span data-feather="arrow-left"></span>
+  </button>
+  <button class="next-image absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed">
+    <span data-feather="arrow-right"></span>
+  </button>
+  <a class="info-btn absolute top-4 right-16 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30">
+    <span data-feather="info" class="w-7 h-7"></span>
+  </a>
+  <button class="modal-close absolute top-4 right-4 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30" aria-label="close">
+      <span data-feather="x"></span>
+  </button>
+</div>
+
+<script src="{{ url_for('static', filename='hammer.min.js') }}"></script>
 <script>
   (() => {
-    var index = -1;
+    let index = -1;
     const modal = document.getElementById("modal");
+    if (!modal) return;
+
+    const modalImg = modal.querySelector("img");
+    const infoBtn = modal.querySelector(".info-btn");
+    const prevBtn = document.querySelector(".previous-image");
+    const nextBtn = document.querySelector(".next-image");
     const itemList = document.querySelectorAll(".gallery-item");
-    itemList.forEach(ele => {
-      ele.addEventListener("click", () => {
-        index = Array.from(itemList).indexOf(ele);
-        if(index >= itemList.length - 1) {
-          document.querySelector(".next-image").setAttribute("disabled", true);
-        } else if(index <= 0) {
-          document.querySelector(".previous-image").setAttribute("disabled", true);
+    const modalCloseBtn = document.querySelector('.modal-close');
+
+    function showModal(i) {
+        index = i;
+        if (index < 0) index = 0;
+        if (index >= itemList.length) index = itemList.length - 1;
+
+        const item = itemList[index];
+        modalImg.src = item.dataset.value;
+        infoBtn.href = "/image?uri=" + item.dataset.uri;
+
+        if (prevBtn) prevBtn.disabled = index === 0;
+        if (nextBtn) nextBtn.disabled = index === itemList.length - 1;
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        feather.replace(); // to render icons in modal
+    }
+
+    function hideModal() {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        modalImg.src = ""; // Clear image src
+    }
+
+    itemList.forEach((ele, i) => {
+      ele.addEventListener("click", () => showModal(i));
+    });
+
+    if(modalCloseBtn) {
+        modalCloseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hideModal();
+        });
+    }
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            hideModal();
         }
-
-        modal.classList.add('is-active');
-        modal.querySelector("img").setAttribute("src", ele.dataset.value);
-        modal.querySelector(".info-btn").href = "/image?uri=" + ele.dataset.uri;
-      })
     });
 
-    // Add a click event on various child elements to close the parent modal
-    document.querySelectorAll('.modal-background, .modal-close, .modal-card-head .delete, .modal-card-foot .button').forEach(($close) => {
-      const $target = $close.closest('.modal');
+    if (prevBtn) {
+        prevBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (index > 0) {
+            showModal(index - 1);
+          }
+        });
+    }
 
-      $close.addEventListener('click', () => {
-        $target.classList.remove("is-active");
-        document.querySelectorAll(".previous-image, .next-image").forEach(e => {
-          e.removeAttribute("disabled")
-        })
-      });
+    if (nextBtn) {
+        nextBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (index < itemList.length - 1) {
+            showModal(index + 1);
+          }
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (modal.classList.contains('hidden')) return;
+        if (e.key === 'ArrowLeft') {
+            if (prevBtn) prevBtn.click();
+        } else if (e.key === 'ArrowRight') {
+            if (nextBtn) nextBtn.click();
+        } else if (e.key === 'Escape') {
+            hideModal();
+        }
     });
 
-    document.querySelector(".previous-image").addEventListener("click", (e) => {
-      e.preventDefault();
-      index--;
-      ele = itemList.item(index);
-      modal.querySelector("img").setAttribute("src", ele.dataset.value);
-      if(index <= 0) {
-        e.currentTarget.setAttribute("disabled", true);
-      } else {
-        document.querySelector(".next-image").removeAttribute("disabled");
-      }
+    const mc = new Hammer(modal);
+    mc.get('swipe').set({ direction: Hammer.DIRECTION_ALL });
+
+    mc.on('swipeleft', () => {
+        if (nextBtn && !nextBtn.disabled) {
+            nextBtn.click();
+        }
     });
 
-    document.querySelector(".next-image").addEventListener("click", (e) => {
-      e.preventDefault();
-      index++;
-      ele = itemList.item(index);
-      modal.querySelector("img").setAttribute("src", ele.dataset.value);
-      if(index >= itemList.length - 1) {
-        e.currentTarget.setAttribute("disabled", true);
-      } else {
-        document.querySelector(".previous-image").removeAttribute("disabled");
-      }
-    })
+    mc.on('swiperight', () => {
+        if (prevBtn && !prevBtn.disabled) {
+            prevBtn.click();
+        }
+    });
+
+    mc.on('swipedown', () => {
+        hideModal();
+    });
   })();
 </script>
 {% endblock %}

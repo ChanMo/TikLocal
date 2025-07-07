@@ -1,42 +1,186 @@
 {% extends "base.html" %}
-{% block content %}
-<section class="section px-3">
-  <div class="container">
-    <div class="gallery">
-      {% for row in files %}
-      <div class="gallery-item">
-        <a href="/detail/{{row.name}}">
-          <video preload="metadata">
-            <source src="/media?uri={{row}}" />
-          </video>
-        </a>
-      </div>
-      {% endfor %}
-    </div>
 
-    <nav class="pagination mb-5" role="navigation" aria-label="pagination">
-      {% if has_previous %}
-      <a class="pagination-previous" href="?page={{page-1}}">Previous</a>
-      {% endif %}
-      {% if has_next %}
-      <a class="pagination-next" href="?page={{page+1}}">Next page</a>
-      {% endif %}
-      <ul class="pagination-list">
-        {% if has_previous %}
-        <li>
-          <a class="pagination-link" href="?page={{page - 1}}">{{page - 1}}</a>
-        </li>
-        {% endif %}
-        <li>
-          <a class="pagination-link is-current">{{page}}</a>
-        </li>
-        {% if has_next %}
-        <li>
-          <a class="pagination-link" href="?page={{page + 1}}">{{page + 1}}</a>
-        </li>
-        {% endif %}
-      </ul>
-    </nav>
+{% block extra_head %}
+<style>
+  .modal-video {
+    width: auto;
+    height: 100%;
+    max-height: 90vh;
+    max-width: 90vw;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-5">
+  {% if files %}
+  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-5">
+    {% for row in files %}
+    <div class="video-item group relative cursor-pointer aspect-w-9 aspect-h-16 rounded-lg overflow-hidden shadow-lg"
+         data-uri="{{row}}" data-src="/media?uri={{row}}">
+      <video class="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" 
+             preload="metadata" playsinline muted loop>
+        <source src="/media?uri={{row}}#t=0.1" type="video/mp4">
+      </video>
+      <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-25 transition-all duration-300"></div>
+      <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <i data-feather="play" class="w-12 h-12 text-white"></i>
+      </div>
+    </div>
+    {% endfor %}
   </div>
-</section>
+  {% else %}
+  <p class="block py-6 text-gray-500 dark:text-gray-400 text-center">Empty.</p>
+  {% endif %}
+
+  {% if has_previous or has_next %}
+  <nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0 mt-8 pt-4">
+    <div class="-mt-px flex w-0 flex-1">
+      {% if has_previous %}
+      <a href="?page={{page-1}}" class="inline-flex items-center border-t-2 border-transparent pr-1 pt-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+        <i data-feather="arrow-left" class="mr-3 h-5 w-5"></i>
+        Previous
+      </a>
+      {% endif %}
+    </div>
+    <div class="hidden md:-mt-px md:flex">
+      {% if page > 2 %}
+        <a href="?page=1" class="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">1</a>
+        {% if page > 3 %}
+        <span class="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-gray-500 dark:text-gray-400">...</span>
+        {% endif %}
+      {% endif %}
+
+      {% if has_previous %}
+      <a href="?page={{page-1}}" class="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">{{page-1}}</a>
+      {% endif %}
+
+      <a href="#" class="inline-flex items-center border-t-2 border-blue-500 px-4 pt-4 text-sm font-medium text-blue-600 dark:text-blue-400" aria-current="page">{{page}}</a>
+      
+      {% if has_next %}
+      <a href="?page={{page+1}}" class="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">{{page+1}}</a>
+      {% endif %}
+
+      {% if files|length == 24 and has_next %}
+        {% if page < 99 %}
+        <span class="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-gray-500 dark:text-gray-400">...</span>
+        <a href="?page={{ page + 2 }}" class="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">{{ page + 2 }}</a>
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="-mt-px flex w-0 flex-1 justify-end">
+      {% if has_next %}
+      <a href="?page={{page+1}}" class="inline-flex items-center border-t-2 border-transparent pl-1 pt-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+        Next
+        <i data-feather="arrow-right" class="ml-3 h-5 w-5"></i>
+      </a>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Video Modal -->
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-90" id="video-modal">
+  <div class="relative w-full h-full flex items-center justify-center p-4">
+    <video class="modal-video" src="" controls autoplay playsinline></video>
+  </div>
+
+  <button class="previous-video absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed">
+    <i data-feather="arrow-left"></i>
+  </button>
+  <button class="next-video absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed">
+    <i data-feather="arrow-right"></i>
+  </button>
+  <a class="info-btn absolute top-4 right-16 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30">
+    <i data-feather="info" class="w-7 h-7"></i>
+  </a>
+  <button class="modal-close absolute top-4 right-4 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30" aria-label="close">
+    <i data-feather="x"></i>
+  </button>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script src="{{ url_for('static', filename='hammer.min.js') }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const videoItems = document.querySelectorAll('.video-item');
+    const modal = document.getElementById('video-modal');
+    if (!modal) return;
+
+    const modalVideo = modal.querySelector('video');
+    const infoBtn = modal.querySelector('.info-btn');
+    const prevBtn = modal.querySelector('.previous-video');
+    const nextBtn = modal.querySelector('.next-video');
+    const closeBtn = modal.querySelector('.modal-close');
+    let currentIndex = -1;
+
+    function showModal(index) {
+      if (index < 0 || index >= videoItems.length) return;
+      currentIndex = index;
+
+      const item = videoItems[currentIndex];
+      modalVideo.src = item.dataset.src;
+      infoBtn.href = "/detail/" + item.dataset.uri;
+
+      prevBtn.disabled = currentIndex === 0;
+      nextBtn.disabled = currentIndex === videoItems.length - 1;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      feather.replace();
+    }
+
+    function hideModal() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      modalVideo.pause();
+      modalVideo.src = "";
+    }
+
+    videoItems.forEach((item, index) => {
+      item.addEventListener('click', () => showModal(index));
+      // Play video on hover for desktop
+      item.addEventListener('mouseenter', () => {
+        item.querySelector('video').play();
+      });
+      item.addEventListener('mouseleave', () => {
+        item.querySelector('video').pause();
+      });
+    });
+
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hideModal();
+    });
+
+    prevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentIndex > 0) showModal(currentIndex - 1);
+    });
+
+    nextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentIndex < videoItems.length - 1) showModal(currentIndex + 1);
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) hideModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (modal.classList.contains('hidden')) return;
+      if (e.key === 'ArrowLeft') prevBtn.click();
+      if (e.key === 'ArrowRight') nextBtn.click();
+      if (e.key === 'Escape') hideModal();
+    });
+
+    const mc = new Hammer(modal);
+    mc.get('swipe').set({ direction: Hammer.DIRECTION_ALL });
+    mc.on('swipeleft', () => nextBtn.click());
+    mc.on('swiperight', () => prevBtn.click());
+    mc.on('swipedown', () => hideModal());
+  });
+</script>
 {% endblock %}

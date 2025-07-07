@@ -35,7 +35,7 @@ def create_app(test_config=None):
     app.config.from_prefixed_env()
     app.config.from_mapping(
         SECRET_KEY = 'dev',
-        #MEDIA_ROOT = Path('/home/chen/Videos')
+        MEDIA_ROOT = Path('/Users/chen/Pictures')
     )
     app.config.from_pyfile('config.py', silent=True)
     try:
@@ -127,7 +127,7 @@ def create_app(test_config=None):
     @app.route('/browse')
     def browse():
         root = Path(app.config["MEDIA_ROOT"])
-        videos = root.glob('**/*.mp4')
+        videos = list(root.glob('**/*.mp4')) + list(root.glob('**/*.webm'))
         videos = sorted(videos, key=lambda row:row.stat().st_ctime, reverse=True)
         count = len(videos)
         page = int(request.args.get('page', 1))

@@ -1,29 +1,75 @@
 <!DOCTYPE html>
-<html lang="zh" class="has-navbar-fixed-bottom">
+<html lang="zh">
   <head>
     <meta charset="utf-8" />
     <title>TikLocal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='app.css')}}">
+    <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='output.css')}}">
     {% block extra_head %}{% endblock %}
-    {% if theme == "dark" %}
-    <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='dark.css')}}">
-    {% endif %}
   </head>
-  <body>
+  <body data-theme="{{ theme if theme else 'light' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen pb-16">
     {% block content %}{% endblock %}
-    <nav class="navbar is-fixed-bottom is-black px-4" role="navigation" aria-label="main navigation">
-      <div class="level is-mobile">
-        <a href="/" class="level-item {% if menu == 'index' %}is-active{% endif %}">Home</a>
-        <a href="/browse" class="level-item {% if menu == 'browse' %}is-active{% endif %}">Videos</a>
-        <a href="/gallery" class="level-item {% if menu == 'gallery' %}is-active{% endif %}">Gallery</a>
-        <a href="/settings" class="level-item {% if menu == 'settings' %}is-active{% endif %}">Settings</a>
+    
+    <!-- 底部导航栏 -->
+    <nav class="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-800">
+      <div class="grid h-16 max-w-lg grid-cols-4 font-medium mx-auto">
+        <a href="/" class="inline-flex flex-col items-center justify-center px-5 group {% if menu == 'index' %}text-blue-600 dark:text-blue-500{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800{% endif %}" aria-label="首页">
+            <i data-feather="home" class="w-5 h-5 mb-1"></i>
+            <span class="text-sm">首页</span>
+        </a>
+        <a href="/browse" class="inline-flex flex-col items-center justify-center px-5 group {% if menu == 'browse' %}text-blue-600 dark:text-blue-500{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800{% endif %}" aria-label="视频">
+            <i data-feather="play-circle" class="w-5 h-5 mb-1"></i>
+            <span class="text-sm">视频</span>
+        </a>
+        <a href="/gallery" class="inline-flex flex-col items-center justify-center px-5 group {% if menu == 'gallery' %}text-blue-600 dark:text-blue-500{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800{% endif %}" aria-label="图库">
+            <i data-feather="image" class="w-5 h-5 mb-1"></i>
+            <span class="text-sm">图库</span>
+        </a>
+        <a href="/settings" class="inline-flex flex-col items-center justify-center px-5 group {% if menu == 'settings' %}text-blue-600 dark:text-blue-500{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800{% endif %}" aria-label="设置">
+            <i data-feather="settings" class="w-5 h-5 mb-1"></i>
+            <span class="text-sm">设置</span>
+        </a>
       </div>
     </nav>
+    
     {% block extra_body %}{% endblock %}
     <script src="{{url_for('static', filename='feather.min.js')}}"></script>
     <script>
+      // 初始化图标
       feather.replace();
+      
+      // 主题初始化
+      function initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 
+          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.body.setAttribute('data-theme', savedTheme);
+      }
+      
+      // 主题切换
+      function toggleTheme() {
+        const body = document.body;
+        const currentTheme = body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        
+        // 平滑过渡效果
+        body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+        setTimeout(() => {
+          body.style.transition = '';
+        }, 300);
+      }
+      
+      // 页面加载时初始化主题
+      document.addEventListener('DOMContentLoaded', initTheme);
+      
+      // 监听系统主题变化
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (!localStorage.getItem('theme')) {
+          document.body.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        }
+      });
     </script>
   </body>
 </html>
