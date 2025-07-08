@@ -14,7 +14,7 @@
 {% block content %}
 <div class="container mx-auto px-4 py-5">
   {% if files %}
-  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-5">
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-5">
     {% for row in files %}
     <div class="video-item group relative cursor-pointer aspect-w-9 aspect-h-16 rounded-lg overflow-hidden shadow-lg"
          data-uri="{{row}}" data-src="/media?uri={{row}}">
@@ -22,7 +22,7 @@
              preload="metadata" playsinline muted loop>
         <source src="/media?uri={{row}}#t=0.1" type="video/mp4">
       </video>
-      <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-25 transition-all duration-300"></div>
+      <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-25 transition-all duration-300 -z-2"></div>
       <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <i data-feather="play" class="w-12 h-12 text-white"></i>
       </div>

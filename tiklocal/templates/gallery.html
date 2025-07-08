@@ -1,4 +1,38 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  @keyframes slideInFromRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slideInFromLeft {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slideOutToRight {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+  }
+  @keyframes slideOutToLeft {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(-100%); opacity: 0; }
+  }
+  @keyframes slideOutToBottom {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(100%); opacity: 0; }
+  }
+  .modal-img-animate {
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  }
+  .slide-in-from-right { animation: slideInFromRight 0.3s ease-out forwards; }
+  .slide-in-from-left { animation: slideInFromLeft 0.3s ease-out forwards; }
+  .slide-out-to-right { animation: slideOutToRight 0.3s ease-in forwards; }
+  .slide-out-to-left { animation: slideOutToLeft 0.3s ease-in forwards; }
+  .slide-out-to-bottom { animation: slideOutToBottom 0.3s ease-in forwards; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mx-auto px-4 py-5">
     {% if subdirs %}
@@ -41,9 +75,9 @@
     {% endif %}
 </div>
 
-<div class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-80" id="modal">
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-80 overflow-hidden" id="modal">
   <div class="relative w-full max-w-screen-lg h-full flex items-center justify-center p-4">
-    <img src="" alt="" class="max-w-full max-h-full object-contain rounded-lg">
+    <img src="" alt="" class="max-w-full max-h-full object-contain rounded-lg modal-img-animate">
   </div>
 
   <button class="previous-image absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -64,6 +98,7 @@
 <script>
   (() => {
     let index = -1;
+    let isAnimating = false;
     const modal = document.getElementById("modal");
     if (!modal) return;
 
@@ -74,93 +109,86 @@
     const itemList = document.querySelectorAll(".gallery-item");
     const modalCloseBtn = document.querySelector('.modal-close');
 
-    function showModal(i) {
-        index = i;
-        if (index < 0) index = 0;
-        if (index >= itemList.length) index = itemList.length - 1;
-
+    function _updateModalContent(newIndex, direction = 'none') {
+        index = newIndex;
         const item = itemList[index];
+        
+        const animationClass = direction === 'next' ? 'slide-in-from-right' : (direction === 'prev' ? 'slide-in-from-left' : '');
+        modalImg.className = 'max-w-full max-h-full object-contain rounded-lg modal-img-animate'; // Reset classes
+        if(animationClass) modalImg.classList.add(animationClass);
+
         modalImg.src = item.dataset.value;
         infoBtn.href = "/image?uri=" + item.dataset.uri;
 
         if (prevBtn) prevBtn.disabled = index === 0;
         if (nextBtn) nextBtn.disabled = index === itemList.length - 1;
 
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        feather.replace(); // to render icons in modal
+        if (!modal.classList.contains('flex')) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            feather.replace();
+        }
     }
 
-    function hideModal() {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        modalImg.src = ""; // Clear image src
+    function showModal(i) {
+        if (isAnimating) return;
+        _updateModalContent(i);
+    }
+
+    function hideModal(direction = 'none') {
+        if (isAnimating) return;
+        isAnimating = true;
+
+        const animationClass = direction === 'down' ? 'slide-out-to-bottom' : '';
+        if(animationClass) modalImg.classList.add(animationClass);
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modalImg.src = "";
+            modalImg.className = 'max-w-full max-h-full object-contain rounded-lg modal-img-animate'; // Reset classes
+            isAnimating = false;
+        }, 300); // Animation duration
+    }
+
+    function navigate(direction) {
+        if (isAnimating) return;
+        const newIndex = direction === 'next' ? index + 1 : index - 1;
+        if (newIndex < 0 || newIndex >= itemList.length) return;
+
+        isAnimating = true;
+        const outClass = direction === 'next' ? 'slide-out-to-left' : 'slide-out-to-right';
+        modalImg.classList.add(outClass);
+
+        setTimeout(() => {
+            _updateModalContent(newIndex, direction);
+            setTimeout(() => {
+                isAnimating = false;
+            }, 300);
+        }, 150); // Start slide-in halfway through slide-out
     }
 
     itemList.forEach((ele, i) => {
       ele.addEventListener("click", () => showModal(i));
     });
 
-    if(modalCloseBtn) {
-        modalCloseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            hideModal();
-        });
-    }
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            hideModal();
-        }
-    });
-
-    if (prevBtn) {
-        prevBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (index > 0) {
-            showModal(index - 1);
-          }
-        });
-    }
-
-    if (nextBtn) {
-        nextBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (index < itemList.length - 1) {
-            showModal(index + 1);
-          }
-        });
-    }
+    if(modalCloseBtn) modalCloseBtn.addEventListener('click', (e) => { e.stopPropagation(); hideModal(); });
+    if(modal) modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
+    if (prevBtn) prevBtn.addEventListener("click", (e) => { e.stopPropagation(); navigate('prev'); });
+    if (nextBtn) nextBtn.addEventListener("click", (e) => { e.stopPropagation(); navigate('next'); });
 
     document.addEventListener('keydown', (e) => {
         if (modal.classList.contains('hidden')) return;
-        if (e.key === 'ArrowLeft') {
-            if (prevBtn) prevBtn.click();
-        } else if (e.key === 'ArrowRight') {
-            if (nextBtn) nextBtn.click();
-        } else if (e.key === 'Escape') {
-            hideModal();
-        }
+        if (e.key === 'ArrowLeft') prevBtn.click();
+        if (e.key === 'ArrowRight') nextBtn.click();
+        if (e.key === 'Escape') hideModal();
     });
 
     const mc = new Hammer(modal);
     mc.get('swipe').set({ direction: Hammer.DIRECTION_ALL });
-
-    mc.on('swipeleft', () => {
-        if (nextBtn && !nextBtn.disabled) {
-            nextBtn.click();
-        }
-    });
-
-    mc.on('swiperight', () => {
-        if (prevBtn && !prevBtn.disabled) {
-            prevBtn.click();
-        }
-    });
-
-    mc.on('swipedown', () => {
-        hideModal();
-    });
+    mc.on('swipeleft', () => nextBtn.click());
+    mc.on('swiperight', () => prevBtn.click());
+    mc.on('swipedown', () => hideModal('down'));
   })();
 </script>
 {% endblock %}
