@@ -54,5 +54,5 @@ jobs:
           name: python-package-dists
           path: dist/
       - name: Publish dists & attestations
-        uses: pypa/gh-action-pypi-publish@latest
+        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc
 
