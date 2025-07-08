@@ -7,7 +7,13 @@
     <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='output.css')}}">
     {% block extra_head %}{% endblock %}
   </head>
-  <body data-theme="{{ theme if theme else 'light' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen pb-16">
+  <body data-theme="{{ theme if theme else 'light' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen pb-16 transition-colors duration-300">
+    <!-- 快速主题切换按钮 -->
+    <button id="quick-theme-toggle" class="fixed top-4 right-4 z-40 w-10 h-10 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center group" aria-label="切换主题">
+      <i data-feather="sun" class="w-5 h-5 text-gray-600 dark:text-gray-300 block dark:hidden transition-transform"></i>
+      <i data-feather="moon" class="w-5 h-5 text-gray-600 dark:text-gray-300 hidden dark:block transition-transform"></i>
+    </button>
+
     {% block content %}{% endblock %}
     
     <!-- 底部导航栏 -->
@@ -35,41 +41,136 @@
     {% block extra_body %}{% endblock %}
     <script src="{{url_for('static', filename='feather.min.js')}}"></script>
     <script>
-      // 初始化图标
-      feather.replace();
-      
-      // 主题初始化
-      function initTheme() {
-        const savedTheme = localStorage.getItem('theme') || 
-          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.body.setAttribute('data-theme', savedTheme);
-      }
-      
-      // 主题切换
-      function toggleTheme() {
-        const body = document.body;
-        const currentTheme = body.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        
-        body.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        
-        // 平滑过渡效果
-        body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
-        setTimeout(() => {
-          body.style.transition = '';
-        }, 300);
-      }
-      
-      // 页面加载时初始化主题
-      document.addEventListener('DOMContentLoaded', initTheme);
-      
-      // 监听系统主题变化
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        if (!localStorage.getItem('theme')) {
-          document.body.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      // 主题管理类
+      class ThemeManager {
+        constructor() {
+          this.init();
+          this.bindEvents();
         }
+
+        init() {
+          // 获取初始主题：优先级 localStorage > 系统偏好 > 默认
+          const savedTheme = localStorage.getItem('theme');
+          const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          const initialTheme = savedTheme || systemTheme;
+          
+          this.setTheme(initialTheme, false);
+          feather.replace();
+        }
+
+        setTheme(theme, animate = true) {
+          const body = document.body;
+          const isChanging = body.getAttribute('data-theme') !== theme;
+          
+          if (isChanging && animate) {
+            // 添加过渡动画类
+            body.classList.add('theme-changing');
+          }
+          
+          body.setAttribute('data-theme', theme);
+          localStorage.setItem('theme', theme);
+          
+          // 更新所有切换按钮的状态
+          this.updateToggleButtons();
+          
+          // 发送主题变更事件
+          window.dispatchEvent(new CustomEvent('themeChanged', { 
+            detail: { theme, previousTheme: body.getAttribute('data-theme') }
+          }));
+          
+          if (isChanging && animate) {
+            // 动画完成后移除过渡类
+            setTimeout(() => {
+              body.classList.remove('theme-changing');
+            }, 300);
+          }
+        }
+
+        toggleTheme() {
+          const currentTheme = document.body.getAttribute('data-theme');
+          const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+          this.setTheme(newTheme);
+          
+          // 提供触觉反馈（支持的设备）
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+        }
+
+        updateToggleButtons() {
+          const isDark = document.body.getAttribute('data-theme') === 'dark';
+          
+          // 更新快速切换按钮
+          const quickToggle = document.getElementById('quick-theme-toggle');
+          if (quickToggle) {
+            const sunIcon = quickToggle.querySelector('.feather-sun');
+            const moonIcon = quickToggle.querySelector('.feather-moon');
+           
+            if (isDark) {
+              sunIcon?.classList.add('hidden');
+              moonIcon?.classList.remove('hidden');
+            } else {
+              sunIcon?.classList.remove('hidden');
+              moonIcon?.classList.add('hidden');
+            }
+          }
+          
+          // 更新设置页面的切换按钮
+          const settingsToggle = document.getElementById('theme-toggle-button');
+          const settingsIndicator = document.getElementById('theme-toggle-indicator');
+          
+          if (settingsToggle && settingsIndicator) {
+            settingsToggle.classList.toggle('bg-blue-600', isDark);
+            settingsToggle.classList.toggle('bg-gray-200', !isDark);
+            settingsIndicator.classList.toggle('translate-x-6', isDark);
+            settingsIndicator.classList.toggle('translate-x-1', !isDark);
+          }
+        }
+
+        bindEvents() {
+          // 快速切换按钮
+          const quickToggle = document.getElementById('quick-theme-toggle');
+          if (quickToggle) {
+            quickToggle.addEventListener('click', () => this.toggleTheme());
+          }
+          
+          // 监听系统主题变化
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            // 仅在用户未手动设置主题时跟随系统
+            if (!localStorage.getItem('theme')) {
+              this.setTheme(e.matches ? 'dark' : 'light');
+            }
+          });
+          
+          // 键盘快捷键 Ctrl/Cmd + Shift + D
+          document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+              e.preventDefault();
+              this.toggleTheme();
+            }
+          });
+        }
+      }
+
+      // 全局主题管理器实例
+      let themeManager;
+
+      // 页面加载完成后初始化
+      document.addEventListener('DOMContentLoaded', () => {
+        themeManager = new ThemeManager();
       });
+
+      // 全局函数，供其他脚本调用
+      window.toggleTheme = () => {
+        if (themeManager) {
+          themeManager.toggleTheme();
+        }
+      };
+
+      // 全局函数，获取当前主题
+      window.getCurrentTheme = () => {
+        return document.body.getAttribute('data-theme');
+      };
     </script>
   </body>
 </html>

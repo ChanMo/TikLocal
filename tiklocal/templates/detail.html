@@ -1,58 +1,586 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .video-player {
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+  
+  .video-controls {
+    backdrop-filter: blur(10px);
+  }
+  
+  .stat-item {
+    transition: all 0.2s ease;
+  }
+  
+  .stat-item:hover {
+    transform: translateY(-2px);
+  }
+  
+  .nav-button {
+    transition: all 0.2s ease;
+  }
+  
+  .nav-button:hover {
+    transform: translateX(2px);
+  }
+  
+  .nav-button.prev:hover {
+    transform: translateX(-2px);
+  }
+  
+  .favorite-btn.active {
+    background-color: #ef4444 !important;
+    color: white !important;
+  }
+  
+  .favorite-btn.active:hover {
+    background-color: #dc2626 !important;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<section class="section">
-  <div class="container mb-5" style="max-width:720px;">
-    <div class="content">
-      <video controls src="/media/{{file}}?subdir="></video>
-      <h3 style="word-break:break-all;">{{file}}</h3>
-      <p>MTime: {{mtime}}</p>
-      <p>Size: {{size|filesizeformat}}</p>
-    </div>
-    <div class="buttons">
-      {% if previous_item %}
-        <a href="/detail/{{previous_item}}" class="button">Previous</a>
-      {% endif %}
-      {% if next_item %}
-        <a href="/detail/{{next_item}}" class="button">Next</a>
-      {% endif %}
-      <a href="/delete/{{file}}" class="button">Delete</a>
-      <button class="button" id="favorite-btn">
-        <span class="icon">
-          <i data-feather="heart"></i>
-        </span>
+<div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-6">
+  <div class="container mx-auto px-4 max-w-6xl">
+    <!-- 返回按钮 -->
+    <div class="mb-6">
+      <button onclick="history.back()" class="inline-flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+        <i data-feather="arrow-left" class="w-4 h-4"></i>
+        <span>返回</span>
       </button>
     </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 视频播放区域 -->
+      <div class="lg:col-span-2">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+          <!-- 视频容器 -->
+          <div class="relative bg-gray-900 flex items-center justify-center" id="video-container">
+            <video 
+              controls 
+              preload="metadata"
+              class="video-player w-full max-h-[70vh] object-contain"
+              id="main-video"
+              src="/media/{{file}}"
+              poster=""
+            >
+              您的浏览器不支持视频播放。
+            </video>
+            
+            <!-- 视频控制按钮 -->
+            <div class="absolute top-4 right-4 flex gap-2 opacity-0 hover:opacity-100 transition-opacity duration-200" id="video-controls">
+              <button 
+                id="fullscreen-btn" 
+                class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+                aria-label="全屏播放"
+              >
+                <i data-feather="maximize" class="w-5 h-5"></i>
+              </button>
+              <button 
+                id="pip-btn" 
+                class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+                aria-label="画中画"
+              >
+                <i data-feather="minimize-2" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 视频信息栏 -->
+          <div class="p-6 border-t border-gray-200 dark:border-gray-700">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white mb-2 break-all">{{file}}</h1>
+            <div class="flex flex-wrap gap-4 text-sm text-gray-500 dark:text-gray-400">
+              <div class="flex items-center gap-1">
+                <i data-feather="calendar" class="w-4 h-4"></i>
+                <span>修改时间: {{mtime}}</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <i data-feather="hard-drive" class="w-4 h-4"></i>
+                <span>文件大小: {{size}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 侧边栏信息 -->
+      <div class="lg:col-span-1 space-y-6">
+        <!-- 视频统计信息 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="info" class="w-5 h-5 text-blue-500"></i>
+            视频信息
+          </h2>
+          
+          <div class="space-y-3">
+            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500 dark:text-gray-400">文件名</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white">{{file}}</span>
+              </div>
+            </div>
+            
+            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500 dark:text-gray-400">文件大小</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white">{{size}}</span>
+              </div>
+            </div>
+            
+            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500 dark:text-gray-400">修改时间</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white">{{mtime}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 播放控制 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="play" class="w-5 h-5 text-green-500"></i>
+            播放控制
+          </h2>
+          
+          <div class="space-y-3">
+            <button 
+              id="play-pause-btn"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="play" class="w-4 h-4"></i>
+              播放/暂停
+            </button>
+            
+            <div class="grid grid-cols-3 gap-2">
+              <button 
+                class="speed-btn px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors duration-200"
+                data-speed="0.5"
+              >
+                0.5x
+              </button>
+              <button 
+                class="speed-btn px-3 py-2 text-sm bg-blue-500 text-white rounded-lg"
+                data-speed="1"
+              >
+                1x
+              </button>
+              <button 
+                class="speed-btn px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors duration-200"
+                data-speed="2"
+              >
+                2x
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="settings" class="w-5 h-5 text-purple-500"></i>
+            操作
+          </h2>
+          
+          <div class="space-y-3">
+            <button 
+              id="favorite-btn"
+              class="favorite-btn w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-all duration-200 font-medium"
+            >
+              <i data-feather="heart" class="w-4 h-4"></i>
+              <span id="favorite-text">添加收藏</span>
+            </button>
+            
+            <a 
+              href="/media/{{file}}" 
+              target="_blank"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="download" class="w-4 h-4"></i>
+              下载视频
+            </a>
+            
+            <button 
+              id="copy-link-btn"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="link" class="w-4 h-4"></i>
+              复制链接
+            </button>
+            
+            <button 
+              onclick="confirmDelete()"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="trash-2" class="w-4 h-4"></i>
+              删除视频
+            </button>
+          </div>
+        </div>
+
+        <!-- 导航控制 -->
+        {% if previous_item or next_item %}
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="navigation" class="w-5 h-5 text-orange-500"></i>
+            视频导航
+          </h2>
+          
+          <div class="space-y-2">
+            {% if previous_item %}
+            <a 
+              href="/detail/{{previous_item}}" 
+              class="nav-button prev w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+            >
+              <i data-feather="chevron-left" class="w-4 h-4"></i>
+              上一个视频
+            </a>
+            {% endif %}
+            
+            {% if next_item %}
+            <a 
+              href="/detail/{{next_item}}" 
+              class="nav-button w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+            >
+              下一个视频
+              <i data-feather="chevron-right" class="w-4 h-4"></i>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- 快速导航 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="compass" class="w-5 h-5 text-teal-500"></i>
+            快速导航
+          </h2>
+          
+          <div class="space-y-2">
+            <a 
+              href="/browse" 
+              class="w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+            >
+              <i data-feather="play-circle" class="w-4 h-4"></i>
+              返回视频列表
+            </a>
+            
+            <a 
+              href="/gallery" 
+              class="w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+            >
+              <i data-feather="image" class="w-4 h-4"></i>
+              浏览图库
+            </a>
+            
+            <a 
+              href="/favorite" 
+              class="w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+            >
+              <i data-feather="heart" class="w-4 h-4"></i>
+              我的收藏
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-</section>
+</div>
 {% endblock %}
+
 {% block extra_body %}
 <script>
-  (async() => {
+document.addEventListener('DOMContentLoaded', () => {
+  const mainVideo = document.getElementById('main-video');
+  const fullscreenBtn = document.getElementById('fullscreen-btn');
+  const pipBtn = document.getElementById('pip-btn');
+  const playPauseBtn = document.getElementById('play-pause-btn');
+  const favoriteBtn = document.getElementById('favorite-btn');
+  const favoriteText = document.getElementById('favorite-text');
+  const copyLinkBtn = document.getElementById('copy-link-btn');
+  const speedBtns = document.querySelectorAll('.speed-btn');
+  const videoControls = document.getElementById('video-controls');
+  
+  const fileName = "{{file}}";
+  let isFavorited = false;
 
-    var value = "{{file}}";
-    const favoriteBtn = document.getElementById("favorite-btn");
+  // 初始化收藏状态
+  async function initFavoriteStatus() {
+    try {
+      const response = await fetch(`/api/favorite/${encodeURIComponent(fileName)}`);
+      const data = await response.json();
+      isFavorited = data.favorite;
+      updateFavoriteUI();
+    } catch (error) {
+      console.error('获取收藏状态失败:', error);
+    }
+  }
 
-    const favoriteRes = await checkFavorite(value);
-    if(favoriteRes) {
-      favoriteBtn.classList.add("is-danger");
+  // 更新收藏按钮UI
+  function updateFavoriteUI() {
+    if (isFavorited) {
+      favoriteBtn.classList.add('active');
+      favoriteText.textContent = '取消收藏';
+      // 使用feather.icons API来生成新的SVG
+      if (typeof feather !== 'undefined' && feather.icons && feather.icons.heart) {
+        favoriteBtn.querySelector('svg').innerHTML = feather.icons.heart.toSvg();
+      }
     } else {
-      favoriteBtn.classList.remove("is-danger");
+      favoriteBtn.classList.remove('active');
+      favoriteText.textContent = '添加收藏';
+      // 使用feather.icons API来生成新的SVG
+      if (typeof feather !== 'undefined' && feather.icons && feather.icons.heart) {
+        favoriteBtn.querySelector('svg').innerHTML = feather.icons.heart.toSvg();
+      }
     }
+  }
 
-
-    async function checkFavorite() {
-      const res = await fetch(`/api/favorite/${value}`);
-      const resJson = await res.json();
-      return resJson.favorite;
-    }
-
-    favoriteBtn.addEventListener("click", async(e) => {
-      e.preventDefault();
-      const res = await fetch(`/api/favorite/${value}`, {
+  // 收藏功能
+  favoriteBtn?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`/api/favorite/${encodeURIComponent(fileName)}`, {
         method: 'POST'
       });
-      favoriteBtn.classList.toggle("is-danger");
+      if (response.ok) {
+        isFavorited = !isFavorited;
+        updateFavoriteUI();
+        showNotification(isFavorited ? '已添加到收藏' : '已取消收藏', 'success');
+      }
+    } catch (error) {
+      console.error('收藏操作失败:', error);
+      showNotification('操作失败，请重试', 'error');
+    }
+  });
+
+  // 播放/暂停控制
+  playPauseBtn?.addEventListener('click', () => {
+    if (mainVideo.paused) {
+      mainVideo.play();
+    } else {
+      mainVideo.pause();
+    }
+  });
+
+  // 更新播放按钮图标
+  mainVideo?.addEventListener('play', () => {
+    if (typeof feather !== 'undefined' && feather.icons && feather.icons.pause) {
+      playPauseBtn.querySelector('svg').innerHTML = feather.icons.pause.toSvg();
+    }
+  });
+
+  mainVideo?.addEventListener('pause', () => {
+    if (typeof feather !== 'undefined' && feather.icons && feather.icons.play) {
+      playPauseBtn.querySelector('svg').innerHTML = feather.icons.play.toSvg();
+    }
+  });
+
+  // 全屏功能
+  fullscreenBtn?.addEventListener('click', () => {
+    if (mainVideo.requestFullscreen) {
+      mainVideo.requestFullscreen();
+    } else if (mainVideo.webkitRequestFullscreen) {
+      mainVideo.webkitRequestFullscreen();
+    } else if (mainVideo.msRequestFullscreen) {
+      mainVideo.msRequestFullscreen();
+    }
+  });
+
+  // 画中画功能
+  pipBtn?.addEventListener('click', async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await mainVideo.requestPictureInPicture();
+      }
+    } catch (error) {
+      showNotification('画中画功能不支持', 'error');
+    }
+  });
+
+  // 播放速度控制
+  speedBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const speed = parseFloat(btn.dataset.speed);
+      mainVideo.playbackRate = speed;
+      
+      // 更新按钮样式
+      speedBtns.forEach(b => {
+        b.className = 'speed-btn px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors duration-200';
+      });
+      btn.className = 'speed-btn px-3 py-2 text-sm bg-blue-500 text-white rounded-lg';
+      
+      showNotification(`播放速度已设为 ${speed}x`, 'info');
     });
-  })()
+  });
+
+  // 鼠标悬停显示控制按钮
+  const videoContainer = document.getElementById('video-container');
+  videoContainer?.addEventListener('mouseenter', () => {
+    videoControls.style.opacity = '1';
+  });
+  videoContainer?.addEventListener('mouseleave', () => {
+    videoControls.style.opacity = '0';
+  });
+
+  // 复制链接功能
+  copyLinkBtn?.addEventListener('click', async () => {
+    try {
+      const url = window.location.origin + '/media/' + encodeURIComponent(fileName);
+      await navigator.clipboard.writeText(url);
+      showNotification('链接已复制到剪贴板', 'success');
+    } catch (err) {
+      showNotification('复制失败，请手动复制', 'error');
+    }
+  });
+
+  // 键盘快捷键
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName.toLowerCase() === 'input') return;
+    
+    switch(e.key) {
+      case ' ':
+        e.preventDefault();
+        playPauseBtn.click();
+        break;
+      case 'f':
+      case 'F':
+        e.preventDefault();
+        fullscreenBtn.click();
+        break;
+      case 'p':
+      case 'P':
+        e.preventDefault();
+        pipBtn.click();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        mainVideo.currentTime = Math.max(0, mainVideo.currentTime - 10);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        mainVideo.currentTime = Math.min(mainVideo.duration, mainVideo.currentTime + 10);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        mainVideo.volume = Math.min(1, mainVideo.volume + 0.1);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        mainVideo.volume = Math.max(0, mainVideo.volume - 0.1);
+        break;
+    }
+  });
+
+  // 初始化
+  initFavoriteStatus();
+});
+
+// 删除确认
+function confirmDelete() {
+  showModal(
+    '确定要删除这个视频吗？', 
+    '此操作不可撤销，视频将被永久删除。', 
+    () => {
+      window.location.href = '/delete/{{file}}';
+    }
+  );
+}
+
+// 通知函数
+function showNotification(message, type = 'info') {
+  const iconMap = {
+    success: 'check-circle',
+    info: 'info',
+    error: 'alert-circle'
+  };
+  const colorMap = {
+    success: 'bg-green-500',
+    info: 'bg-blue-500',
+    error: 'bg-red-500'
+  };
+
+  const notification = document.createElement('div');
+  notification.className = `fixed bottom-20 right-5 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white ${colorMap[type]} transform translate-y-20 opacity-0 transition-all duration-300 ease-out z-50`;
+  notification.innerHTML = `
+    <i data-feather="${iconMap[type]}" class="w-6 h-6"></i>
+    <span class="font-medium">${message}</span>
+  `;
+  
+  document.body.appendChild(notification);
+  feather.replace();
+  
+  setTimeout(() => {
+    notification.classList.remove('translate-y-20', 'opacity-0');
+  }, 10);
+
+  setTimeout(() => {
+    notification.classList.add('opacity-0');
+    setTimeout(() => {
+      notification.remove();
+    }, 300);
+  }, 3000);
+}
+
+// 模态框函数
+function showModal(title, text, onConfirm) {
+  const existingModal = document.getElementById('confirmation-modal');
+  if (existingModal) existingModal.remove();
+
+  const modalHTML = `
+    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md m-4 transform transition-all" role="document">
+        <div class="p-6">
+          <div class="flex items-start gap-4">
+            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+              <i data-feather="alert-triangle" class="h-6 w-6 text-red-600 dark:text-red-400"></i>
+            </div>
+            <div class="mt-0 text-center sm:text-left">
+              <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">${title}</h3>
+              <div class="mt-2">
+                <p class="text-sm text-gray-500 dark:text-gray-400">${text}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-2xl">
+          <button type="button" id="confirm-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+            确认删除
+          </button>
+          <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+  feather.replace();
+
+  const modal = document.getElementById('confirmation-modal');
+  const confirmBtn = document.getElementById('confirm-btn');
+  const cancelBtn = document.getElementById('cancel-btn');
+
+  function closeModal() {
+    modal.remove();
+  }
+
+  confirmBtn.onclick = () => {
+    onConfirm();
+    closeModal();
+  };
+  cancelBtn.onclick = closeModal;
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      closeModal();
+    }
+  }
+}
 </script>
 {% endblock %}

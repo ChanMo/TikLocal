@@ -1,16 +1,398 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .image-viewer {
+    max-height: 80vh;
+    object-fit: contain;
+    cursor: zoom-in;
+  }
+  
+  .image-viewer.zoomed {
+    cursor: zoom-out;
+    transform-origin: center;
+  }
+  
+  .info-card {
+    backdrop-filter: blur(10px);
+  }
+  
+  .stat-item {
+    transition: all 0.2s ease;
+  }
+  
+  .stat-item:hover {
+    transform: translateY(-2px);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<section class="section">
-  <div class="container mb-5" style="max-width:720px;">
-    <div class="content">
-      <img src="/media2?uri={{uri}}" />
-      <h3 style="word-break:break-all;">{{image.name}}</h3>
-      <p>MTime: {{stat.st_mtime}}</p>
-      <p>Size: {{stat.st_size|filesizeformat}}</p>
+<div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-6">
+  <div class="container mx-auto px-4 max-w-6xl">
+    <!-- 返回按钮 -->
+    <div class="mb-6">
+      <button onclick="history.back()" class="inline-flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+        <i data-feather="arrow-left" class="w-4 h-4"></i>
+        <span>返回</span>
+      </button>
     </div>
-    <div class="buttons">
-      <a href="/delete2?uri={{uri}}" class="button">Delete</a>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 图片展示区域 -->
+      <div class="lg:col-span-2">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+          <!-- 图片容器 -->
+          <div class="relative bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4" id="image-container">
+            <img 
+              src="/media2?uri={{uri}}" 
+              alt="{{image.name}}"
+              class="image-viewer rounded-lg shadow-md max-w-full transition-transform duration-300"
+              id="main-image"
+              loading="lazy"
+            />
+            
+            <!-- 图片控制按钮 -->
+            <div class="absolute top-4 right-4 flex gap-2">
+              <button 
+                id="zoom-btn" 
+                class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+                aria-label="缩放图片"
+              >
+                <i data-feather="zoom-in" class="w-5 h-5"></i>
+              </button>
+              <button 
+                id="fullscreen-btn" 
+                class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+                aria-label="全屏查看"
+              >
+                <i data-feather="maximize" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 图片信息栏 -->
+          <div class="p-6 border-t border-gray-200 dark:border-gray-700">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white mb-2 break-all">{{image.name}}</h1>
+            <div class="flex flex-wrap gap-4 text-sm text-gray-500 dark:text-gray-400">
+              <div class="flex items-center gap-1">
+                <i data-feather="calendar" class="w-4 h-4"></i>
+                <span>修改时间: {{ stat.st_mtime | timestamp_to_date }}</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <i data-feather="hard-drive" class="w-4 h-4"></i>
+                <span>文件大小: {{ stat.st_size | filesizeformat }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 侧边栏信息 -->
+      <div class="lg:col-span-1 space-y-6">
+        <!-- 图片统计信息 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="info" class="w-5 h-5 text-blue-500"></i>
+            图片信息
+          </h2>
+          
+          <div class="space-y-3">
+            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500 dark:text-gray-400">文件名</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white">{{image.name}}</span>
+              </div>
+            </div>
+            
+            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500 dark:text-gray-400">文件大小</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ stat.st_size | filesizeformat }}</span>
+              </div>
+            </div>
+            
+            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500 dark:text-gray-400">修改时间</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ stat.st_mtime | timestamp_to_date }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="settings" class="w-5 h-5 text-green-500"></i>
+            操作
+          </h2>
+          
+          <div class="space-y-3">
+            <a 
+              href="/media2?uri={{uri}}" 
+              target="_blank"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="download" class="w-4 h-4"></i>
+              下载图片
+            </a>
+            
+            <button 
+              id="copy-link-btn"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="link" class="w-4 h-4"></i>
+              复制链接
+            </button>
+            
+            <button 
+              onclick="confirmDelete()"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="trash-2" class="w-4 h-4"></i>
+              删除图片
+            </button>
+          </div>
+        </div>
+
+        <!-- 快速导航 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="navigation" class="w-5 h-5 text-purple-500"></i>
+            快速导航
+          </h2>
+          
+          <div class="space-y-2">
+            <a 
+              href="/gallery" 
+              class="w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+            >
+              <i data-feather="image" class="w-4 h-4"></i>
+              返回图库
+            </a>
+            
+            <a 
+              href="/browse" 
+              class="w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+            >
+              <i data-feather="play-circle" class="w-4 h-4"></i>
+              浏览视频
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-</section>
+
+  <!-- 全屏模态框 -->
+  <div id="fullscreen-modal" class="fixed inset-0 z-50 bg-black bg-opacity-95 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="relative max-w-full max-h-full">
+      <img 
+        id="fullscreen-image" 
+        src="/media2?uri={{uri}}" 
+        alt="{{image.name}}"
+        class="max-w-full max-h-full object-contain"
+      />
+      <button 
+        id="close-fullscreen" 
+        class="absolute top-4 right-4 w-12 h-12 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+      >
+        <i data-feather="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const mainImage = document.getElementById('main-image');
+  const zoomBtn = document.getElementById('zoom-btn');
+  const fullscreenBtn = document.getElementById('fullscreen-btn');
+  const fullscreenModal = document.getElementById('fullscreen-modal');
+  const closeFullscreen = document.getElementById('close-fullscreen');
+  const copyLinkBtn = document.getElementById('copy-link-btn');
+  
+  let isZoomed = false;
+  
+  // 图片缩放功能
+  function toggleZoom() {
+    isZoomed = !isZoomed;
+    if (isZoomed) {
+      mainImage.style.transform = 'scale(1.5)';
+      mainImage.classList.add('zoomed');
+      zoomBtn.querySelector('i').setAttribute('data-feather', 'zoom-out');
+    } else {
+      mainImage.style.transform = 'scale(1)';
+      mainImage.classList.remove('zoomed');
+      zoomBtn.querySelector('i').setAttribute('data-feather', 'zoom-in');
+    }
+    feather.replace();
+  }
+  
+  // 绑定缩放事件
+  zoomBtn?.addEventListener('click', toggleZoom);
+  mainImage?.addEventListener('click', toggleZoom);
+  
+  // 全屏功能
+  fullscreenBtn?.addEventListener('click', () => {
+    fullscreenModal.classList.remove('hidden');
+    fullscreenModal.classList.add('flex');
+  });
+  
+  closeFullscreen?.addEventListener('click', () => {
+    fullscreenModal.classList.add('hidden');
+    fullscreenModal.classList.remove('flex');
+  });
+  
+  // 点击模态框背景关闭
+  fullscreenModal?.addEventListener('click', (e) => {
+    if (e.target === fullscreenModal) {
+      fullscreenModal.classList.add('hidden');
+      fullscreenModal.classList.remove('flex');
+    }
+  });
+  
+  // ESC键关闭全屏
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !fullscreenModal.classList.contains('hidden')) {
+      fullscreenModal.classList.add('hidden');
+      fullscreenModal.classList.remove('flex');
+    }
+  });
+  
+  // 复制链接功能
+  copyLinkBtn?.addEventListener('click', async () => {
+    try {
+      const url = window.location.origin + '/media2?uri={{uri}}';
+      await navigator.clipboard.writeText(url);
+      showNotification('链接已复制到剪贴板', 'success');
+    } catch (err) {
+      showNotification('复制失败，请手动复制', 'error');
+    }
+  });
+  
+  // 键盘导航
+  document.addEventListener('keydown', (e) => {
+    if (fullscreenModal.classList.contains('hidden')) {
+      switch(e.key) {
+        case ' ':
+        case 'Enter':
+          e.preventDefault();
+          toggleZoom();
+          break;
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          fullscreenBtn.click();
+          break;
+      }
+    }
+  });
+});
+
+// 删除确认
+function confirmDelete() {
+  showModal(
+    '确定要删除这张图片吗？', 
+    '此操作不可撤销，图片将被永久删除。', 
+    () => {
+      window.location.href = '/delete2?uri={{uri}}';
+    }
+  );
+}
+
+// 通知函数（复用设置页面的）
+function showNotification(message, type = 'info') {
+  const iconMap = {
+    success: 'check-circle',
+    info: 'info',
+    error: 'alert-circle'
+  };
+  const colorMap = {
+    success: 'bg-green-500',
+    info: 'bg-blue-500',
+    error: 'bg-red-500'
+  };
+
+  const notification = document.createElement('div');
+  notification.className = `fixed bottom-20 right-5 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white ${colorMap[type]} transform translate-y-20 opacity-0 transition-all duration-300 ease-out z-50`;
+  notification.innerHTML = `
+    <i data-feather="${iconMap[type]}" class="w-6 h-6"></i>
+    <span class="font-medium">${message}</span>
+  `;
+  
+  document.body.appendChild(notification);
+  feather.replace();
+  
+  setTimeout(() => {
+    notification.classList.remove('translate-y-20', 'opacity-0');
+  }, 10);
+
+  setTimeout(() => {
+    notification.classList.add('opacity-0');
+    setTimeout(() => {
+      notification.remove();
+    }, 300);
+  }, 3000);
+}
+
+// 模态框函数（复用设置页面的）
+function showModal(title, text, onConfirm) {
+  const existingModal = document.getElementById('confirmation-modal');
+  if (existingModal) existingModal.remove();
+
+  const modalHTML = `
+    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md m-4 transform transition-all" role="document">
+        <div class="p-6">
+          <div class="flex items-start gap-4">
+            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
+              <i data-feather="alert-triangle" class="h-6 w-6 text-red-600 dark:text-red-400"></i>
+            </div>
+            <div class="mt-0 text-center sm:text-left">
+              <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">${title}</h3>
+              <div class="mt-2">
+                <p class="text-sm text-gray-500 dark:text-gray-400">${text}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-2xl">
+          <button type="button" id="confirm-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+            确认删除
+          </button>
+          <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+  feather.replace();
+
+  const modal = document.getElementById('confirmation-modal');
+  const confirmBtn = document.getElementById('confirm-btn');
+  const cancelBtn = document.getElementById('cancel-btn');
+
+  function closeModal() {
+    modal.remove();
+  }
+
+  confirmBtn.onclick = () => {
+    onConfirm();
+    closeModal();
+  };
+  cancelBtn.onclick = closeModal;
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      closeModal();
+    }
+  }
+}
+</script>
 {% endblock %}

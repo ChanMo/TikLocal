@@ -11,23 +11,6 @@ from urllib.parse import quote, unquote
 
 from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, session, redirect
-#from waitress import serve
-# from PIL import Image
-
-# parser = argparse.ArgumentParser(
-#     prog='TikLocal',
-#     description='像Tiktok和Pinterest一样浏览您的媒体库',
-#     epilog='Contact: chan.mo@outlook.com'
-# )
-#
-# parser.add_argument('media_folder')
-# parser.add_argument('--port', type=int, default=8000)
-#
-# args = parser.parse_args()
-# media_folder = Path(args.media_folder)
-#
-# if not media_folder.exists() or not media_folder.is_dir():
-#     sys.exit('Error: The media root does not exist or is not a directory.')
 
 
 def create_app(test_config=None):
@@ -35,13 +18,36 @@ def create_app(test_config=None):
     app.config.from_prefixed_env()
     app.config.from_mapping(
         SECRET_KEY = 'dev',
-        MEDIA_ROOT = Path('/Users/chen/Pictures')
+        MEDIA_ROOT = Path(os.environ['MEDIA_ROOT'])
     )
     app.config.from_pyfile('config.py', silent=True)
     try:
         os.makedirs(app.instance_path)
     except OSError:
         pass
+
+    # 添加自定义过滤器
+    @app.template_filter('timestamp_to_date')
+    def timestamp_to_date(timestamp):
+        """将时间戳转换为可读的日期时间格式"""
+        try:
+            return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        except (ValueError, OSError):
+            return '未知时间'
+
+    @app.template_filter('filesizeformat')
+    def filesizeformat(num_bytes):
+        """将字节数转换为可读的文件大小格式"""
+        if num_bytes is None:
+            return '0 B'
+        
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if num_bytes < 1024.0:
+                if unit == 'B':
+                    return f"{int(num_bytes)} {unit}"
+                return f"{num_bytes:.1f} {unit}"
+            num_bytes /= 1024.0
+        return f"{num_bytes:.1f} PB"
 
 
     @app.route("/delete2", methods=['POST', 'GET'])
@@ -53,7 +59,6 @@ def create_app(test_config=None):
 
         return render_template(
             'delete_confirm.html',
-            theme = session.get('theme', 'light'),
             target = target,
             file = target.name
         )
@@ -70,7 +75,6 @@ def create_app(test_config=None):
         target = Path(app.config["MEDIA_ROOT"]) / unquote(uri)
         return render_template(
             'image_detail.html',
-            theme = session.get('theme', 'light'),
             image = target,
             uri = uri,
             stat = target.stat()
@@ -107,7 +111,6 @@ def create_app(test_config=None):
             subdir = subdir,
             subdirs = subdir.split('/'),
             menu = 'gallery',
-            theme = session.get('theme', 'light'),
             uri = uri
         )
 
@@ -116,10 +119,9 @@ def create_app(test_config=None):
         files = []
         for file in os.scandir(directory):
             if file.is_dir():
-                files += get_files(file)
-            if os.path.isfile(os.path.join(directory, file)):
-                file_extension = os.path.splitext(file)[-1]
-                mime_type = mimetypes.guess_type(file)[0]
+                files += get_files(file.path)
+            elif file.is_file():
+                mime_type = mimetypes.guess_type(file.name)[0]
                 if mime_type and mime_type.startswith(media_type):
                     files.append(file)
         return files
@@ -146,8 +148,7 @@ def create_app(test_config=None):
             files = res,
             menu = 'browse',
             has_previous = page > 1,
-            has_next = len(videos[offset+length:])>1,
-            theme = session.get('theme', 'light')
+            has_next = len(videos[offset+length:])>1
         )
 
 
@@ -169,59 +170,89 @@ def create_app(test_config=None):
         )
 
 
-    @app.route('/settings')
+    @app.route('/settings/')
     def settings_view():
-        theme = request.args.get('theme', session.get('theme', 'light'))
-        session['theme'] = theme
         return render_template(
             'settings.html',
             menu = 'settings',
-            theme = theme,
             videos = len(get_files(Path(app.config["MEDIA_ROOT"])))
         )
 
     @app.route('/detail/<name>')
     def detail_view(name):
-        f = Path(app.config["MEDIA_ROOT"]) / name
-        files = get_files(Path(app.config["MEDIA_ROOT"]))
-        files = sorted(files, key=lambda row:row.stat().st_ctime, reverse=True)
-        files = [i.name for i in files]
-        index = files.index(name)
-        previous_item = files[index-1] if index > 0 else None
-        next_item = files[index+1] if index < len(files) else None
-        return render_template(
-            'detail.html',
-            file = name,
-            mtime = datetime.datetime.fromtimestamp(os.path.getmtime(f)).strftime('%Y-%m-%d %H:%M'),
-            size = os.path.getsize(f),
-            theme = session.get('theme', 'light'),
-            previous_item = previous_item,
-            next_item = next_item
-        )
+        try:
+            f = Path(app.config["MEDIA_ROOT"]) / name
+            if not f.exists():
+                return "视频文件不存在", 404
+                
+            files = get_files(Path(app.config["MEDIA_ROOT"]))
+            files = sorted(files, key=lambda row:row.stat().st_ctime, reverse=True)
+            files = [i.name for i in files]
+            
+            if name not in files:
+                return "视频不在列表中", 404
+                
+            index = files.index(name)
+            previous_item = files[index-1] if index > 0 else None
+            next_item = files[index+1] if index < len(files) - 1 else None
+            
+            return render_template(
+                'detail.html',
+                file = name,
+                mtime = datetime.datetime.fromtimestamp(os.path.getmtime(f)).strftime('%Y-%m-%d %H:%M'),
+                size = os.path.getsize(f),
+                previous_item = previous_item,
+                next_item = next_item
+            )
+        except Exception as e:
+            # 记录错误并返回友好的错误页面
+            print(f"视频详情页错误: {e}")
+            return f"加载视频详情时出错: {str(e)}", 500
 
     @app.route("/delete/<name>", methods=['POST', 'GET'])
     def delete_view(name):
-        subdir = request.args.get('subdir', '/')
         if request.method == 'POST':
-            os.unlink(Path(app.config["MEDIA_ROOT"]) / name)
-            return redirect('/browse')
+            try:
+                file_path = Path(app.config["MEDIA_ROOT"]) / name
+                if file_path.exists():
+                    os.unlink(file_path)
+                return redirect('/browse')
+            except Exception as e:
+                print(f"删除文件错误: {e}")
+                return f"删除文件时出错: {str(e)}", 500
 
         return render_template(
             'delete_confirm.html',
-            file = name,
-            theme = session.get('theme', 'light')
+            file = name
         )
 
 
     @app.route("/media")
     def media_detail_view():
-        uri = Path(request.args.get('uri'))
-        return send_from_directory(Path(app.config["MEDIA_ROOT"]) / uri.parent, uri.name)
+        uri = request.args.get('uri')
+        if not uri:
+            return "缺少文件参数", 400
+        try:
+            uri_path = Path(uri)
+            target = Path(app.config["MEDIA_ROOT"]) / uri_path
+            if not target.exists():
+                return "文件不存在", 404
+            return send_from_directory(target.parent, target.name)
+        except Exception as e:
+            print(f"媒体文件访问错误: {e}")
+            return f"访问文件时出错: {str(e)}", 500
 
     @app.route("/media/<name>")
     def video_view(name):
-        subdir = request.args.get('subdir', '/')
-        return send_from_directory(Path(app.config["MEDIA_ROOT"]) / subdir, name)
+        try:
+            # 直接在MEDIA_ROOT根目录查找文件
+            target = Path(app.config["MEDIA_ROOT"]) / name
+            if not target.exists():
+                return f"视频文件不存在: {name}", 404
+            return send_from_directory(app.config["MEDIA_ROOT"], name)
+        except Exception as e:
+            print(f"视频文件访问错误: {e}")
+            return f"访问视频文件时出错: {str(e)}", 500
 
     @app.route('/favorite')
     def favorite_view():
@@ -233,36 +264,34 @@ def create_app(test_config=None):
 
         return render_template(
             'favorite.html',
-            theme = session.get('theme', 'light'),
             files = text
         )
 
 
     @app.route('/api/favorite/<name>', methods=['GET', 'POST'])
     def favorite_api(name):
-        #name = request.get_json().get('value')
-        db = Path(app.config["MEDIA_ROOT"]) / 'favorite.json'
-        text = []
-        if db.exists():
-            with db.open() as f:
-                text = json.loads(f.read())
-        if request.method == 'GET':
-            return {'favorite': name in text}
+        try:
+            db = Path(app.config["MEDIA_ROOT"]) / 'favorite.json'
+            text = []
+            if db.exists():
+                with db.open() as f:
+                    text = json.loads(f.read())
+            
+            if request.method == 'GET':
+                return {'favorite': name in text}
 
-        if name not in text:
-            text.append(name)
-        else:
-            text.remove(name)
+            # POST method - toggle favorite
+            if name not in text:
+                text.append(name)
+            else:
+                text.remove(name)
 
-        with db.open(mode='w') as f:
-            f.write(json.dumps(text))
-        return {'success':True}
+            with db.open(mode='w') as f:
+                f.write(json.dumps(text))
+            return {'success': True, 'favorite': name in text}
+        except Exception as e:
+            print(f"收藏操作错误: {e}")
+            return {'success': False, 'error': str(e)}, 500
 
 
     return app
-
-#def main():
-#    serve(app, host='0.0.0.0', port=args.port)
-#
-#if __name__ == '__main__':
-#    main()
