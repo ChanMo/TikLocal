@@ -1,0 +1,58 @@
+# .github/workflows/main.yml
+# Triggers: ➊ every time you publish a GitHub Release, and
+#           ➋ when you push a semver tag like v1.2.3
+name: Build & publish to PyPI
+
+on:
+  release:
+    types: [published]
+  push:
+    tags: ["v*"]
+
+# Default, repo-wide token only needs read-access:
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build dists with Poetry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4       # pin major, first-party
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4           # pin major, first-party
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/poetry.lock') }}
+      - name: Install Poetry
+        run: pip install --upgrade poetry
+      - name: Build wheel & sdist
+        run: poetry build
+      - name: Upload dist/ as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-dists
+          path: dist/
+
+  publish-pypi:
+    name: Upload to PyPI
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi            # must match the “Trusted Publisher” entry
+      url: https://pypi.org/project/TikLocal/
+    permissions:
+      id-token: write       # OIDC token for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-package-dists
+          path: dist/
+      - name: Publish dists & attestations
+        uses: pypa/gh-action-pypi-publish@latest
+
