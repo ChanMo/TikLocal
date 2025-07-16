@@ -8,9 +8,16 @@ import random
 import datetime
 import subprocess as sp
 from urllib.parse import quote, unquote
+from importlib.metadata import version, PackageNotFoundError
 
 from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, session, redirect
+
+
+try:
+    app_version = version("tiklocal")
+except PackageNotFoundError:
+    app_version = '1.0.0'
 
 
 def create_app(test_config=None):
@@ -175,6 +182,7 @@ def create_app(test_config=None):
         return render_template(
             'settings.html',
             menu = 'settings',
+            version=app_version,
             videos = len(get_files(Path(app.config["MEDIA_ROOT"])))
         )
 
