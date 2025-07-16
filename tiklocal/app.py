@@ -162,19 +162,23 @@ def create_app(test_config=None):
     @app.route('/')
     def tiktok():
         """ Render the Tiktok-like page """
+        return render_template(
+            'tiktok.html',
+            menu = 'index',
+        )
+
+    @app.route('/api/videos')
+    def api_videos():
+        """ API to get random videos """
         root = Path(app.config["MEDIA_ROOT"])
-        videos = list(root.glob('**/*.mp4'))
+        videos = list(root.glob('**/*.mp4')) + list(root.glob('**/*.webm'))
         random.shuffle(videos)
         res = []
 
-        for row in videos:
-            res.append(row.relative_to(root))
+        for row in videos[:20]:
+            res.append(str(row.relative_to(root)))
 
-        return render_template(
-            'tiktok.html',
-            files=res,
-            menu = 'index',
-        )
+        return json.dumps(res)
 
 
     @app.route('/settings/')

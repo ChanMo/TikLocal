@@ -38,10 +38,6 @@ video {
 {% endblock %}
 {% block content %}
 <div id="container">
-  {% for row in files %}
-  <video controls class="video" muted loop data-name="{{row.name}}" data-src="/media?uri={{row}}">
-  </video>
-  {% endfor %}
   <div class="fab">
     <a id="favorite-btn" data-value="">
       <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
@@ -59,37 +55,61 @@ video {
     const infoBtn = document.querySelector("#info-btn");
     const favoriteBtn = document.getElementById("favorite-btn");
     const container = document.querySelector('#container');
-    const videos = container.querySelectorAll('video');
+    let videos = [];
     let index = 0;
-  
-    videos[0].style.display = 'block';
-    videos[0].src = videos[0].dataset.src;
-    videos[0].load();
-    videos[0].play();
+    let isLoading = false;
 
-    infoBtn.href = `/detail/${videos[0].dataset.name}`;
-    favoriteBtn.dataset.value = videos[0].dataset.name;
-    const favoriteRes = await checkFavorite(videos[0].dataset.name);
-    if(favoriteRes) {
-      favoriteBtn.classList.add("is-active");
-    } else {
-      favoriteBtn.classList.remove("is-active");
+    async function loadVideos() {
+      if (isLoading) return;
+      isLoading = true;
+      const res = await fetch('/api/videos');
+      const newVideos = await res.json();
+      newVideos.forEach(videoPath => {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.classList.add('video');
+        video.muted = true;
+        video.loop = true;
+        video.dataset.name = videoPath;
+        video.dataset.src = `/media/${videoPath}`;
+        container.appendChild(video);
+      });
+      videos = container.querySelectorAll('video');
+      isLoading = false;
     }
+
+    await loadVideos();
+
+    if (videos.length > 0) {
+        videos[0].style.display = 'block';
+        videos[0].src = videos[0].dataset.src;
+        videos[0].load();
+        videos[0].play();
+
+        infoBtn.href = `/detail/${videos[0].dataset.name}`;
+        favoriteBtn.dataset.value = videos[0].dataset.name;
+        const favoriteRes = await checkFavorite(videos[0].dataset.name);
+        if(favoriteRes) {
+          favoriteBtn.classList.add("is-active");
+        } else {
+          favoriteBtn.classList.remove("is-active");
+        }
+    }
+
 
     var manager = new Hammer.Manager(container);
     var Swipe = new Hammer.Swipe();
     manager.add(Swipe);
     manager.on('swipedown', async(e) => {
       //previous;
+      if (videos.length === 0) return;
 
+      let previous = index;
       index -= 1;
-      let previous;
-      if (index == -1) {
-        previous = 0;
+      if (index < 0) {
         index = videos.length - 1;
-      } else {
-        previous = index + 1;
       }
+
       videos[previous].style.display = 'none';
       videos[previous].pause();
       videos[index].style.display = 'block';
@@ -108,31 +128,37 @@ video {
     });
     manager.on('swipeup', async(e) => {
       //next;
+      if (videos.length === 0) return;
 
+      let previous = index;
       index += 1;
-      let previous;
-      if (index == videos.length) {
-        previous = videos.length - 1;
+      if (index >= videos.length) {
         index = 0;
-      } else {
-        previous = index - 1;
       }
+
+      if (index >= videos.length - 5) {
+          loadVideos();
+      }
+
       videos[previous].style.display = 'none';
       videos[previous].pause();
-      videos[index].style.display = 'block';
-      videos[index].src = videos[index].dataset.src;
-      videos[index].load();
-      videos[index].muted = false;
-      videos[index].play();
-      
-      const value = videos[index].dataset.name;      
-      infoBtn.href = `/detail/${value}`;
-      const favoriteRes = await checkFavorite(value);
-      favoriteBtn.dataset.value = value;
-      if(favoriteRes) {
-        favoriteBtn.classList.add("is-active");
-      } else {
-        favoriteBtn.classList.remove("is-active");
+
+      if (videos[index]) {
+        videos[index].style.display = 'block';
+        videos[index].src = videos[index].dataset.src;
+        videos[index].load();
+        videos[index].muted = false;
+        videos[index].play();
+        
+        const value = videos[index].dataset.name;      
+        infoBtn.href = `/detail/${value}`;
+        const favoriteRes = await checkFavorite(value);
+        favoriteBtn.dataset.value = value;
+        if(favoriteRes) {
+          favoriteBtn.classList.add("is-active");
+        } else {
+          favoriteBtn.classList.remove("is-active");
+        }
       }
 
     });
