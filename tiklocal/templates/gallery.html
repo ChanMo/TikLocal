@@ -39,12 +39,14 @@
     <nav class="mb-4" aria-label="breadcrumbs">
       <ol class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
         <li><a href="/gallery" class="hover:text-gray-700 dark:hover:text-gray-200">Root</a></li>
+        {% set path = [] %}
         {% for row in subdirs %}
+        {% set _ = path.append(row) %}
         <li>
           <span class="mx-2">/</span>
         </li>
         {% if not loop.last %}
-        <li><a href="?subdir={{row}}" class="hover:text-gray-700 dark:hover:text-gray-200">{{row}}</a></li>
+        <li><a href="?subdir={{path|join('/')}}" class="hover:text-gray-700 dark:hover:text-gray-200">{{row}}</a></li>
         {% else %}
         <li class="text-gray-700 dark:text-gray-200" aria-current="page">{{row}}</li>
         {% endif %}
@@ -64,8 +66,8 @@
     {% if recent %}
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-5">
       {% for row in recent %}
-      <div class="gallery-item group relative cursor-pointer" data-value="/media/{{row.name}}?subdir={{subdir}}" data-uri="{{uri}}{{row.name}}">
-        <img class="block w-full h-48 rounded-lg object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" src="/media/{{row.name}}?subdir={{subdir}}" />
+      <div class="gallery-item group relative cursor-pointer" data-value="/media?uri={{uri}}{{row.name}}" data-uri="{{uri}}{{row.name}}">
+        <img class="block w-full h-48 rounded-lg object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" src="/media?uri={{uri}}{{row.name}}" />
         <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-25 transition-all duration-300 rounded-lg -z-1"></div>
       </div>
       {% endfor %}

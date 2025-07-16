@@ -45,7 +45,7 @@
           <!-- 图片容器 -->
           <div class="relative bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4" id="image-container">
             <img 
-              src="/media2?uri={{uri}}" 
+              src="/media?uri={{uri}}" 
               alt="{{image.name}}"
               class="image-viewer rounded-lg shadow-md max-w-full transition-transform duration-300"
               id="main-image"
@@ -130,7 +130,7 @@
           
           <div class="space-y-3">
             <a 
-              href="/media2?uri={{uri}}" 
+              href="/media?uri={{uri}}" 
               target="_blank"
               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 font-medium"
             >
@@ -190,7 +190,7 @@
     <div class="relative max-w-full max-h-full">
       <img 
         id="fullscreen-image" 
-        src="/media2?uri={{uri}}" 
+        src="/media?uri={{uri}}" 
         alt="{{image.name}}"
         class="max-w-full max-h-full object-contain"
       />
@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 复制链接功能
   copyLinkBtn?.addEventListener('click', async () => {
     try {
-      const url = window.location.origin + '/media2?uri={{uri}}';
+      const url = window.location.origin + '/media?uri={{uri}}';
       await navigator.clipboard.writeText(url);
       showNotification('链接已复制到剪贴板', 'success');
     } catch (err) {
@@ -299,7 +299,7 @@ function confirmDelete() {
     '确定要删除这张图片吗？', 
     '此操作不可撤销，图片将被永久删除。', 
     () => {
-      window.location.href = '/delete2?uri={{uri}}';
+      window.location.href = '/delete?uri={{uri}}';
     }
   );
 }

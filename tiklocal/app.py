@@ -50,8 +50,8 @@ def create_app(test_config=None):
         return f"{num_bytes:.1f} PB"
 
 
-    @app.route("/delete2", methods=['POST', 'GET'])
-    def delete2_view():
+    @app.route("/delete", methods=['POST', 'GET'])
+    def delete_confirm_view():
         target = Path(app.config["MEDIA_ROOT"]) / unquote(request.args.get('uri'))
         if request.method == 'POST':
             target.unlink()
@@ -63,7 +63,7 @@ def create_app(test_config=None):
             file = target.name
         )
 
-    @app.route("/media2")
+    @app.route("/media")
     def media_view():
         target = Path(app.config["MEDIA_ROOT"]) / unquote(request.args.get('uri'))
         return send_from_directory(target.parent, target.name)
