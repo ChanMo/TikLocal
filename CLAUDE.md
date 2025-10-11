@@ -8,7 +8,7 @@ TikLocal is a Flask-based web application that provides a TikTok-like interface 
 
 ## Key Dependencies
 
-- **Backend**: Flask 3.1.0, Waitress (WSGI server)
+- **Backend**: Flask 3.1.0, Waitress (WSGI server), PyYAML 6.0 (config file support)
 - **Frontend**: TailwindCSS v4, Feather Icons, Hammer.js
 - **Python**: Requires Python >=3.10,<4.0
 - **Package Management**: Poetry for Python dependencies, npm for CSS building
@@ -33,11 +33,20 @@ npm run build-css-prod
 # Install dependencies
 poetry install
 
-# Run the application
-poetry run tiklocal /path/to/media/folder
+# Run the application (multiple ways)
+poetry run tiklocal /path/to/media/folder       # Direct path argument
+poetry run tiklocal --port 9000                 # Custom port with config file
+MEDIA_ROOT=/path tiklocal                       # Environment variable
+tiklocal                                        # Use config file
 
-# Or run directly
-python -m tiklocal.run
+# Configuration file (optional)
+# Create ~/.config/tiklocal/config.yaml:
+# media_root: /path/to/media
+# host: 0.0.0.0
+# port: 8000
+
+# Get help
+tiklocal --help
 ```
 
 ## Architecture
@@ -45,8 +54,8 @@ python -m tiklocal.run
 ### Core Application Structure
 
 - **`tiklocal/app.py`**: Main Flask application factory with all routes and view functions
-- **`tiklocal/run.py`**: Entry point that starts the Waitress WSGI server on port 8000
-- **`tiklocal/config.py`**: Configuration file (currently empty, uses environment variables)
+- **`tiklocal/run.py`**: CLI entry point with argument parsing, config file loading, and Waitress server startup
+- **`tiklocal/config.py`**: Configuration file (currently empty, configuration handled via config file/env vars)
 
 ### Key Routes and Features
 
@@ -74,14 +83,63 @@ python -m tiklocal.run
 
 ### Configuration
 
-- **Environment Variables**: `MEDIA_ROOT` (required) - path to media directory
+The application supports multiple configuration methods with the following priority (highest to lowest):
+
+1. **Command Line Arguments**: Direct arguments passed to `tiklocal`
+   - `tiklocal /path/to/media` - specify media root
+   - `--host HOST` - server host (default: 0.0.0.0)
+   - `--port PORT` - server port (default: 8000)
+
+2. **Environment Variables**:
+   - `MEDIA_ROOT` - path to media directory
+   - `TIKLOCAL_HOST` - server host
+   - `TIKLOCAL_PORT` - server port
+
+3. **Configuration File**: `~/.config/tiklocal/config.yaml` or `~/.tiklocal/config.yaml`
+   ```yaml
+   media_root: /path/to/media
+   host: 0.0.0.0
+   port: 8000
+   ```
+
+4. **Defaults**: host=0.0.0.0, port=8000
+
 - **Instance Config**: Uses Flask's instance-relative configuration
 - **Favorites**: Stored as JSON file in media root directory
 
 ## Development Notes
 
-- The application uses environment variable `MEDIA_ROOT` to determine media location
+- Configuration priority: CLI args > Environment variables > Config file > Defaults
+- Config file locations: `~/.config/tiklocal/config.yaml` or `~/.tiklocal/config.yaml`
 - Templates include responsive design optimized for mobile and tablet usage
 - Custom Jinja2 filters for timestamp and file size formatting
 - Error handling includes user-friendly messages and proper HTTP status codes
 - Dark mode implementation uses CSS custom properties and data attributes
+
+## Release Process
+
+When publishing a new version to PyPI:
+
+1. **Update version number** in `pyproject.toml`:
+   ```toml
+   version = "x.y.z"
+   ```
+
+2. **Commit changes**:
+   ```bash
+   git add .
+   git commit -m "Release vx.y.z: description of changes"
+   ```
+
+3. **Create and push git tag** (required for PyPI build):
+   ```bash
+   git tag -a vx.y.z -m "Release vx.y.z: description"
+   git push origin vx.y.z
+   ```
+
+4. **Push commits**:
+   ```bash
+   git push
+   ```
+
+**Note**: The git tag triggers the CI/CD pipeline to automatically build and publish to PyPI.

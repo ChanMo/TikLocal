@@ -3,8 +3,8 @@
   "version": "0.1.6",
   "description": "A local media server that combines the features of TikTok and Pinterest",
   "scripts": {
-    "build-css": "tailwindcss -i ./tiklocal/static/tailwind.css -o ./tiklocal/static/output.css --watch",
-    "build-css-prod": "tailwindcss -i ./tiklocal/static/tailwind.css -o ./tiklocal/static/output.css --minify",
+    "build-css": "tailwindcss -i ./tiklocal/static/input.css -o ./tiklocal/static/output.css --watch",
+    "build-css-prod": "tailwindcss -i ./tiklocal/static/input.css -o ./tiklocal/static/output.css --minify",
     "dev": "npm run build-css",
     "build": "npm run build-css-prod"
   },

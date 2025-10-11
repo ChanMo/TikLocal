@@ -5,6 +5,7 @@
     <title>TikLocal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='output.css')}}">
+    <script src="{{url_for('static', filename='feather.min.js')}}"></script>
     {% block extra_head %}{% endblock %}
   </head>
   <body data-theme="{{ theme if theme else 'light' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen pb-16 transition-colors duration-300">
@@ -39,7 +40,6 @@
     </nav>
     
     {% block extra_body %}{% endblock %}
-    <script src="{{url_for('static', filename='feather.min.js')}}"></script>
     <script>
       // 主题管理类
       class ThemeManager {

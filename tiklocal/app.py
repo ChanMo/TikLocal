@@ -180,6 +180,40 @@ def create_app(test_config=None):
 
         return json.dumps(res)
 
+    @app.route('/api/random-images')
+    def api_random_images():
+        """ API to get random images with pagination """
+        root = Path(app.config["MEDIA_ROOT"])
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('size', 30))
+
+        # 获取所有图片文件
+        images = []
+        for ext in ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.webp', '*.bmp']:
+            images.extend(root.glob(f'**/{ext}'))
+            images.extend(root.glob(f'**/{ext.upper()}'))
+
+        # 随机打乱（使用固定种子确保同一会话中的一致性）
+        seed = request.args.get('seed', str(random.randint(1, 999999)))
+        random.seed(seed)
+        random.shuffle(images)
+
+        # 分页
+        total = len(images)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_images = images[start:end]
+
+        res = [str(img.relative_to(root)) for img in page_images]
+
+        return {
+            'images': res,
+            'page': page,
+            'total': total,
+            'has_more': end < total,
+            'seed': seed
+        }
+
 
     @app.route('/settings/')
     def settings_view():
