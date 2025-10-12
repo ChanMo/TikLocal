@@ -9,6 +9,7 @@ import datetime
 import subprocess as sp
 from urllib.parse import quote, unquote
 from importlib.metadata import version, PackageNotFoundError
+import math
 
 from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, session, redirect
@@ -18,6 +19,79 @@ try:
     app_version = version("tiklocal")
 except PackageNotFoundError:
     app_version = '1.0.0'
+
+FAVORITE_FILENAME = 'favorite.json'
+
+
+def load_favorites(media_root: Path) -> set[str]:
+    """Read favorite entries stored alongside the media library."""
+    favorites_path = media_root / FAVORITE_FILENAME
+    if not favorites_path.exists():
+        return set()
+
+    try:
+        with favorites_path.open('r', encoding='utf-8') as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return {str(item) for item in data}
+    except Exception as exc:
+        print(f"读取收藏列表失败: {exc}", file=sys.stderr)
+    return set()
+
+
+def build_weighted_entries(files: list[Path], favorites: set[str], root: Path) -> list[tuple[str, float]]:
+    """Assign a weight to each file based on recency and favorite status."""
+    now = datetime.datetime.now()
+    weighted: list[tuple[str, float]] = []
+    for file_path in files:
+        if not file_path.exists() or not file_path.is_file():
+            continue
+
+        try:
+            mtime = file_path.stat().st_mtime
+        except (FileNotFoundError, PermissionError):
+            continue
+
+        rel_path = str(file_path.relative_to(root))
+        favorite_boost = 3.0 if rel_path in favorites else 1.0
+        age_days = max((now - datetime.datetime.fromtimestamp(mtime)).total_seconds() / 86400, 0.0)
+        time_weight = math.exp(-age_days / 90.0)
+        weight = favorite_boost * (0.1 + time_weight)
+        weighted.append((rel_path, weight))
+    return weighted
+
+
+def weighted_select(entries: list[tuple[str, float]], limit: int | None = None, rng: random.Random | None = None) -> list[str]:
+    """Pick items without replacement using the provided weights."""
+    if not entries:
+        return []
+
+    rng = rng or random
+    pool = entries[:]
+    target = len(pool) if limit is None else min(limit, len(pool))
+    result: list[str] = []
+
+    while pool and len(result) < target:
+        total_weight = sum(weight for _, weight in pool)
+        if total_weight <= 0:
+            rng.shuffle(pool)
+            result.extend([path for path, _ in pool][: target - len(result)])
+            break
+
+        pick = rng.random() * total_weight
+        cumulative = 0.0
+        for index, (path, weight) in enumerate(pool):
+            cumulative += weight
+            if cumulative >= pick:
+                result.append(path)
+                pool.pop(index)
+                break
+
+    if limit is None and pool:
+        rng.shuffle(pool)
+        result.extend([path for path, _ in pool])
+
+    return result
 
 
 def create_app(test_config=None):
@@ -172,13 +246,10 @@ def create_app(test_config=None):
         """ API to get random videos """
         root = Path(app.config["MEDIA_ROOT"])
         videos = list(root.glob('**/*.mp4')) + list(root.glob('**/*.webm'))
-        random.shuffle(videos)
-        res = []
-
-        for row in videos[:20]:
-            res.append(str(row.relative_to(root)))
-
-        return json.dumps(res)
+        favorites = load_favorites(root)
+        weighted = build_weighted_entries(videos, favorites, root)
+        selected = weighted_select(weighted, limit=20)
+        return json.dumps(selected)
 
     @app.route('/api/random-images')
     def api_random_images():
@@ -193,18 +264,22 @@ def create_app(test_config=None):
             images.extend(root.glob(f'**/{ext}'))
             images.extend(root.glob(f'**/{ext.upper()}'))
 
-        # 随机打乱（使用固定种子确保同一会话中的一致性）
-        seed = request.args.get('seed', str(random.randint(1, 999999)))
-        random.seed(seed)
-        random.shuffle(images)
+        seed = request.args.get('seed')
+        if seed is None:
+            seed = str(random.randint(1, 999999))
+
+        favorites = load_favorites(root)
+        weighted = build_weighted_entries(images, favorites, root)
+        rng = random.Random(seed)
+        ordered = weighted_select(weighted, limit=len(weighted), rng=rng)
 
         # 分页
-        total = len(images)
+        total = len(ordered)
         start = (page - 1) * page_size
         end = start + page_size
-        page_images = images[start:end]
+        page_images = ordered[start:end]
 
-        res = [str(img.relative_to(root)) for img in page_images]
+        res = page_images
 
         return {
             'images': res,
@@ -302,7 +377,7 @@ def create_app(test_config=None):
 
     @app.route('/favorite')
     def favorite_view():
-        db = Path(app.config["MEDIA_ROOT"]) / 'favorite.json'
+        db = Path(app.config["MEDIA_ROOT"]) / FAVORITE_FILENAME
         text = []
         if db.exists():
             with db.open() as f:
@@ -317,7 +392,7 @@ def create_app(test_config=None):
     @app.route('/api/favorite/<name>', methods=['GET', 'POST'])
     def favorite_api(name):
         try:
-            db = Path(app.config["MEDIA_ROOT"]) / 'favorite.json'
+            db = Path(app.config["MEDIA_ROOT"]) / FAVORITE_FILENAME
             text = []
             if db.exists():
                 with db.open() as f:
