@@ -65,7 +65,7 @@
               class="video-player w-full max-h-[70vh] object-contain"
               id="main-video"
               src="/media/{{file}}"
-              poster=""
+              poster="/thumb?uri={{file}}"
             >
               您的浏览器不支持视频播放。
             </video>
@@ -193,6 +193,14 @@
               <i data-feather="heart" class="w-4 h-4"></i>
               <span id="favorite-text">添加收藏</span>
             </button>
+
+            <button 
+              id="set-thumb-btn"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="camera" class="w-4 h-4"></i>
+              设为缩略图（取当前帧）
+            </button>
             
             <a 
               href="/media/{{file}}" 
@@ -304,6 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const copyLinkBtn = document.getElementById('copy-link-btn');
   const speedBtns = document.querySelectorAll('.speed-btn');
   const videoControls = document.getElementById('video-controls');
+  const setThumbBtn = document.getElementById('set-thumb-btn');
   
   const fileName = "{{file}}";
   let isFavorited = false;
@@ -479,6 +488,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 初始化
   initFavoriteStatus();
+
+  // 设为缩略图（取当前暂停帧）
+  setThumbBtn?.addEventListener('click', async () => {
+    try {
+      const ts = Math.max(0, mainVideo.currentTime || 0);
+      const resp = await fetch(`/api/thumbnail/${encodeURIComponent(fileName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ time: ts })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        // 强制刷新 poster 缓存
+        mainVideo.setAttribute('poster', `/thumb?uri=${encodeURIComponent(fileName)}&v=${Date.now()}`);
+        showNotification('缩略图已更新', 'success');
+      } else {
+        showNotification(data.error || '缩略图生成失败', 'error');
+      }
+    } catch (e) {
+      showNotification('发生错误，请稍后重试', 'error');
+    }
+  });
 });
 
 // 删除确认

@@ -10,9 +10,11 @@ import subprocess as sp
 from urllib.parse import quote, unquote
 from importlib.metadata import version, PackageNotFoundError
 import math
+import hashlib
 
 from pathlib import Path
-from flask import Flask, render_template, send_from_directory, request, session, redirect
+from flask import Flask, render_template, send_from_directory, request, session, redirect, send_file
+from tiklocal.paths import get_thumbnails_dir, get_thumbs_map_path
 
 
 try:
@@ -21,6 +23,7 @@ except PackageNotFoundError:
     app_version = '1.0.0'
 
 FAVORITE_FILENAME = 'favorite.json'
+VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.mkv', '.avi', '.m4v'}
 
 
 def load_favorites(media_root: Path) -> set[str]:
@@ -106,6 +109,153 @@ def create_app(test_config=None):
         os.makedirs(app.instance_path)
     except OSError:
         pass
+
+    # 缩略图配置（统一使用全局数据目录 ~/.tiklocal 或 TIKLOCAL_INSTANCE）
+    THUMB_DIR = get_thumbnails_dir()
+    THUMB_MAP = get_thumbs_map_path()
+
+    PLACEHOLDER_PNG = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0cIDAT\x08\x99c\xf8\xff\xff?\x00\x05\xfe\x02\xfeA\x93\x8a\x1d\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    def _thumb_key(rel_path: str) -> str:
+        return hashlib.sha1(rel_path.encode('utf-8', errors='ignore')).hexdigest() + '.jpg'
+
+    def _thumb_path(rel_path: str) -> Path:
+        return THUMB_DIR / _thumb_key(rel_path)
+
+    def _load_thumb_map() -> dict:
+        if THUMB_MAP.exists():
+            try:
+                with THUMB_MAP.open('r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
+            except Exception as exc:
+                print(f"读取缩略图映射失败: {exc}", file=sys.stderr)
+        return {}
+
+    def _save_thumb_map(data: dict) -> None:
+        try:
+            with THUMB_MAP.open('w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception as exc:
+            print(f"保存缩略图映射失败: {exc}", file=sys.stderr)
+
+    def _ffmpeg_capture(input_path: Path, output_path: Path, ts: float | None) -> bool:
+        """用 ffmpeg 截帧到 output_path，返回是否成功。"""
+        candidates = []
+        if ts is not None and ts >= 0:
+            candidates = [ts]
+        else:
+            # 无时长信息时的保守候选
+            candidates = [5.0, 1.0, 0.1]
+
+        for t in candidates:
+            cmd = [
+                'ffmpeg',
+                '-y',
+                '-ss', str(max(0.0, float(t))),
+                '-i', str(input_path),
+                '-frames:v', '1',
+                '-vf', 'scale=-1:360:force_original_aspect_ratio=decrease',
+                '-q:v', '3',
+                str(output_path)
+            ]
+            try:
+                proc = sp.run(cmd, stdout=sp.DEVNULL, stderr=sp.DEVNULL, timeout=30)
+                if output_path.exists() and output_path.stat().st_size > 0:
+                    return True
+            except FileNotFoundError:
+                # 未安装 ffmpeg
+                return False
+            except sp.TimeoutExpired:
+                continue
+            except Exception as exc:
+                print(f"ffmpeg 截帧错误: {exc}", file=sys.stderr)
+                continue
+        return False
+
+    def _is_video(path: Path) -> bool:
+        try:
+            mime = mimetypes.guess_type(path.name)[0] or ''
+        except Exception:
+            mime = ''
+        if path.suffix.lower() in VIDEO_EXTENSIONS:
+            return True
+        return mime.startswith('video/')
+
+    @app.route('/thumb')
+    def thumb_view():
+        """按需返回或生成缩略图，不污染 MEDIA_ROOT。"""
+        uri = request.args.get('uri')
+        if not uri:
+            return send_file(io.BytesIO(PLACEHOLDER_PNG), mimetype='image/png')
+
+        # 解析并校验路径
+        try:
+            media_root: Path = Path(app.config["MEDIA_ROOT"])
+            target = media_root / Path(unquote(uri))
+            target = target.resolve()
+            # 拒绝越权访问
+            if not str(target).startswith(str(media_root.resolve())):
+                return send_file(io.BytesIO(PLACEHOLDER_PNG), mimetype='image/png')
+        except Exception:
+            return send_file(io.BytesIO(PLACEHOLDER_PNG), mimetype='image/png')
+
+        rel_path = str(Path(unquote(uri)))
+        thumb_file = _thumb_path(rel_path)
+
+        # 仅为视频生成缩略图
+        if not _is_video(target):
+            return send_file(io.BytesIO(PLACEHOLDER_PNG), mimetype='image/png')
+
+        if not thumb_file.exists():
+            # 生成缩略图（懒生成）
+            ok = _ffmpeg_capture(target, thumb_file, None)
+            if not ok:
+                return send_file(io.BytesIO(PLACEHOLDER_PNG), mimetype='image/png')
+
+        return send_from_directory(THUMB_DIR, thumb_file.name)
+
+    @app.route('/api/thumbnail/<path:name>', methods=['POST'])
+    def set_thumbnail(name):
+        """将指定时间点设为缩略图。"""
+        try:
+            media_root: Path = Path(app.config["MEDIA_ROOT"])
+            target = (media_root / name).resolve()
+            if not target.exists() or not str(target).startswith(str(media_root.resolve())):
+                return {'success': False, 'error': '文件不存在或非法路径'}, 400
+
+            payload = request.get_json(silent=True) or {}
+            ts = payload.get('time', None)
+            try:
+                ts_val = None if ts is None else max(0.0, float(ts))
+            except (TypeError, ValueError):
+                ts_val = None
+
+            rel_path = str(Path(name))
+            thumb_file = _thumb_path(rel_path)
+            # 重新生成
+            ok = _ffmpeg_capture(target, thumb_file, ts_val)
+            if not ok:
+                return {'success': False, 'error': '缩略图生成失败（可能未安装 ffmpeg）'}, 500
+
+            # 记录映射
+            mapping = _load_thumb_map()
+            mapping[rel_path] = {
+                'ts': ts_val if ts_val is not None else None,
+                'updated_at': datetime.datetime.now().isoformat(timespec='seconds')
+            }
+            _save_thumb_map(mapping)
+
+            return {
+                'success': True,
+                'url': f"/thumb?uri={quote(rel_path)}&v={int(datetime.datetime.now().timestamp())}"
+            }
+        except Exception as exc:
+            print(f"设置缩略图错误: {exc}", file=sys.stderr)
+            return {'success': False, 'error': '内部错误'}, 500
 
     # 添加自定义过滤器
     @app.template_filter('timestamp_to_date')
@@ -211,6 +361,26 @@ def create_app(test_config=None):
     def browse():
         root = Path(app.config["MEDIA_ROOT"])
         videos = list(root.glob('**/*.mp4')) + list(root.glob('**/*.webm'))
+
+        # 大文件快速筛选：通过 query 参数启用（size=big），默认阈值 50MB，可用 min_mb 调整
+        size_mode = request.args.get('size', 'all')
+        try:
+            min_mb = int(request.args.get('min_mb', 50))
+        except ValueError:
+            min_mb = 50
+        has_min_mb = request.args.get('min_mb') is not None
+
+        if size_mode == 'big':
+            threshold = min_mb * 1024 * 1024
+            filtered = []
+            for v in videos:
+                try:
+                    if v.stat().st_size >= threshold:
+                        filtered.append(v)
+                except (FileNotFoundError, PermissionError):
+                    continue
+            videos = filtered
+
         videos = sorted(videos, key=lambda row:row.stat().st_ctime, reverse=True)
         count = len(videos)
         page = int(request.args.get('page', 1))
@@ -228,6 +398,9 @@ def create_app(test_config=None):
             length = length,
             files = res,
             menu = 'browse',
+            size_mode = size_mode,
+            min_mb = min_mb,
+            has_min_mb = has_min_mb,
             has_previous = page > 1,
             has_next = len(videos[offset+length:])>1
         )
@@ -337,6 +510,18 @@ def create_app(test_config=None):
                 file_path = Path(app.config["MEDIA_ROOT"]) / name
                 if file_path.exists():
                     os.unlink(file_path)
+                # 清理缩略图及映射
+                try:
+                    rel_path = str(Path(name))
+                    thumb_file = _thumb_path(rel_path)
+                    if thumb_file.exists():
+                        thumb_file.unlink(missing_ok=True)
+                    mapping = _load_thumb_map()
+                    if rel_path in mapping:
+                        mapping.pop(rel_path, None)
+                        _save_thumb_map(mapping)
+                except Exception as _:
+                    pass
                 return redirect('/browse')
             except Exception as e:
                 print(f"删除文件错误: {e}")
