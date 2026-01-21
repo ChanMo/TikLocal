@@ -2,157 +2,126 @@
 
 {% block extra_head %}
 <style>
-  @keyframes slideInFromRight {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+  /* Immersive Discovery Feed */
+  body {
+    background-color: #000;
   }
-  @keyframes slideInFromLeft {
-    from { transform: translateX(-100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+  
+  #image-grid {
+    column-count: 2;
+    column-gap: 8px;
+    padding: 8px;
   }
-  @keyframes slideOutToRight {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(100%); opacity: 0; }
+  @media (min-width: 640px) { #image-grid { column-count: 3; } }
+  @media (min-width: 1024px) { #image-grid { column-count: 4; } }
+  @media (min-width: 1536px) { #image-grid { column-count: 5; } }
+
+  .grid-item {
+    break-inside: avoid;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    background: #1a1a1a;
+    cursor: pointer;
+    transition: transform 0.2s ease;
   }
-  @keyframes slideOutToLeft {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(-100%); opacity: 0; }
+  .grid-item:active {
+    transform: scale(0.98);
   }
-  @keyframes slideOutToBottom {
-    from { transform: translateY(0); opacity: 1; }
-    to { transform: translateY(100%); opacity: 0; }
+  .grid-item img {
+    width: 100%;
+    height: auto;
+    display: block;
+    opacity: 0;
+    transition: opacity 0.4s ease;
   }
-  .modal-img-animate {
-    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  .grid-item img.loaded {
+    opacity: 1;
   }
-  .slide-in-from-right { animation: slideInFromRight 0.3s ease-out forwards; }
-  .slide-in-from-left { animation: slideInFromLeft 0.3s ease-out forwards; }
-  .slide-out-to-right { animation: slideOutToRight 0.3s ease-in forwards; }
-  .slide-out-to-left { animation: slideOutToLeft 0.3s ease-in forwards; }
-  .slide-out-to-bottom { animation: slideOutToBottom 0.3s ease-in forwards; }
+
+  #img-loading {
+    text-align: center;
+    color: #666;
+    padding: 40px;
+    font-size: 14px;
+  }
+
+  /* Modal Overlay */
+  #modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+  }
+  #modal.active {
+    display: flex;
+  }
+  #modal img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  .modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: white;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+    padding: 10px;
+    cursor: pointer;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-5">
-    <div id="folder-mode">
-        {% if subdirs %}
-        <nav class="mb-4" aria-label="breadcrumbs">
-          <ol class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-            <li><a href="/gallery" class="hover:text-gray-700 dark:hover:text-gray-200">Root</a></li>
-            {% set path = [] %}
-            {% for row in subdirs %}
-            {% set _ = path.append(row) %}
-            <li>
-              <span class="mx-2">/</span>
-            </li>
-            {% if not loop.last %}
-            <li><a href="?subdir={{path|join('/')}}" class="hover:text-gray-700 dark:hover:text-gray-200">{{row}}</a></li>
-            {% else %}
-            <li class="text-gray-700 dark:text-gray-200" aria-current="page">{{row}}</li>
-            {% endif %}
-            {% endfor %}
-          </ol>
-        </nav>
-        {% endif %}
-
-        {% if directories %}
-        <div class="flex flex-wrap gap-2 mb-4">
-          {% for row in directories %}
-          <a class="bg-gray-200 text-gray-800 hover:bg-gray-300 px-3 py-1 rounded-full text-sm dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600" href="?media_type={{media_type}}&subdir={% if subdir %}{{subdir}}/{% endif %}{{row.name}}">{{row.name}}</a>
-          {% endfor %}
-        </div>
-        {% endif %}
-
-        {% if recent %}
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-5">
-          {% for row in recent %}
-          <div class="gallery-item group relative cursor-pointer" data-value="/media?uri={{uri}}{{row.name}}" data-uri="{{uri}}{{row.name}}">
-            <img class="block w-full h-48 rounded-lg object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" src="/media?uri={{uri}}{{row.name}}" />
-            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-25 transition-all duration-300 rounded-lg -z-1"></div>
-          </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <p class="block py-6 text-gray-500 dark:text-gray-400 text-center">Empty.</p>
-        {% endif %}
-    </div>
-
-    <div id="random-mode" class="hidden">
-        <div id="random-gallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-5"></div>
-        <div id="loading" class="hidden text-center py-4 text-gray-500 dark:text-gray-400">加载中...</div>
-    </div>
+<div class="container mx-auto">
+    <!-- Discover Grid -->
+    <div id="image-grid"></div>
+    <div id="img-loading">正在探索新内容...</div>
 </div>
 
-<!-- 模式切换按钮 -->
-<button id="mode-toggle" class="fixed bottom-20 right-6 z-40 bg-white dark:bg-gray-800 rounded-full p-4 shadow-lg hover:shadow-xl transition-shadow" aria-label="切换模式">
-    <span data-feather="shuffle" class="w-6 h-6 text-gray-700 dark:text-gray-200"></span>
-</button>
-
-<div class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-80 overflow-hidden" id="modal">
-  <div class="relative w-full max-w-screen-lg h-full flex items-center justify-center p-4">
-    <img src="" alt="" class="max-w-full max-h-full object-contain rounded-lg modal-img-animate">
-  </div>
-
-  <button class="previous-image absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed">
-    <span data-feather="arrow-left"></span>
-  </button>
-  <button class="next-image absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed">
-    <span data-feather="arrow-right"></span>
-  </button>
-  <a class="info-btn absolute top-4 right-16 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30">
-    <span data-feather="info" class="w-7 h-7"></span>
-  </a>
-  <button class="modal-close absolute top-4 right-4 rounded-full bg-white/20 p-2 text-white backdrop-blur-sm hover:bg-white/30" aria-label="close">
-      <span data-feather="x"></span>
-  </button>
+<!-- Simple Lightbox Modal -->
+<div id="modal">
+    <div class="modal-close" id="modal-close">
+        <i data-feather="x"></i>
+    </div>
+    <img id="modal-img" src="" alt="">
+    <a id="modal-info" href="#" class="fixed top-5 left-5 text-white bg-white/10 p-3 rounded-full">
+        <i data-feather="info"></i>
+    </a>
 </div>
+{% endblock %}
 
+{% block extra_body %}
 <script src="{{ url_for('static', filename='hammer.min.js') }}"></script>
 <script>
-  // 随机模式管理
   (() => {
-    const modeToggle = document.getElementById('mode-toggle');
-    const folderMode = document.getElementById('folder-mode');
-    const randomMode = document.getElementById('random-mode');
-    const randomGallery = document.getElementById('random-gallery');
-    const loading = document.getElementById('loading');
+    const grid = document.getElementById('image-grid');
+    const loading = document.getElementById('img-loading');
+    const modal = document.getElementById('modal');
+    const modalImg = document.getElementById('modal-img');
+    const modalClose = document.getElementById('modal-close');
+    const modalInfo = document.getElementById('modal-info');
 
-    let currentMode = localStorage.getItem('galleryMode') || 'folder';
-    let currentPage = 1;
-    let isLoading = false;
-    let hasMore = true;
+    let page = 1;
     let seed = null;
+    let hasMore = true;
+    let isLoading = false;
 
-    function updateModeIcon() {
-      if (!modeToggle) return;
-      const iconName = currentMode === 'folder' ? 'shuffle' : 'folder';
-      modeToggle.innerHTML = `<span data-feather="${iconName}" class="w-6 h-6 text-gray-700 dark:text-gray-200"></span>`;
-      feather.replace();
-    }
-
-    function switchMode() {
-      currentMode = currentMode === 'folder' ? 'random' : 'folder';
-      localStorage.setItem('galleryMode', currentMode);
-
-      if (currentMode === 'random') {
-        folderMode.classList.add('hidden');
-        randomMode.classList.remove('hidden');
-        if (randomGallery.children.length === 0) loadRandomImages();
-      } else {
-        folderMode.classList.remove('hidden');
-        randomMode.classList.add('hidden');
-      }
-      updateModeIcon();
-    }
-
-    async function loadRandomImages() {
+    async function loadImages() {
       if (isLoading || !hasMore) return;
       isLoading = true;
-      loading.classList.remove('hidden');
+      loading.style.display = 'block';
 
       try {
-        const url = `/api/random-images?page=${currentPage}&size=30${seed ? '&seed=' + seed : ''}`;
+        const url = `/api/random-images?page=${page}&size=30${seed ? '&seed=' + seed : ''}`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -161,163 +130,54 @@
 
         data.images.forEach(uri => {
           const div = document.createElement('div');
-          div.className = 'gallery-item group relative cursor-pointer';
-          div.dataset.value = `/media?uri=${encodeURIComponent(uri)}`;
-          div.dataset.uri = uri;
+          div.className = 'grid-item';
           div.innerHTML = `
-            <img class="block w-full h-48 rounded-lg object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
-                 src="/media?uri=${encodeURIComponent(uri)}" loading="lazy" />
-            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-25 transition-all duration-300 rounded-lg -z-1"></div>
+            <img src="/media?uri=${encodeURIComponent(uri)}" loading="lazy" 
+                 onload="this.classList.add('loaded')" 
+                 onclick="openModal('${encodeURIComponent(uri)}')">
           `;
-          randomGallery.appendChild(div);
+          grid.appendChild(div);
         });
 
-        currentPage++;
-        if (window.attachModalEvents) window.attachModalEvents();
+        page++;
       } catch (err) {
-        console.error('加载图片失败:', err);
+        console.error('Failed to load images:', err);
       } finally {
         isLoading = false;
-        loading.classList.add('hidden');
+        loading.style.display = hasMore ? 'block' : 'none';
       }
     }
 
-    function handleScroll() {
-      if (currentMode !== 'random') return;
-      const scrollTop = window.scrollY;
-      const windowHeight = window.innerHeight;
-      const docHeight = document.documentElement.scrollHeight;
-
-      if (scrollTop + windowHeight >= docHeight - 500) {
-        loadRandomImages();
-      }
-    }
-
-    if (modeToggle) {
-      modeToggle.addEventListener('click', switchMode);
-    }
-    window.addEventListener('scroll', handleScroll);
-
-    // 初始化模式
-    if (currentMode === 'random') {
-      folderMode.classList.add('hidden');
-      randomMode.classList.remove('hidden');
-      loadRandomImages();
-    }
-    updateModeIcon();
-  })();
-
-  // 模态框管理
-  (() => {
-    let index = -1;
-    let isAnimating = false;
-    const modal = document.getElementById("modal");
-    if (!modal) return;
-
-    const modalImg = modal.querySelector("img");
-    const infoBtn = modal.querySelector(".info-btn");
-    const prevBtn = document.querySelector(".previous-image");
-    const nextBtn = document.querySelector(".next-image");
-    const modalCloseBtn = document.querySelector('.modal-close');
-
-    window.showModal = function(i) {
-      const itemList = document.querySelectorAll(".gallery-item");
-      if (isAnimating || !itemList.length) return;
-
-      index = i;
-      const item = itemList[index];
-      if (!item) return;
-
-      modalImg.className = 'max-w-full max-h-full object-contain rounded-lg modal-img-animate';
-      modalImg.src = item.dataset.value;
-      infoBtn.href = "/image?uri=" + item.dataset.uri;
-
-      if (prevBtn) prevBtn.disabled = index === 0;
-      if (nextBtn) nextBtn.disabled = index === itemList.length - 1;
-
-      if (!modal.classList.contains('flex')) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        feather.replace();
-      }
+    window.openModal = (uri) => {
+        const decodedUri = decodeURIComponent(uri);
+        modalImg.src = `/media?uri=${uri}`;
+        modalInfo.href = `/image?uri=${uri}`;
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
     };
 
-    function hideModal(direction = 'none') {
-        if (isAnimating) return;
-        isAnimating = true;
+    const closeModal = () => {
+        modal.classList.remove('active');
+        modalImg.src = '';
+        document.body.style.overflow = '';
+    };
 
-        const animationClass = direction === 'down' ? 'slide-out-to-bottom' : '';
-        if(animationClass) modalImg.classList.add(animationClass);
+    modalClose.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
 
-        setTimeout(() => {
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            modalImg.src = "";
-            modalImg.className = 'max-w-full max-h-full object-contain rounded-lg modal-img-animate';
-            isAnimating = false;
-        }, 300);
-    }
-
-    function navigate(direction) {
-        if (isAnimating) return;
-        const itemList = document.querySelectorAll(".gallery-item");
-        const newIndex = direction === 'next' ? index + 1 : index - 1;
-        if (newIndex < 0 || newIndex >= itemList.length) return;
-
-        isAnimating = true;
-        const outClass = direction === 'next' ? 'slide-out-to-left' : 'slide-out-to-right';
-        modalImg.classList.add(outClass);
-
-        setTimeout(() => {
-            const item = itemList[newIndex];
-            index = newIndex;
-
-            const animationClass = direction === 'next' ? 'slide-in-from-right' : 'slide-in-from-left';
-            modalImg.className = 'max-w-full max-h-full object-contain rounded-lg modal-img-animate';
-            modalImg.classList.add(animationClass);
-            modalImg.src = item.dataset.value;
-            infoBtn.href = "/image?uri=" + item.dataset.uri;
-
-            if (prevBtn) prevBtn.disabled = index === 0;
-            if (nextBtn) nextBtn.disabled = index === itemList.length - 1;
-
-            setTimeout(() => { isAnimating = false; }, 300);
-        }, 150);
-    }
-
-    function attachModalEvents() {
-      const itemList = document.querySelectorAll(".gallery-item");
-      itemList.forEach((ele, i) => {
-        if (!ele.dataset.modalAttached) {
-          ele.addEventListener("click", () => showModal(i));
-          ele.dataset.modalAttached = 'true';
-        }
-      });
-    }
-
-    if(modalCloseBtn) modalCloseBtn.addEventListener('click', (e) => { e.stopPropagation(); hideModal(); });
-    if(modal) modal.addEventListener('click', (e) => { if (e.target === modal) hideModal(); });
-    if (prevBtn) prevBtn.addEventListener("click", (e) => { e.stopPropagation(); navigate('prev'); });
-    if (nextBtn) nextBtn.addEventListener("click", (e) => { e.stopPropagation(); navigate('next'); });
-
-    document.addEventListener('keydown', (e) => {
-        if (modal.classList.contains('hidden')) return;
-        if (e.key === 'ArrowLeft') prevBtn.click();
-        if (e.key === 'ArrowRight') nextBtn.click();
-        if (e.key === 'Escape') hideModal();
+    window.addEventListener('scroll', () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800) {
+        loadImages();
+      }
     });
 
-    const mc = new Hammer(modal);
-    mc.get('swipe').set({ direction: Hammer.DIRECTION_ALL });
-    mc.on('swipeleft', () => nextBtn.click());
-    mc.on('swiperight', () => prevBtn.click());
-    mc.on('swipedown', () => hideModal('down'));
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+    });
 
-    // 暴露 attachModalEvents 供随机模式使用
-    window.attachModalEvents = attachModalEvents;
-
-    // 初始化文件夹模式的事件
-    attachModalEvents();
+    // Init
+    loadImages();
   })();
 </script>
 {% endblock %}

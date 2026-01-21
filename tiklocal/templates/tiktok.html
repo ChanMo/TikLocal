@@ -1,233 +1,236 @@
 {% extends "base.html" %}
 {% block extra_head %}
 <style>
+/* Immersive Video Feed Layout */
 body {
   padding-bottom: 0 !important;
+  overscroll-behavior-y: none;
+  background-color: #000;
 }
-nav {
-  display: none !important;
-}
-html,body {
-  height: 100vh;
-  height: 100dvh;
-  background: black;
-  margin: 0;
+html, body {
+  height: 100%;
   overflow: hidden;
 }
+
+/* Main Container */
 #container {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  position: relative;
+  height: 100%;
+  z-index: 0;
+  background: #000;
 }
+
+/* Video Player */
 video {
   width: 100%;
   height: 100%;
+  object-fit: contain;
+  display: none;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  display: none;
-  object-fit: contain;
 }
-.fab {
-  position: fixed;
-  bottom: 5.75rem;
-  right: 1.75rem;
+video.active {
+  display: block;
+}
+
+/* Right Side Controls */
+.controls-sidebar {
+  position: absolute;
+  right: 16px;
+  bottom: calc(100px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  z-index: 1000;
+  gap: 20px;
+  z-index: 20;
+  align-items: center;
 }
-.fab svg {
-  width: 40px;
-  height: 40px;
-  color: #e3e3e3;
-}
-.speed-btn {
-  width: 40px;
-  height: 40px;
+
+.action-btn {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  color: white;
+  text-decoration: none;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
   cursor: pointer;
 }
-.speed-text {
-  color: #e3e3e3;
+.action-btn:active {
+  transform: scale(0.9);
+}
+.action-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+}
+
+/* Speed Button Specifics */
+.speed-btn {
   font-size: 14px;
-  font-weight: bold;
+  font-weight: 700;
+  font-family: system-ui, sans-serif;
 }
-.is-active svg {
-  fill: #ff0000;
+
+/* Like Button Animation */
+@keyframes heart-burst {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
+.action-btn.is-active .heart-filled {
+  display: block;
+  color: #fe2c55;
+  animation: heart-burst 0.3s forwards;
+}
+.action-btn.is-active .heart-outline {
+  display: none;
+}
+.heart-filled {
+  display: none;
+}
+
 </style>
 {% endblock %}
+
 {% block content %}
 <div id="container">
-  <div class="fab">
-    <a id="speed-btn" class="speed-btn">
-      <span class="speed-text">1x</span>
+  
+  <!-- Video Feed Container -->
+  <div id="video-container">
+    <!-- Videos will be injected here -->
+  </div>
+
+  <!-- Right Sidebar Controls -->
+  <div class="controls-sidebar" id="controls">
+    <!-- Speed Control -->
+    <div class="action-btn speed-btn" id="speed-btn">1x</div>
+    
+    <!-- Favorite Control -->
+    <a href="#" class="action-btn" id="favorite-btn" data-value="">
+      <svg class="heart-outline" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+      <svg class="heart-filled" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
     </a>
-    <a id="favorite-btn" data-value="">
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-    </a>
-    <a id="info-btn" href="">
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-    </a>
-    <a href="/gallery">
-      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF"><path d="M0 0h24v24H0z" fill="none"/><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+
+    <!-- Info/Detail Control -->
+    <a href="#" class="action-btn" id="info-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
     </a>
   </div>
 </div>
 {% endblock %}
+
 {% block extra_body %}
 <script src="{{url_for('static', filename='hammer.min.js')}}"></script>
 <script>
   (async() => {
-    const infoBtn = document.querySelector("#info-btn");
-    const favoriteBtn = document.getElementById("favorite-btn");
-    const speedBtn = document.getElementById("speed-btn");
-    const speedText = document.querySelector(".speed-text");
-    const container = document.querySelector('#container');
+    // Add immersive class to body
+    document.body.classList.add('immersive');
+
+    const videoContainer = document.getElementById('video-container');
+    const speedBtn = document.getElementById('speed-btn');
+    const favoriteBtn = document.getElementById('favorite-btn');
+    const infoBtn = document.getElementById('info-btn');
+
     let videos = [];
     let index = 0;
-    let isLoading = false;
+    let loadingVideos = false;
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
-    let currentSpeedIndex = 1; // 默认 1x
+    let currentSpeedIndex = 1;
 
     async function loadVideos() {
-      if (isLoading) return;
-      isLoading = true;
-      const res = await fetch('/api/videos');
-      const newVideos = await res.json();
-      newVideos.forEach(videoPath => {
-        const video = document.createElement('video');
-        video.controls = true;
-        video.classList.add('video');
-        video.muted = true;
-        video.loop = true;
-        video.dataset.name = videoPath;
-        video.dataset.src = `/media/${videoPath}`;
-        container.appendChild(video);
-      });
-      videos = container.querySelectorAll('video');
-      isLoading = false;
+      if (loadingVideos) return;
+      loadingVideos = true;
+      try {
+        const res = await fetch('/api/videos');
+        const newVideos = await res.json();
+        newVideos.forEach(videoPath => {
+          const v = document.createElement('video');
+          v.muted = true;
+          v.loop = true;
+          v.playsInline = true; 
+          v.dataset.name = videoPath;
+          v.dataset.src = `/media/${videoPath}`;
+          videoContainer.appendChild(v);
+        });
+        videos = Array.from(videoContainer.querySelectorAll('video'));
+      } finally {
+        loadingVideos = false;
+      }
     }
+
+    function showVideo(i) {
+      if (!videos.length) return;
+      const prev = index;
+      index = (i + videos.length) % videos.length;
+
+      if (videos[prev]) {
+        videos[prev].classList.remove('active');
+        videos[prev].pause();
+        videos[prev].style.display = 'none';
+      }
+
+      const currVid = videos[index];
+      if (currVid) {
+        currVid.style.display = 'block';
+        requestAnimationFrame(() => {
+          currVid.classList.add('active');
+          if (!currVid.src) { currVid.src = currVid.dataset.src; currVid.load(); }
+          currVid.muted = false;
+          currVid.playbackRate = speedOptions[currentSpeedIndex];
+          currVid.play().catch(e => console.log(e));
+          updateControls(currVid);
+        });
+      }
+    }
+
+    function updateControls(video) {
+      const name = video.dataset.name;
+      infoBtn.href = `/detail/${encodeURIComponent(name)}`;
+      favoriteBtn.dataset.value = name;
+      fetch(`/api/favorite/${encodeURIComponent(name)}`)
+        .then(r => r.json())
+        .then(d => favoriteBtn.classList.toggle('is-active', d.favorite));
+    }
+
+    const hammer = new Hammer(videoContainer);
+    hammer.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
+    hammer.on('swipeup', () => {
+      if (index >= videos.length - 3) loadVideos();
+      showVideo(index + 1);
+    });
+    hammer.on('swipedown', () => showVideo(index - 1));
+    hammer.on('tap', () => {
+      const v = videos[index];
+      if (v) v.paused ? v.play() : v.pause();
+    });
+
+    speedBtn.addEventListener('click', () => {
+      currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.length;
+      const rate = speedOptions[currentSpeedIndex];
+      speedBtn.textContent = rate + 'x';
+      if (videos[index]) videos[index].playbackRate = rate;
+    });
+
+    favoriteBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const val = favoriteBtn.dataset.value;
+      favoriteBtn.classList.toggle('is-active');
+      await fetch(`/api/favorite/${encodeURIComponent(val)}`, { method: 'POST' });
+    });
 
     await loadVideos();
-
-    if (videos.length > 0) {
-        videos[0].style.display = 'block';
-        videos[0].src = videos[0].dataset.src;
-        videos[0].load();
-        videos[0].playbackRate = speedOptions[currentSpeedIndex];
-        videos[0].play();
-
-        infoBtn.href = `/detail/${videos[0].dataset.name}`;
-        favoriteBtn.dataset.value = videos[0].dataset.name;
-        const favoriteRes = await checkFavorite(videos[0].dataset.name);
-        if(favoriteRes) {
-          favoriteBtn.classList.add("is-active");
-        } else {
-          favoriteBtn.classList.remove("is-active");
-        }
-    }
-
-
-    var manager = new Hammer.Manager(container);
-    var Swipe = new Hammer.Swipe();
-    manager.add(Swipe);
-    manager.on('swipedown', async(e) => {
-      //previous;
-      if (videos.length === 0) return;
-
-      let previous = index;
-      index -= 1;
-      if (index < 0) {
-        index = videos.length - 1;
-      }
-
-      videos[previous].style.display = 'none';
-      videos[previous].pause();
-      videos[index].style.display = 'block';
-      videos[index].muted = false;
-      videos[index].playbackRate = speedOptions[currentSpeedIndex];
-      videos[index].play();
-
-      const value = videos[index].dataset.name;      
-      infoBtn.href = `/detail/${value}`;
-      const favoriteRes = await checkFavorite(value);
-      favoriteBtn.dataset.value = value;
-      if(favoriteRes) {
-        favoriteBtn.classList.add("is-active");
-      } else {
-        favoriteBtn.classList.remove("is-active");
-      }
-    });
-    manager.on('swipeup', async(e) => {
-      //next;
-      if (videos.length === 0) return;
-
-      let previous = index;
-      index += 1;
-      if (index >= videos.length) {
-        index = 0;
-      }
-
-      if (index >= videos.length - 5) {
-          loadVideos();
-      }
-
-      videos[previous].style.display = 'none';
-      videos[previous].pause();
-
-      if (videos[index]) {
-        videos[index].style.display = 'block';
-        videos[index].src = videos[index].dataset.src;
-        videos[index].load();
-        videos[index].muted = false;
-        videos[index].playbackRate = speedOptions[currentSpeedIndex];
-        videos[index].play();
-
-        const value = videos[index].dataset.name;      
-        infoBtn.href = `/detail/${value}`;
-        const favoriteRes = await checkFavorite(value);
-        favoriteBtn.dataset.value = value;
-        if(favoriteRes) {
-          favoriteBtn.classList.add("is-active");
-        } else {
-          favoriteBtn.classList.remove("is-active");
-        }
-      }
-
-    });
-
-    async function checkFavorite(name) {
-      const res = await fetch(`/api/favorite/${name}`);
-      const resJson = await res.json();
-      return resJson.favorite;
-    }
-
-    favoriteBtn.addEventListener("click", async(e) => {
-      e.preventDefault();
-      const value = favoriteBtn.dataset.value;
-      const res = await fetch(`/api/favorite/${value}`, {
-        method: 'POST'
-      });
-      favoriteBtn.classList.toggle("is-active");
-    });
-
-    speedBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.length;
-      const speed = speedOptions[currentSpeedIndex];
-      speedText.textContent = speed + 'x';
-      if (videos[index]) {
-        videos[index].playbackRate = speed;
-      }
-    });
-  })()
+    showVideo(0);
+  })();
 </script>
 {% endblock %}

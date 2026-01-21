@@ -3,13 +3,107 @@
   <head>
     <meta charset="utf-8" />
     <title>TikLocal</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='output.css')}}">
     <script src="{{url_for('static', filename='feather.min.js')}}"></script>
+    <style>
+      /* Unified Floating Dock Styles */
+      :root {
+        --dock-bg: rgba(20, 20, 20, 0.7);
+        --dock-border: rgba(255, 255, 255, 0.12);
+        --dock-active: #fff;
+        --dock-inactive: rgba(255, 255, 255, 0.5);
+      }
+
+      [data-theme="light"] {
+        --dock-bg: rgba(255, 255, 255, 0.8);
+        --dock-border: rgba(0, 0, 0, 0.08);
+        --dock-active: #000;
+        --dock-inactive: rgba(0, 0, 0, 0.4);
+      }
+
+      .floating-dock {
+        position: fixed;
+        bottom: max(env(safe-area-inset-bottom), 24px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100% - 32px);
+        max-width: 400px;
+        height: 64px;
+        background: var(--dock-bg);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border: 1px solid var(--dock-border);
+        border-radius: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-evenly;
+        z-index: 100;
+        box-shadow: 0 10px 40px -10px rgba(0,0,0,0.3);
+        padding: 0 12px;
+        transition: transform 0.3s ease;
+      }
+
+      .dock-item {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        color: var(--dock-inactive);
+        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+      }
+
+      .dock-item svg {
+        width: 22px;
+        height: 22px;
+        stroke-width: 2;
+        transition: all 0.3s ease;
+      }
+
+      .dock-item.active {
+        color: var(--dock-active);
+      }
+      .dock-item.active svg {
+        transform: translateY(-2px);
+        stroke-width: 2.5;
+      }
+      .dock-item.active::after {
+        content: '';
+        position: absolute;
+        bottom: 6px;
+        width: 4px;
+        height: 4px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+
+      .dock-divider {
+        width: 1px;
+        height: 20px;
+        background: var(--dock-border);
+      }
+
+      /* Base layout adjustments */
+      body {
+        padding-bottom: 110px !important; /* Space for dock */
+      }
+      /* Special case for TikTok page which handles its own padding */
+      body.immersive {
+        padding-bottom: 0 !important;
+      }
+    </style>
     {% block extra_head %}{% endblock %}
   </head>
-  <body data-theme="{{ theme if theme else 'light' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen pb-16 transition-colors duration-300">
-    <!-- 快速主题切换按钮 -->
+  <body data-theme="{{ theme if theme else 'light' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen transition-colors duration-300">
+    
+    <!-- Quick Theme Toggle (Optional, can be moved to settings) -->
     <button id="quick-theme-toggle" class="fixed top-4 right-4 z-40 w-10 h-10 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center group" aria-label="切换主题">
       <i data-feather="sun" class="w-5 h-5 text-gray-600 dark:text-gray-300 block dark:hidden transition-transform"></i>
       <i data-feather="moon" class="w-5 h-5 text-gray-600 dark:text-gray-300 hidden dark:block transition-transform"></i>
@@ -17,160 +111,66 @@
 
     {% block content %}{% endblock %}
     
-    <!-- 底部导航栏 -->
-    <nav class="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-800">
-      <div class="grid h-16 max-w-lg grid-cols-4 font-medium mx-auto">
-        <a href="/" class="inline-flex flex-col items-center justify-center px-5 group {% if menu == 'index' %}text-blue-600 dark:text-blue-500{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800{% endif %}" aria-label="首页">
-            <i data-feather="home" class="w-5 h-5 mb-1"></i>
-            <span class="text-sm">首页</span>
-        </a>
-        <a href="/browse" class="inline-flex flex-col items-center justify-center px-5 group {% if menu == 'browse' %}text-blue-600 dark:text-blue-500{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800{% endif %}" aria-label="视频">
-            <i data-feather="play-circle" class="w-5 h-5 mb-1"></i>
-            <span class="text-sm">视频</span>
-        </a>
-        <a href="/gallery" class="inline-flex flex-col items-center justify-center px-5 group {% if menu == 'gallery' %}text-blue-600 dark:text-blue-500{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800{% endif %}" aria-label="图库">
-            <i data-feather="image" class="w-5 h-5 mb-1"></i>
-            <span class="text-sm">图库</span>
-        </a>
-        <a href="/settings" class="inline-flex flex-col items-center justify-center px-5 group {% if menu == 'settings' %}text-blue-600 dark:text-blue-500{% else %}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800{% endif %}" aria-label="设置">
-            <i data-feather="settings" class="w-5 h-5 mb-1"></i>
-            <span class="text-sm">设置</span>
-        </a>
-      </div>
+    <!-- Unified Floating Dock -->
+    <nav class="floating-dock">
+      <a href="/" class="dock-item {% if menu == 'index' %}active{% endif %}" aria-label="Feed">
+        <i data-feather="film"></i>
+      </a>
+      
+      <a href="/gallery" class="dock-item {% if menu == 'gallery' %}active{% endif %}" aria-label="Discover">
+        <i data-feather="grid"></i>
+      </a>
+
+      <a href="/browse" class="dock-item {% if menu == 'browse' %}active{% endif %}" aria-label="Library">
+        <i data-feather="folder"></i>
+      </a>
+
+      <a href="/settings" class="dock-item {% if menu == 'settings' %}active{% endif %}" aria-label="Settings">
+        <i data-feather="settings"></i>
+      </a>
     </nav>
     
     {% block extra_body %}{% endblock %}
     <script>
-      // 主题管理类
+      // Theme Manager
       class ThemeManager {
         constructor() {
           this.init();
           this.bindEvents();
         }
-
         init() {
-          // 获取初始主题：优先级 localStorage > 系统偏好 > 默认
           const savedTheme = localStorage.getItem('theme');
           const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           const initialTheme = savedTheme || systemTheme;
-          
           this.setTheme(initialTheme, false);
           feather.replace();
         }
-
         setTheme(theme, animate = true) {
           const body = document.body;
-          const isChanging = body.getAttribute('data-theme') !== theme;
-          
-          if (isChanging && animate) {
-            // 添加过渡动画类
-            body.classList.add('theme-changing');
-          }
-          
           body.setAttribute('data-theme', theme);
           localStorage.setItem('theme', theme);
-          
-          // 更新所有切换按钮的状态
           this.updateToggleButtons();
-          
-          // 发送主题变更事件
-          window.dispatchEvent(new CustomEvent('themeChanged', { 
-            detail: { theme, previousTheme: body.getAttribute('data-theme') }
-          }));
-          
-          if (isChanging && animate) {
-            // 动画完成后移除过渡类
-            setTimeout(() => {
-              body.classList.remove('theme-changing');
-            }, 300);
-          }
         }
-
         toggleTheme() {
           const currentTheme = document.body.getAttribute('data-theme');
-          const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-          this.setTheme(newTheme);
-          
-          // 提供触觉反馈（支持的设备）
-          if (navigator.vibrate) {
-            navigator.vibrate(50);
-          }
+          this.setTheme(currentTheme === 'dark' ? 'light' : 'dark');
         }
-
         updateToggleButtons() {
           const isDark = document.body.getAttribute('data-theme') === 'dark';
-          
-          // 更新快速切换按钮
           const quickToggle = document.getElementById('quick-theme-toggle');
           if (quickToggle) {
-            const sunIcon = quickToggle.querySelector('.feather-sun');
-            const moonIcon = quickToggle.querySelector('.feather-moon');
-           
-            if (isDark) {
-              sunIcon?.classList.add('hidden');
-              moonIcon?.classList.remove('hidden');
-            } else {
-              sunIcon?.classList.remove('hidden');
-              moonIcon?.classList.add('hidden');
-            }
-          }
-          
-          // 更新设置页面的切换按钮
-          const settingsToggle = document.getElementById('theme-toggle-button');
-          const settingsIndicator = document.getElementById('theme-toggle-indicator');
-          
-          if (settingsToggle && settingsIndicator) {
-            settingsToggle.classList.toggle('bg-blue-600', isDark);
-            settingsToggle.classList.toggle('bg-gray-200', !isDark);
-            settingsIndicator.classList.toggle('translate-x-6', isDark);
-            settingsIndicator.classList.toggle('translate-x-1', !isDark);
+            quickToggle.querySelector('.feather-sun')?.classList.toggle('hidden', isDark);
+            quickToggle.querySelector('.feather-moon')?.classList.toggle('hidden', !isDark);
           }
         }
-
         bindEvents() {
-          // 快速切换按钮
-          const quickToggle = document.getElementById('quick-theme-toggle');
-          if (quickToggle) {
-            quickToggle.addEventListener('click', () => this.toggleTheme());
-          }
-          
-          // 监听系统主题变化
-          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-            // 仅在用户未手动设置主题时跟随系统
-            if (!localStorage.getItem('theme')) {
-              this.setTheme(e.matches ? 'dark' : 'light');
-            }
-          });
-          
-          // 键盘快捷键 Ctrl/Cmd + Shift + D
-          document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
-              e.preventDefault();
-              this.toggleTheme();
-            }
-          });
+          document.getElementById('quick-theme-toggle')?.addEventListener('click', () => this.toggleTheme());
         }
       }
 
-      // 全局主题管理器实例
-      let themeManager;
-
-      // 页面加载完成后初始化
       document.addEventListener('DOMContentLoaded', () => {
-        themeManager = new ThemeManager();
+        new ThemeManager();
       });
-
-      // 全局函数，供其他脚本调用
-      window.toggleTheme = () => {
-        if (themeManager) {
-          themeManager.toggleTheme();
-        }
-      };
-
-      // 全局函数，获取当前主题
-      window.getCurrentTheme = () => {
-        return document.body.getAttribute('data-theme');
-      };
     </script>
   </body>
 </html>
