@@ -35,12 +35,44 @@ pip install tiklocal
 ### 使用
 
 TikLocal 的启动非常简单，只需执行以下命令：
-```
+```bash
 tiklocal ~/Videos/
 ```
 您可以指定任意的媒体文件夹
 
 想要关闭时, 使用`Ctrl + C`
+
+#### 命令行工具
+
+TikLocal 提供了多个 CLI 命令：
+
+**启动服务器：**
+```bash
+tiklocal /path/to/media           # 指定媒体目录启动
+tiklocal --port 9000              # 使用自定义端口
+```
+
+**生成视频缩略图：**
+```bash
+tiklocal thumbs /path/to/media    # 生成缩略图
+tiklocal thumbs /path --overwrite # 重新生成已有的缩略图
+```
+
+**查找和清理重复文件：**
+```bash
+tiklocal dedupe /path/to/media              # 查找重复文件（预演模式）
+tiklocal dedupe /path --type video          # 仅检查视频文件
+tiklocal dedupe /path --execute             # 执行删除
+tiklocal dedupe /path --keep newest         # 保留最新的文件
+```
+
+`dedupe` 命令选项：
+- `--type`: 文件类型（`video`、`image`、`all`）
+- `--algorithm`: 哈希算法（`sha256`、`md5`）
+- `--keep`: 保留策略（`oldest`=最早、`newest`=最新、`shortest_path`=路径最短）
+- `--dry-run`: 预演模式（默认）
+- `--execute`: 执行实际删除
+- `--auto-confirm`: 跳过确认提示
 
 ### 配置
 

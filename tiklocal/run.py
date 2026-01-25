@@ -55,7 +55,7 @@ def main():
             if idx != 0:
                 argv.pop(idx)
                 argv.insert(0, 'thumbs')
-        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs'):
+        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe'):
             # 默认回退 serve（空参数或第一个不是已知子命令）
             argv.insert(0, 'serve')
 
@@ -70,6 +70,8 @@ def main():
   tiklocal --port 9000                     # 使用指定端口
   tiklocal serve /path --port 9000         # 显式使用 serve 子命令
   tiklocal thumbs /path --overwrite        # 批量生成缩略图
+  tiklocal dedupe /path --dry-run          # 查找重复文件（预演）
+  tiklocal dedupe /path --execute          # 删除重复，保留最早文件
         '''
     )
 
@@ -88,6 +90,22 @@ def main():
     thumbs_parser.add_argument('--overwrite', action='store_true', help='存在时覆盖重建')
     thumbs_parser.add_argument('--limit', type=int, default=0, help='最多处理多少个（0 表示全部）')
 
+    # dedupe 子命令
+    dedupe_parser = subparsers.add_parser('dedupe', help='检测并清理重复文件')
+    dedupe_parser.add_argument('media_root', nargs='?', help='媒体文件根目录路径')
+    dedupe_parser.add_argument('--type', choices=['video', 'image', 'all'], default='all',
+                              help='文件类型（默认：all）')
+    dedupe_parser.add_argument('--algorithm', choices=['md5', 'sha256'], default='sha256',
+                              help='哈希算法（默认：sha256，更安全）')
+    dedupe_parser.add_argument('--keep', choices=['oldest', 'newest', 'shortest_path'], default='oldest',
+                              help='保留策略：oldest=最早文件，newest=最新文件，shortest_path=路径最短（默认：oldest）')
+    dedupe_parser.add_argument('--dry-run', action='store_true', default=True,
+                              help='预演模式，仅显示将删除的文件（默认开启）')
+    dedupe_parser.add_argument('--execute', action='store_true',
+                              help='执行实际删除（关闭 dry-run）')
+    dedupe_parser.add_argument('--auto-confirm', action='store_true',
+                              help='自动确认删除，跳过确认提示（危险）')
+
     args = parser.parse_args(argv)
 
     # 判断命令类型（无子命令时视为 serve）
@@ -104,6 +122,31 @@ def main():
         print(f"数据目录: {get_data_dir()}")
         stats = generate_thumbnails(media_path, overwrite=getattr(args, 'overwrite', False), limit=getattr(args, 'limit', 0), show_progress=True)
         # 完成后退出
+        return
+
+    if cmd == 'dedupe':
+        from tiklocal.dedupe import run_dedupe
+
+        media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
+        if not media_root:
+            parser.error('必须指定媒体目录:\n  - tiklocal dedupe /path/to/media\n  - 或设置环境变量: MEDIA_ROOT=/path/to/media')
+
+        media_path = Path(media_root)
+        if not media_path.exists() or not media_path.is_dir():
+            print(f"错误: 媒体目录不可用: {media_root}", file=sys.stderr)
+            sys.exit(1)
+
+        # --execute 标志会关闭 dry-run
+        dry_run = not getattr(args, 'execute', False)
+
+        stats = run_dedupe(
+            media_root=media_path,
+            file_type=getattr(args, 'type', 'all'),
+            algorithm=getattr(args, 'algorithm', 'sha256'),
+            keep_strategy=getattr(args, 'keep', 'oldest'),
+            dry_run=dry_run,
+            auto_confirm=getattr(args, 'auto_confirm', False)
+        )
         return
 
     # serve 路径

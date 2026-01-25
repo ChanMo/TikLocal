@@ -36,13 +36,45 @@ pip install tiklocal
 
 Starting TikLocal is very simple, just run the following command:
 
-```
+```bash
 tiklocal ~/Videos/
 ```
 
 You can specify any media folder.
 
 To close, press `Ctrl + C`.
+
+#### CLI Commands
+
+TikLocal provides several CLI commands:
+
+**Start the server:**
+```bash
+tiklocal /path/to/media           # Start with media directory
+tiklocal --port 9000              # Use custom port
+```
+
+**Generate video thumbnails:**
+```bash
+tiklocal thumbs /path/to/media    # Generate thumbnails
+tiklocal thumbs /path --overwrite # Regenerate existing thumbnails
+```
+
+**Find and remove duplicate files:**
+```bash
+tiklocal dedupe /path/to/media              # Find duplicates (dry-run mode)
+tiklocal dedupe /path --type video          # Check video files only
+tiklocal dedupe /path --execute             # Execute deletion
+tiklocal dedupe /path --keep newest         # Keep newest files
+```
+
+Options for `dedupe`:
+- `--type`: File type (`video`, `image`, `all`)
+- `--algorithm`: Hash algorithm (`sha256`, `md5`)
+- `--keep`: Keep strategy (`oldest`, `newest`, `shortest_path`)
+- `--dry-run`: Preview mode (default)
+- `--execute`: Execute actual deletion
+- `--auto-confirm`: Skip confirmation prompt
 
 ### Configuration
 
