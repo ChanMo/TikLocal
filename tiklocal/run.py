@@ -80,6 +80,7 @@ def main():
     serve_parser.add_argument('media_root', nargs='?', help='媒体文件根目录路径')
     serve_parser.add_argument('--host', default=None, help='服务器监听地址 (默认: 0.0.0.0)')
     serve_parser.add_argument('--port', type=int, default=None, help='服务器端口 (默认: 8000)')
+    serve_parser.add_argument('--dev', action='store_true', help='开发模式（启用热重载和调试）')
 
     # thumbs 子命令
     thumbs_parser = subparsers.add_parser('thumbs', help='批量生成视频缩略图')
@@ -132,7 +133,14 @@ def main():
     print(f"数据目录: {get_data_dir()}")
     print(f"访问地址: http://{host}:{port}")
 
-    serve(create_app(), host=host, port=port)
+    app = create_app()
+    if getattr(args, 'dev', False):
+        # 开发模式：使用Flask内置服务器
+        print("⚠️  开发模式已启用（不要在生产环境使用）")
+        app.run(host=host, port=port, debug=True, use_reloader=True)
+    else:
+        # 生产模式：使用Waitress
+        serve(app, host=host, port=port)
 
 
 if __name__ == '__main__':

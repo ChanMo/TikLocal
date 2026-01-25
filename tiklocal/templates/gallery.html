@@ -66,6 +66,7 @@
     max-height: 100%;
     object-fit: contain;
     border-radius: 8px;
+    transition: opacity 0.2s ease;
   }
   .modal-close {
     position: absolute;
@@ -114,6 +115,8 @@
     let seed = null;
     let hasMore = true;
     let isLoading = false;
+    let allImages = [];      // 存储所有已加载的图片URI
+    let currentIndex = -1;   // Modal中当前图片索引
 
     async function loadImages() {
       if (isLoading || !hasMore) return;
@@ -129,11 +132,12 @@
         hasMore = data.has_more;
 
         data.images.forEach(uri => {
+          allImages.push(uri);  // 追加到全局数组
           const div = document.createElement('div');
           div.className = 'grid-item';
           div.innerHTML = `
-            <img src="/media?uri=${encodeURIComponent(uri)}" loading="lazy" 
-                 onload="this.classList.add('loaded')" 
+            <img src="/media?uri=${encodeURIComponent(uri)}" loading="lazy"
+                 onload="this.classList.add('loaded')"
                  onclick="openModal('${encodeURIComponent(uri)}')">
           `;
           grid.appendChild(div);
@@ -150,10 +154,40 @@
 
     window.openModal = (uri) => {
         const decodedUri = decodeURIComponent(uri);
-        modalImg.src = `/media?uri=${uri}`;
-        modalInfo.href = `/image?uri=${uri}`;
+        currentIndex = allImages.indexOf(decodedUri);  // 查找当前索引
+        if (currentIndex === -1) {
+            // 如果URI不在列表中（不应该发生），降级到原有行为
+            currentIndex = allImages.length;
+            allImages.push(decodedUri);
+        }
+        showImage(currentIndex);  // 使用新函数
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
+    };
+
+    // 核心切换函数
+    const showImage = (newIndex) => {
+        if (newIndex < 0 || newIndex >= allImages.length) return;
+        currentIndex = newIndex;
+        const uri = encodeURIComponent(allImages[currentIndex]);
+        modalImg.src = `/media?uri=${uri}`;
+        modalInfo.href = `/image?uri=${uri}`;
+
+        // 预加载相邻图片
+        preloadImage(currentIndex - 1);
+        preloadImage(currentIndex + 1);
+
+        // 接近末尾时自动加载更多
+        if (currentIndex >= allImages.length - 5 && hasMore && !isLoading) {
+            loadImages();
+        }
+    };
+
+    // 预加载函数
+    const preloadImage = (idx) => {
+        if (idx < 0 || idx >= allImages.length) return;
+        const img = new Image();
+        img.src = `/media?uri=${encodeURIComponent(allImages[idx])}`;
     };
 
     const closeModal = () => {
@@ -165,15 +199,24 @@
     modalClose.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
 
+    // 添加Hammer手势支持（水平滑动）
+    const modalHammer = new Hammer(modal);
+    modalHammer.get('swipe').set({ direction: Hammer.DIRECTION_HORIZONTAL });
+    modalHammer.on('swipeleft', () => showImage(currentIndex + 1));
+    modalHammer.on('swiperight', () => showImage(currentIndex - 1));
+
     window.addEventListener('scroll', () => {
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800) {
         loadImages();
       }
     });
 
-    // Keyboard support
+    // 增强键盘支持
     document.addEventListener('keydown', (e) => {
+        if (!modal.classList.contains('active')) return;
         if (e.key === 'Escape') closeModal();
+        if (e.key === 'ArrowLeft') showImage(currentIndex - 1);
+        if (e.key === 'ArrowRight') showImage(currentIndex + 1);
     });
 
     // Init

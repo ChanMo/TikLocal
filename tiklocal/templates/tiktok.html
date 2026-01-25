@@ -147,6 +147,7 @@ video.active {
     let loadingVideos = false;
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
     let currentSpeedIndex = 1;
+    let lastPlayPauseTime = 0; // 用于修复控制条冲突
 
     async function loadVideos() {
       if (loadingVideos) return;
@@ -154,11 +155,21 @@ video.active {
       try {
         const res = await fetch('/api/videos');
         const newVideos = await res.json();
+
+        // 内存管理：保留最近50个视频元素
+        if (videos.length > 50) {
+          const removeCount = 20;
+          const toRemove = videos.splice(0, removeCount);
+          toRemove.forEach(v => v.remove());
+          index = Math.max(0, index - removeCount);
+        }
+
         newVideos.forEach(videoPath => {
           const v = document.createElement('video');
           v.muted = true;
           v.loop = true;
-          v.playsInline = true; 
+          v.controls = true;
+          v.playsInline = true;
           v.dataset.name = videoPath;
           v.dataset.src = `/media/${videoPath}`;
           videoContainer.appendChild(v);
@@ -177,6 +188,7 @@ video.active {
       if (videos[prev]) {
         videos[prev].classList.remove('active');
         videos[prev].pause();
+        videos[prev].muted = true;  // 重新静音，防止意外恢复播放时有声音
         videos[prev].style.display = 'none';
       }
 
@@ -185,11 +197,21 @@ video.active {
         currVid.style.display = 'block';
         requestAnimationFrame(() => {
           currVid.classList.add('active');
-          if (!currVid.src) { currVid.src = currVid.dataset.src; currVid.load(); }
+          if (!currVid.src) {
+            currVid.src = currVid.dataset.src;
+            currVid.load();
+          }
           currVid.muted = false;
           currVid.playbackRate = speedOptions[currentSpeedIndex];
           currVid.play().catch(e => console.log(e));
           updateControls(currVid);
+
+          // 预加载下一个视频以减少切换卡顿
+          const nextIndex = (index + 1) % videos.length;
+          if (videos[nextIndex] && !videos[nextIndex].src) {
+            videos[nextIndex].src = videos[nextIndex].dataset.src;
+            videos[nextIndex].load();
+          }
         });
       }
     }
@@ -211,8 +233,16 @@ video.active {
     });
     hammer.on('swipedown', () => showVideo(index - 1));
     hammer.on('tap', () => {
+      const now = Date.now();
       const v = videos[index];
-      if (v) v.paused ? v.play() : v.pause();
+
+      // 如果刚刚通过原生控制条操作过，忽略此次tap
+      if (now - lastPlayPauseTime < 100) return;
+
+      if (v) {
+        v.paused ? v.play() : v.pause();
+        lastPlayPauseTime = now;
+      }
     });
 
     speedBtn.addEventListener('click', () => {
@@ -228,6 +258,19 @@ video.active {
       favoriteBtn.classList.toggle('is-active');
       await fetch(`/api/favorite/${encodeURIComponent(val)}`, { method: 'POST' });
     });
+
+    // 使用事件委托修复控制条冲突，避免事件监听器内存泄漏
+    videoContainer.addEventListener('play', (e) => {
+      if (e.target.tagName === 'VIDEO') {
+        lastPlayPauseTime = Date.now();
+      }
+    }, true);
+
+    videoContainer.addEventListener('pause', (e) => {
+      if (e.target.tagName === 'VIDEO') {
+        lastPlayPauseTime = Date.now();
+      }
+    }, true);
 
     await loadVideos();
     showVideo(0);
