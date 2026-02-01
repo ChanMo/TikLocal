@@ -4,13 +4,9 @@ import json
 import mimetypes
 import os
 import re
+import requests
 from pathlib import Path
 from typing import Any
-
-try:
-    from openai import OpenAI
-except ImportError:  # pragma: no cover - handled at runtime
-    OpenAI = None
 
 
 class ImageMetadataStore:
@@ -52,33 +48,19 @@ class CaptionService:
         model: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
-        api_mode: str | None = None,
     ):
         self.model = model or os.environ.get('TIKLOCAL_LLM_MODEL')
         self.base_url = base_url or os.environ.get('TIKLOCAL_LLM_BASE_URL')
         self.api_key = api_key or os.environ.get('OPENAI_API_KEY')
-        self.api_mode = (api_mode or os.environ.get('TIKLOCAL_LLM_API') or 'auto').lower()
-        self._client = None
-
-    def _get_client(self):
-        if OpenAI is None:
-            raise RuntimeError("OpenAI 客户端未安装，请先安装 openai 依赖。")
         if not self.api_key:
             raise RuntimeError("未配置 OPENAI_API_KEY。")
         if not self.model:
             raise RuntimeError("未配置 TIKLOCAL_LLM_MODEL。")
         if self.base_url and "openrouter.ai" in self.base_url and "/api/v1" not in self.base_url:
             raise RuntimeError("OpenRouter base_url 需要包含 /api/v1，例如 https://openrouter.ai/api/v1")
-        if self._client is None:
-            kwargs = {"api_key": self.api_key}
-            if self.base_url:
-                kwargs["base_url"] = self.base_url
-            self._client = OpenAI(**kwargs)
-        return self._client
 
     def generate(self, image_path: Path, tags_limit: int = 5) -> dict[str, Any]:
         data_url = self._to_data_url(image_path)
-        client = self._get_client()
 
         system_prompt = (
             "你是我的私人媒体库助手。"
@@ -93,58 +75,7 @@ class CaptionService:
             "输出格式：{\"title\": \"...\", \"tags\": [\"...\", \"...\"]}。"
         )
 
-        api_mode = self._resolve_api_mode()
-        text = ""
-        if api_mode == "chat":
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": user_prompt},
-                            {"type": "image_url", "image_url": {"url": data_url}},
-                        ],
-                    },
-                ],
-                temperature=0.6,
-            )
-            text = self._extract_text(response)
-        else:
-            try:
-                response = client.responses.create(
-                    model=self.model,
-                    instructions=system_prompt,
-                    input=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "input_text", "text": user_prompt},
-                                {"type": "input_image", "image_url": data_url},
-                            ],
-                        }
-                    ],
-                    temperature=0.6,
-                )
-                text = self._extract_text(response)
-            except Exception:
-                # Fallback for OpenAI-compatible providers without Responses API
-                response = client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": user_prompt},
-                                {"type": "image_url", "image_url": {"url": data_url}},
-                            ],
-                        },
-                    ],
-                    temperature=0.6,
-                )
-                text = self._extract_text(response)
+        text = self._request_chat_completion(system_prompt, user_prompt, data_url)
         if self._looks_like_html(text):
             raise RuntimeError("模型返回了 HTML 页面，请检查 base_url 或 model 是否正确。")
 
@@ -168,34 +99,68 @@ class CaptionService:
             encoded = base64.b64encode(f.read()).decode("ascii")
         return f"data:{mime};base64,{encoded}"
 
-    def _extract_text(self, response: Any) -> str:
-        if isinstance(response, str):
-            return response
-        if hasattr(response, "output_text"):
-            return response.output_text or ""
-        if hasattr(response, "choices"):
-            try:
-                message = response.choices[0].message
-                return message.content or ""
-            except Exception:
-                return ""
-        if isinstance(response, dict):
-            if response.get("output_text"):
-                return response.get("output_text") or ""
-            if response.get("choices"):
-                message = response["choices"][0].get("message", {})
-                return message.get("content") or ""
+    def _request_chat_completion(self, system_prompt: str, user_prompt: str, data_url: str) -> str:
+        base_url = (self.base_url or "https://api.openai.com/v1").rstrip("/")
+        url = f"{base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "temperature": 0.6,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_prompt},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ],
+        }
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        text = response.text or ""
+        if response.status_code >= 400:
+            raise RuntimeError(self._parse_error(text) or f"HTTP {response.status_code}")
+
+        if self._looks_like_html(text):
+            return text
+        try:
+            data = response.json()
+        except Exception:
+            return text
+
+        if isinstance(data, dict) and data.get("error"):
+            raise RuntimeError(self._parse_error(data) or "API error")
+
+        return self._extract_text_from_json(data)
+
+    def _extract_text_from_json(self, data: Any) -> str:
+        if not isinstance(data, dict):
+            return ""
+        choices = data.get("choices") or []
+        if choices:
+            message = choices[0].get("message") or {}
+            content = message.get("content")
+            if isinstance(content, str):
+                return content
         return ""
 
-    def _resolve_api_mode(self) -> str:
-        if self.api_mode in ("chat", "responses"):
-            return self.api_mode
-        if not self.base_url:
-            return "responses"
-        base = self.base_url.lower()
-        if "openai.com" in base:
-            return "responses"
-        return "chat"
+    def _parse_error(self, data: Any) -> str:
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except Exception:
+                return data.strip()
+        if isinstance(data, dict):
+            err = data.get("error")
+            if isinstance(err, dict):
+                return err.get("message") or ""
+            if isinstance(err, str):
+                return err
+        return ""
 
     def _looks_like_html(self, text: str) -> bool:
         if not text:
