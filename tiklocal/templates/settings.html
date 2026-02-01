@@ -12,27 +12,6 @@
       <div class="grid grid-cols-1 lg:grid-cols-3 lg:gap-12">
         <!-- Left Column / Main Settings -->
         <div class="lg:col-span-2 space-y-8">
-          <!-- Appearance Settings -->
-          <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
-            <header class="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <i data-feather="sun" class="w-6 h-6 text-blue-500"></i>
-                <span>Appearance</span>
-              </h2>
-            </header>
-            <div class="p-6">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h3 class="font-semibold text-gray-800 dark:text-gray-200">Theme Mode</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">Switch between light and dark themes.</p>
-                </div>
-                <button onclick="toggleTheme()" id="theme-toggle-button" class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors bg-gray-200 dark:bg-gray-700">
-                  <span id="theme-toggle-indicator" class="inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-900 ring-1 ring-gray-300 dark:ring-gray-600 transition-transform ease-in-out duration-200 translate-x-1 dark:translate-x-6"></span>
-                </button>
-              </div>
-            </div>
-          </section>
-
           <!-- Actions -->
           <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
             <header class="p-6 border-b border-gray-200 dark:border-gray-700">
@@ -75,18 +54,6 @@
               </h2>
             </header>
             <div class="p-6 space-y-4">
-              <a href="/favorite" class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <div class="flex items-center gap-4">
-                  <div class="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                    <i data-feather="heart" class="w-5 h-5 text-red-500"></i>
-                  </div>
-                  <div>
-                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">My Favorites</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">View saved media</p>
-                  </div>
-                </div>
-                <i data-feather="chevron-right" class="w-5 h-5 text-gray-400"></i>
-              </a>
               <div class="flex items-center justify-between p-4 rounded-lg">
                 <div class="flex items-center gap-4">
                   <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
@@ -97,7 +64,43 @@
                     <p class="text-sm text-gray-500 dark:text-gray-400">In your library</p>
                   </div>
                 </div>
-                <span class="text-2xl font-bold text-indigo-500">{{ videos }}</span>
+                <span id="videos-count" class="text-2xl font-bold text-indigo-500">{{ videos }}</span>
+              </div>
+              <div class="flex items-center justify-between p-4 rounded-lg">
+                <div class="flex items-center gap-4">
+                  <div class="flex-shrink-0 w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-full flex items-center justify-center">
+                    <i data-feather="image" class="w-5 h-5 text-pink-500"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">Total Images</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">In your library</p>
+                  </div>
+                </div>
+                <span id="images-count" class="text-2xl font-bold text-pink-500">{{ images }}</span>
+              </div>
+              <a href="/favorite" class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <div class="flex items-center gap-4">
+                  <div class="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                    <i data-feather="heart" class="w-5 h-5 text-red-500"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">My Favorites</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">View saved media</p>
+                  </div>
+                </div>
+                <span id="favorites-count" class="text-2xl font-bold text-red-500">{{ favorites }}</span>
+              </a>
+              <div class="flex items-center justify-between p-4 rounded-lg">
+                <div class="flex items-center gap-4">
+                  <div class="flex-shrink-0 w-10 h-10 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center">
+                    <i data-feather="database" class="w-5 h-5 text-teal-500"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">Cache Size</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400"><span id="cache-count">{{ cache_count }}</span> thumbnails</p>
+                  </div>
+                </div>
+                <span id="cache-size" class="text-2xl font-bold text-teal-500">{{ cache_size_mb }} MB</span>
               </div>
             </div>
           </section>
@@ -146,42 +149,57 @@
 {% block extra_body %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // 监听主题变化事件，更新UI
-  window.addEventListener('themeChanged', (e) => {
-    updateThemeUI();
-  });
-
-  function updateThemeUI() {
-    const isDark = document.body.getAttribute('data-theme') === 'dark';
-    const themeToggleButton = document.getElementById('theme-toggle-button');
-    const themeToggleIndicator = document.getElementById('theme-toggle-indicator');
-    
-    if (themeToggleButton) {
-      themeToggleButton.classList.toggle('bg-blue-600', isDark);
-      themeToggleButton.classList.toggle('bg-gray-200', !isDark);
-    }
-    if (themeToggleIndicator) {
-      themeToggleIndicator.classList.toggle('translate-x-6', isDark);
-      themeToggleIndicator.classList.toggle('translate-x-1', !isDark);
-    }
-  }
-
-  // 初始化UI状态
-  updateThemeUI();
+  // 页面加载时获取统计信息
+  loadStats();
 });
 
-// 快速操作
-function clearCache() {
-  showModal('确定要清除缓存吗？', '这将删除临时文件，释放存储空间。', () => {
-    // 添加实际的缓存清理逻辑
-    showNotification('缓存清理成功！', 'success');
+async function loadStats() {
+  try {
+    const res = await fetch('/api/library/stats');
+    const data = await res.json();
+
+    // 更新统计显示
+    document.getElementById('videos-count').textContent = data.videos;
+    document.getElementById('images-count').textContent = data.images;
+    document.getElementById('favorites-count').textContent = data.favorites;
+    document.getElementById('cache-count').textContent = data.cache_count;
+    document.getElementById('cache-size').textContent = `${data.cache_mb} MB`;
+  } catch (err) {
+    console.error('Failed to load stats:', err);
+  }
+}
+
+async function clearCache() {
+  showModal('确定要清除缓存吗？', '这将删除所有缩略图文件，释放存储空间。缩略图会在访问时自动重新生成。', async () => {
+    try {
+      const res = await fetch('/api/cache/clear', { method: 'POST' });
+      const data = await res.json();
+
+      if (data.success) {
+        showNotification(`缓存清理成功！删除了 ${data.deleted_count} 个文件，释放了 ${data.freed_mb} MB 空间。`, 'success');
+        loadStats(); // 刷新统计
+      } else {
+        showNotification(`清理失败：${data.error}`, 'error');
+      }
+    } catch (err) {
+      showNotification('清理失败，请重试', 'error');
+    }
   });
 }
 
-function refreshLibrary() {
-  showModal('确定要刷新媒体库吗？', '这可能需要几分钟时间。', () => {
-    // 添加实际的媒体库刷新逻辑
-    showNotification('媒体库刷新已开始！', 'info');
+async function refreshLibrary() {
+  showModal('确定要刷新媒体库吗？', '这将重新扫描所有媒体文件，可能需要一些时间。', async () => {
+    try {
+      showNotification('正在刷新媒体库...', 'info');
+      const res = await fetch('/api/library/stats');
+      const data = await res.json();
+
+      // 更新所有统计数据
+      loadStats();
+      showNotification('媒体库刷新成功！', 'success');
+    } catch (err) {
+      showNotification('刷新失败，请重试', 'error');
+    }
   });
 }
 

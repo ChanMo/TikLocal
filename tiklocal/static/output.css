@@ -20,7 +20,9 @@
     --color-orange-900: oklch(40.8% 0.123 38.172);
     --color-green-500: oklch(72.3% 0.219 149.579);
     --color-green-600: oklch(62.7% 0.194 149.214);
+    --color-teal-100: oklch(95.3% 0.051 180.801);
     --color-teal-500: oklch(70.4% 0.14 182.503);
+    --color-teal-900: oklch(38.6% 0.063 188.416);
     --color-blue-100: oklch(93.2% 0.032 255.585);
     --color-blue-300: oklch(80.9% 0.105 251.813);
     --color-blue-400: oklch(70.7% 0.165 254.624);
@@ -33,6 +35,9 @@
     --color-indigo-500: oklch(58.5% 0.233 277.117);
     --color-indigo-900: oklch(35.9% 0.144 278.697);
     --color-purple-500: oklch(62.7% 0.265 303.9);
+    --color-pink-100: oklch(94.8% 0.028 342.258);
+    --color-pink-500: oklch(65.6% 0.241 354.308);
+    --color-pink-900: oklch(40.8% 0.153 2.432);
     --color-gray-50: oklch(98.5% 0.002 247.839);
     --color-gray-100: oklch(96.7% 0.003 264.542);
     --color-gray-200: oklch(92.8% 0.006 264.531);
@@ -626,6 +631,9 @@
   .bg-orange-100 {
     background-color: var(--color-orange-100);
   }
+  .bg-pink-100 {
+    background-color: var(--color-pink-100);
+  }
   .bg-red-100 {
     background-color: var(--color-red-100);
   }
@@ -634,6 +642,9 @@
   }
   .bg-red-600 {
     background-color: var(--color-red-600);
+  }
+  .bg-teal-100 {
+    background-color: var(--color-teal-100);
   }
   .bg-white {
     background-color: var(--color-white);
@@ -821,6 +832,9 @@
   .text-orange-600 {
     color: var(--color-orange-600);
   }
+  .text-pink-500 {
+    color: var(--color-pink-500);
+  }
   .text-purple-500 {
     color: var(--color-purple-500);
   }
@@ -872,6 +886,9 @@
   }
   .ring-gray-300 {
     --tw-ring-color: var(--color-gray-300);
+  }
+  .filter {
+    filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);
   }
   .backdrop-blur-sm {
     --tw-backdrop-blur: blur(var(--blur-sm));
@@ -1127,9 +1144,19 @@
       display: flex;
     }
   }
+  .sm\:grid {
+    @media (width >= 40rem) {
+      display: grid;
+    }
+  }
   .sm\:h-10 {
     @media (width >= 40rem) {
       height: calc(var(--spacing) * 10);
+    }
+  }
+  .sm\:h-full {
+    @media (width >= 40rem) {
+      height: 100%;
     }
   }
   .sm\:w-10 {
@@ -1150,6 +1177,11 @@
   .sm\:flex-row-reverse {
     @media (width >= 40rem) {
       flex-direction: row-reverse;
+    }
+  }
+  .sm\:gap-4 {
+    @media (width >= 40rem) {
+      gap: calc(var(--spacing) * 4);
     }
   }
   .sm\:px-0 {
@@ -1336,11 +1368,27 @@
       }
     }
   }
+  .dark\:bg-pink-900\/30 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      background-color: color-mix(in srgb, oklch(40.8% 0.153 2.432) 30%, transparent);
+      @supports (color: color-mix(in lab, red, red)) {
+        background-color: color-mix(in oklab, var(--color-pink-900) 30%, transparent);
+      }
+    }
+  }
   .dark\:bg-red-900\/30 {
     &:where([data-theme=dark], [data-theme=dark] *) {
       background-color: color-mix(in srgb, oklch(39.6% 0.141 25.723) 30%, transparent);
       @supports (color: color-mix(in lab, red, red)) {
         background-color: color-mix(in oklab, var(--color-red-900) 30%, transparent);
+      }
+    }
+  }
+  .dark\:bg-teal-900\/30 {
+    &:where([data-theme=dark], [data-theme=dark] *) {
+      background-color: color-mix(in srgb, oklch(38.6% 0.063 188.416) 30%, transparent);
+      @supports (color: color-mix(in lab, red, red)) {
+        background-color: color-mix(in oklab, var(--color-teal-900) 30%, transparent);
       }
     }
   }
@@ -1726,6 +1774,59 @@ video, img, canvas, svg {
   inherits: false;
   initial-value: 0 0 #0000;
 }
+@property --tw-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-sepia {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-drop-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-drop-shadow-size {
+  syntax: "*";
+  inherits: false;
+}
 @property --tw-backdrop-blur {
   syntax: "*";
   inherits: false;
@@ -1824,6 +1925,19 @@ video, img, canvas, svg {
       --tw-ring-offset-width: 0px;
       --tw-ring-offset-color: #fff;
       --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-blur: initial;
+      --tw-brightness: initial;
+      --tw-contrast: initial;
+      --tw-grayscale: initial;
+      --tw-hue-rotate: initial;
+      --tw-invert: initial;
+      --tw-opacity: initial;
+      --tw-saturate: initial;
+      --tw-sepia: initial;
+      --tw-drop-shadow: initial;
+      --tw-drop-shadow-color: initial;
+      --tw-drop-shadow-alpha: 100%;
+      --tw-drop-shadow-size: initial;
       --tw-backdrop-blur: initial;
       --tw-backdrop-brightness: initial;
       --tw-backdrop-contrast: initial;

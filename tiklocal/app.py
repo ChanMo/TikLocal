@@ -1,4 +1,5 @@
 import os
+import io
 import json
 import random
 import datetime
@@ -12,10 +13,36 @@ from flask import Flask, render_template, send_from_directory, request, redirect
 from tiklocal.services import LibraryService, FavoriteService, RecommendService
 from tiklocal.services.thumbnail import ThumbnailService
 
-try:
-    app_version = version("tiklocal")
-except PackageNotFoundError:
-    app_version = '1.0.0'
+
+def get_app_version():
+    """获取应用版本号，开发模式下从 pyproject.toml 读取"""
+    # 开发模式：优先从 pyproject.toml 读取
+    pyproject_path = Path(__file__).parent.parent / 'pyproject.toml'
+    if pyproject_path.exists():
+        try:
+            import tomllib
+        except ImportError:
+            try:
+                import tomli as tomllib
+            except ImportError:
+                tomllib = None
+
+        if tomllib:
+            try:
+                with open(pyproject_path, 'rb') as f:
+                    data = tomllib.load(f)
+                    return data.get('tool', {}).get('poetry', {}).get('version', '1.0.0')
+            except Exception:
+                pass
+
+    # 生产模式：从已安装的包元数据获取
+    try:
+        return version("tiklocal")
+    except PackageNotFoundError:
+        return '1.0.0'
+
+
+app_version = get_app_version()
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -71,24 +98,27 @@ def create_app(test_config=None):
         """Video Library List"""
         # Using scan_videos instead of recursive get_files
         videos = library_service.scan_videos()
-        
+
         # Filter Logic
-        size_mode = request.args.get('size', 'all')
+        filter_mode = request.args.get('filter', 'all')
         min_mb = int(request.args.get('min_mb', 50))
-        
-        if size_mode == 'big':
+
+        if filter_mode == 'big':
             threshold = min_mb * 1024 * 1024
             videos = [v for v in videos if v.stat().st_size >= threshold]
+        elif filter_mode == 'favorite':
+            favorites = favorite_service.load()
+            videos = [v for v in videos if library_service.get_relative_path(v) in favorites]
 
         # Pagination
         count = len(videos)
         page = int(request.args.get('page', 1))
         length = 20
         offset = length * (page - 1)
-        
+
         # Convert to relative strings for template
         sliced_videos = [library_service.get_relative_path(v) for v in videos[offset:offset+length]]
-        
+
         return render_template(
             'browse.html',
             page=page,
@@ -96,7 +126,7 @@ def create_app(test_config=None):
             length=length,
             files=sliced_videos,
             menu='browse',
-            size_mode=size_mode,
+            filter=filter_mode,
             min_mb=min_mb,
             has_min_mb=request.args.get('min_mb') is not None,
             has_previous=page > 1,
@@ -105,8 +135,29 @@ def create_app(test_config=None):
 
     @app.route('/settings/')
     def settings_view():
+        from tiklocal.paths import get_thumbnails_dir
+
+        # 获取各类统计
         video_count = len(library_service.scan_videos())
-        return render_template('settings.html', menu='settings', version=app_version, videos=video_count)
+        image_count = len(library_service.scan_images())
+        favorite_count = len(favorite_service.load())
+
+        # 缩略图缓存信息
+        thumb_dir = get_thumbnails_dir()
+        thumb_files = list(thumb_dir.glob('*.jpg'))
+        cache_count = len(thumb_files)
+        cache_size_mb = round(sum(f.stat().st_size for f in thumb_files if f.exists()) / (1024 * 1024), 2)
+
+        return render_template(
+            'settings.html',
+            menu='settings',
+            version=app_version,
+            videos=video_count,
+            images=image_count,
+            favorites=favorite_count,
+            cache_count=cache_count,
+            cache_size_mb=cache_size_mb
+        )
 
     @app.route('/library')
     def library_redirect():
@@ -251,17 +302,65 @@ def create_app(test_config=None):
     def api_set_thumbnail(name):
         target = library_service.resolve_path(name)
         if not target: return {'success': False, 'error': 'Invalid path'}, 400
-        
+
         payload = request.get_json(silent=True) or {}
         ts = payload.get('time')
-        
+
         # This logic is a bit specific to app.py still, ideally move to ThumbnailService
         # But for now, we just need to regen the thumb
         thumb_path = thumbnail_service._get_thumb_path(name)
         success = thumbnail_service._generate(target, thumb_path, timestamp=float(ts) if ts else None)
-        
+
         if success:
              return {'success': True, 'url': f"/thumb?uri={quote(name)}&v={int(datetime.datetime.now().timestamp())}"}
         return {'success': False, 'error': 'Failed to generate'}, 500
+
+    @app.route('/api/cache/clear', methods=['POST'])
+    def api_clear_cache():
+        """清理缩略图缓存"""
+        from tiklocal.paths import get_thumbnails_dir
+
+        thumb_dir = get_thumbnails_dir()
+        deleted_count = 0
+        freed_bytes = 0
+
+        try:
+            for thumb_file in thumb_dir.glob('*.jpg'):
+                try:
+                    freed_bytes += thumb_file.stat().st_size
+                    thumb_file.unlink()
+                    deleted_count += 1
+                except Exception:
+                    continue
+
+            return {
+                'success': True,
+                'deleted_count': deleted_count,
+                'freed_mb': round(freed_bytes / (1024 * 1024), 2)
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}, 500
+
+    @app.route('/api/library/stats')
+    def api_library_stats():
+        """获取媒体库统计信息"""
+        from tiklocal.paths import get_thumbnails_dir
+
+        videos = library_service.scan_videos()
+        images = library_service.scan_images()
+        favorites = favorite_service.load()
+
+        # 计算缩略图缓存信息
+        thumb_dir = get_thumbnails_dir()
+        thumb_files = list(thumb_dir.glob('*.jpg'))
+        thumb_size = sum(f.stat().st_size for f in thumb_files if f.exists())
+
+        return {
+            'videos': len(videos),
+            'images': len(images),
+            'favorites': len(favorites),
+            'cache_count': len(thumb_files),
+            'cache_mb': round(thumb_size / (1024 * 1024), 2)
+        }
 
     return app
