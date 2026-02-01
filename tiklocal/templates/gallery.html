@@ -68,6 +68,125 @@
     border-radius: 8px;
     transition: opacity 0.2s ease;
   }
+  /* Floating Toolbar */
+  .toolbar {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 12px;
+    z-index: 220;
+    align-items: center;
+  }
+  .tool-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .tool-btn:active { transform: scale(0.95); }
+  .tool-btn.active {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    border-color: white;
+    box-shadow: 0 0 20px rgba(255,255,255,0.4);
+    transform: scale(1.1);
+  }
+
+  /* Zoom Options (Pop-up) */
+  .zoom-options {
+    position: absolute;
+    bottom: 60px; /* Above the toolbar */
+    right: 0; 
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: all 0.2s ease;
+  }
+  .zoom-options.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .zoom-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    color: rgba(255,255,255,0.6);
+    font-size: 11px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .zoom-btn.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-color: white;
+    box-shadow: 0 0 10px rgba(255,255,255,0.3);
+  }
+
+  /* Magnifier */
+  .magnifier {
+    position: absolute;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    background-repeat: no-repeat;
+    background-color: #000;
+    cursor: grab;
+    z-index: 210;
+    display: none;
+    transform: translate(-50%, -50%) scale(0); 
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.3s ease, height 0.3s ease;
+  }
+  .magnifier.magnifier-large {
+    width: 300px;
+    height: 300px;
+  }
+  .magnifier.active {
+    display: block;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .magnifier:active {
+    cursor: grabbing;
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+  /* Zoom Level Badge inside Lens */
+  .mag-badge {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.5);
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .magnifier.active .mag-badge { opacity: 1; }
+
   .modal-close {
     position: absolute;
     top: 20px;
@@ -94,9 +213,26 @@
         <i data-feather="x"></i>
     </div>
     <img id="modal-img" src="" alt="">
-    <a id="modal-info" href="#" class="fixed top-5 left-5 text-white bg-white/10 p-3 rounded-full">
-        <i data-feather="info"></i>
-    </a>
+    
+    <div class="magnifier" id="magnifier">
+        <div class="mag-badge" id="mag-badge">2.5x</div>
+    </div>
+
+    <!-- Toolbar & Controls -->
+    <div class="toolbar">
+        <a id="modal-info" href="#" class="tool-btn">
+            <i data-feather="info"></i>
+        </a>
+        <div style="position: relative;">
+            <div class="zoom-options" id="zoom-options">
+                <div class="zoom-btn" onclick="setZoom(5.0)">5x</div>
+                <div class="zoom-btn active" onclick="setZoom(2.5)">2.5x</div>
+            </div>
+            <button id="magnifier-toggle" class="tool-btn">
+                <i data-feather="search"></i>
+            </button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -110,13 +246,23 @@
     const modalImg = document.getElementById('modal-img');
     const modalClose = document.getElementById('modal-close');
     const modalInfo = document.getElementById('modal-info');
+    const magnifier = document.getElementById('magnifier');
+    const magToggle = document.getElementById('magnifier-toggle');
+    const zoomOptions = document.getElementById('zoom-options');
+    const magBadge = document.getElementById('mag-badge');
 
     let page = 1;
     let seed = null;
     let hasMore = true;
     let isLoading = false;
-    let allImages = [];      // 存储所有已加载的图片URI
-    let currentIndex = -1;   // Modal中当前图片索引
+    let allImages = [];      
+    let currentIndex = -1;
+    let isMagnifying = false;
+    let zoomLevel = 2.5; // Current Zoom Level
+    
+    // Magnifier State
+    let magX = 0;
+    let magY = 0;
 
     async function loadImages() {
       if (isLoading || !hasMore) return;
@@ -132,7 +278,7 @@
         hasMore = data.has_more;
 
         data.images.forEach(uri => {
-          allImages.push(uri);  // 追加到全局数组
+          allImages.push(uri);  
           const div = document.createElement('div');
           div.className = 'grid-item';
           div.innerHTML = `
@@ -154,36 +300,34 @@
 
     window.openModal = (uri) => {
         const decodedUri = decodeURIComponent(uri);
-        currentIndex = allImages.indexOf(decodedUri);  // 查找当前索引
+        currentIndex = allImages.indexOf(decodedUri); 
         if (currentIndex === -1) {
-            // 如果URI不在列表中（不应该发生），降级到原有行为
             currentIndex = allImages.length;
             allImages.push(decodedUri);
         }
-        showImage(currentIndex);  // 使用新函数
+        showImage(currentIndex);
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
     };
 
-    // 核心切换函数
     const showImage = (newIndex) => {
         if (newIndex < 0 || newIndex >= allImages.length) return;
         currentIndex = newIndex;
         const uri = encodeURIComponent(allImages[currentIndex]);
         modalImg.src = `/media?uri=${uri}`;
         modalInfo.href = `/image?uri=${uri}`;
+        
+        // Reset state
+        toggleMagnifier(false);
 
-        // 预加载相邻图片
         preloadImage(currentIndex - 1);
         preloadImage(currentIndex + 1);
 
-        // 接近末尾时自动加载更多
         if (currentIndex >= allImages.length - 5 && hasMore && !isLoading) {
             loadImages();
         }
     };
 
-    // 预加载函数
     const preloadImage = (idx) => {
         if (idx < 0 || idx >= allImages.length) return;
         const img = new Image();
@@ -192,18 +336,171 @@
 
     const closeModal = () => {
         modal.classList.remove('active');
+        modalImg.style.transform = '';
+        modalImg.style.transition = '';
+        modal.style.backgroundColor = '';
+        modal.style.transition = '';
+        
         modalImg.src = '';
+        toggleMagnifier(false);
         document.body.style.overflow = '';
     };
 
-    modalClose.addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
+    // Zoom Level Control
+    window.setZoom = (level) => {
+        zoomLevel = level;
+        magBadge.innerText = level + 'x';
+        
+        // Update active state of zoom buttons (Fix: avoid partial matches like '2.5' in '5')
+        document.querySelectorAll('.zoom-btn').forEach(btn => {
+            const btnLevel = parseFloat(btn.innerText);
+            btn.classList.toggle('active', btnLevel === level);
+        });
 
-    // 添加Hammer手势支持（水平滑动）
+        // Dynamic Sizing: 5x zoom gets a larger lens
+        if (level >= 5.0) {
+            magnifier.classList.add('magnifier-large');
+        } else {
+            magnifier.classList.remove('magnifier-large');
+        }
+
+        if (isMagnifying) {
+            // Re-render content as size changed
+            setTimeout(updateMagnifierContent, 50); // Small delay to allow CSS width change
+        }
+    };
+
+    // Toggle Magnifier Mode
+    const toggleMagnifier = (active) => {
+        isMagnifying = active;
+        if (isMagnifying) {
+            magToggle.classList.add('active');
+            zoomOptions.classList.add('show');
+            
+            magnifier.classList.add('active');
+            
+            // Initial Position: Center of screen
+            magX = window.innerWidth / 2;
+            magY = window.innerHeight / 2;
+            
+            updateMagnifierPosition();
+            updateMagnifierContent();
+        } else {
+            magToggle.classList.remove('active');
+            zoomOptions.classList.remove('show');
+            magnifier.classList.remove('active');
+        }
+    };
+    
+    magToggle.addEventListener('click', (e) => {
+        e.stopPropagation(); 
+        toggleMagnifier(!isMagnifying);
+    });
+
+    // Update Magnifier DOM Position
+    const updateMagnifierPosition = () => {
+        magnifier.style.left = magX + 'px';
+        magnifier.style.top = magY + 'px';
+    };
+
+    // Update Magnifier Background (The Zoom Effect)
+    const updateMagnifierContent = () => {
+        const rect = modalImg.getBoundingClientRect();
+        
+        const relX = (magX - rect.left) / rect.width;
+        const relY = (magY - rect.top) / rect.height;
+        
+        magnifier.style.backgroundImage = `url('${modalImg.src}')`;
+        magnifier.style.backgroundSize = `${rect.width * zoomLevel}px ${rect.height * zoomLevel}px`;
+        
+        const magWidth = magnifier.offsetWidth;
+        const magHeight = magnifier.offsetHeight;
+
+        const bgX = - (relX * rect.width * zoomLevel - magWidth / 2);
+        const bgY = - (relY * rect.height * zoomLevel - magHeight / 2);
+        
+        magnifier.style.backgroundPosition = `${bgX}px ${bgY}px`;
+    };
+
+    modalClose.addEventListener('click', closeModal);
+    // Click outside logic
+    modal.addEventListener('click', (e) => { 
+        // If click is on toolbar or its children, do nothing (handled by stopPropagation usually)
+        if (e.target.closest('.toolbar')) return;
+
+        if(e.target === modal) {
+            if (isMagnifying) {
+                toggleMagnifier(false);
+            } else {
+                closeModal(); 
+            }
+        }
+    });
+
+    // Hammer.js Setup for Modal (Swipe/Close)
     const modalHammer = new Hammer(modal);
     modalHammer.get('swipe').set({ direction: Hammer.DIRECTION_HORIZONTAL });
-    modalHammer.on('swipeleft', () => showImage(currentIndex + 1));
-    modalHammer.on('swiperight', () => showImage(currentIndex - 1));
+    modalHammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 10 });
+
+    // Gestures
+    modalHammer.on('swipeleft', () => !isMagnifying && showImage(currentIndex + 1));
+    modalHammer.on('swiperight', () => !isMagnifying && showImage(currentIndex - 1));
+
+    modalHammer.on('panstart', (e) => {
+        if (isMagnifying) return; 
+        modalImg.style.transition = 'none';
+        modal.style.transition = 'none';
+    });
+
+    modalHammer.on('panmove', (e) => {
+        if (isMagnifying) return;
+
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            const deltaY = e.deltaY;
+            const percent = Math.min(Math.abs(deltaY) / window.innerHeight, 1);
+            modalImg.style.transform = `translateY(${deltaY}px) scale(${1 - percent * 0.4})`;
+            modal.style.backgroundColor = `rgba(0,0,0,${0.95 * (1 - percent)})`;
+        }
+    });
+
+    modalHammer.on('panend', (e) => {
+        if (isMagnifying) return;
+
+        const shouldClose = Math.abs(e.deltaY) > 150 || Math.abs(e.velocityY) > 0.5;
+        const isVertical = Math.abs(e.deltaY) > Math.abs(e.deltaX);
+        
+        if (shouldClose && isVertical) {
+            closeModal();
+        } else {
+            modalImg.style.transition = 'transform 0.3s ease';
+            modal.style.transition = 'background-color 0.3s ease';
+            modalImg.style.transform = '';
+            modal.style.backgroundColor = '';
+        }
+    });
+
+    // Dedicated Hammer for Magnifier Draggable
+    const magHammer = new Hammer(magnifier);
+    magHammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 0 });
+
+    let startX = 0, startY = 0;
+
+    magHammer.on('panstart', (e) => {
+        startX = magX;
+        startY = magY;
+        magnifier.style.transition = 'none'; 
+    });
+
+    magHammer.on('panmove', (e) => {
+        magX = startX + e.deltaX;
+        magY = startY + e.deltaY;
+        updateMagnifierPosition();
+        updateMagnifierContent();
+    });
+
+    magHammer.on('panend', (e) => {
+        magnifier.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; 
+    });
 
     window.addEventListener('scroll', () => {
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800) {

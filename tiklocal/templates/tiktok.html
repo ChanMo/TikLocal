@@ -32,21 +32,199 @@ video {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  pointer-events: none; /* Let clicks pass to overlay */
 }
 video.active {
   display: block;
 }
 
+/* Interaction Layer */
+#overlay-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  /* background: rgba(255,0,0,0.1); Debug tap area */
+}
+
+/* Center Play Icon */
+#play-status-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  width: 80px;
+  height: 80px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  pointer-events: none;
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+#play-status-icon.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Custom Progress Bar */
+#custom-controls {
+  position: absolute;
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  left: 12px;
+  right: 12px;
+  height: 20px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 1;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-container {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* Invisible Interactive Layer */
+input[type=range] {
+  -webkit-appearance: none;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  z-index: 2; /* On top */
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Visual Track Background */
+.progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+/* Visual Progress Fill */
+.progress-fill {
+  position: absolute;
+  left: 0;
+  height: 4px;
+  background: #fff;
+  border-radius: 2px;
+  width: 0%; /* JS will update this */
+  transition: width 0.1s linear, height 0.2s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Thumb Indicator (Pseudo-element on fill or separate div? Using ::after on fill for simplicity) */
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%) scale(0);
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Time Display */
+.time-display {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  width: 35px; /* Fixed width prevents jitter */
+  text-align: center;
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+/* Immersive / Playing State */
+/* When immersive (playing & idle):
+   1. Controls go down.
+   2. Track becomes thin.
+   3. Time hidden.
+   4. Sidebar hidden.
+*/
+body.immersive-mode #custom-controls {
+  bottom: calc(0px + env(safe-area-inset-bottom)); /* Hug bottom */
+  left: 0; 
+  right: 0;
+  padding: 0;
+  gap: 0;
+}
+
+body.immersive-mode .progress-track {
+  height: 2px; /* Micro bar */
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 0;
+}
+
+body.immersive-mode .progress-fill {
+  height: 2px;
+  border-radius: 0;
+}
+
+body.immersive-mode .time-display {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* Hover/Active State Handling */
+/* When controls are active (paused or tapped): Show Thumb */
+body:not(.immersive-mode) .progress-fill::after {
+  transform: translateY(-50%) scale(1);
+}
+
+body.immersive-mode .controls-sidebar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(20px);
+}
+body.immersive-mode .floating-dock {
+  transform: translate(-50%, 150%) !important;
+}
+body.immersive-mode #quick-theme-toggle {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-20px);
+}
+
+
 /* Right Side Controls */
 .controls-sidebar {
   position: absolute;
   right: 16px;
-  bottom: calc(100px + env(safe-area-inset-bottom));
+  bottom: calc(140px + env(safe-area-inset-bottom)); /* Adjusted for dock + progress */
   display: flex;
   flex-direction: column;
   gap: 20px;
   z-index: 20;
   align-items: center;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .action-btn {
@@ -111,6 +289,32 @@ video.active {
     <!-- Videos will be injected here -->
   </div>
 
+  <!-- Interaction Layer -->
+  <div id="overlay-layer"></div>
+
+  <!-- Play Status Icon -->
+  <div id="play-status-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+    </svg>
+  </div>
+
+  <!-- Custom Progress Bar -->
+  <div id="custom-controls">
+    <span class="time-display" id="time-current">00:00</span>
+    
+    <div class="progress-container">
+        <!-- The interactive layer -->
+        <input type="range" id="video-progress" min="0" max="100" step="0.1" value="0">
+        
+        <!-- The visual layer -->
+        <div class="progress-track"></div>
+        <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <span class="time-display" id="time-total">00:00</span>
+  </div>
+
   <!-- Right Sidebar Controls -->
   <div class="controls-sidebar" id="controls">
     <!-- Speed Control -->
@@ -138,16 +342,60 @@ video.active {
     document.body.classList.add('immersive');
 
     const videoContainer = document.getElementById('video-container');
+    const overlayLayer = document.getElementById('overlay-layer');
     const speedBtn = document.getElementById('speed-btn');
     const favoriteBtn = document.getElementById('favorite-btn');
     const infoBtn = document.getElementById('info-btn');
+    
+    // Custom Controls
+    const playStatusIcon = document.getElementById('play-status-icon');
+    const progressBar = document.getElementById('video-progress');
+    const progressFill = document.getElementById('progress-fill'); // New visual fill
+    const timeCurrent = document.getElementById('time-current');
+    const timeTotal = document.getElementById('time-total');
+    const customControls = document.getElementById('custom-controls');
 
     let videos = [];
     let index = 0;
     let loadingVideos = false;
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
     let currentSpeedIndex = 1;
-    let lastPlayPauseTime = 0; // 用于修复控制条冲突
+    let isImmersive = false; // Starts with UI visible
+    let isDragging = false;
+    let wasPlayingBeforeDrag = false;
+    
+    // Tap Logic Variables
+    let clickTimer = null;
+    let lastClickTime = 0;
+
+    // Helper: Format time
+    function formatTime(seconds) {
+      if (!seconds || isNaN(seconds) || seconds === Infinity || seconds < 0) return "00:00";
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    // Toggle Immersive Mode
+    function toggleUI() {
+      isImmersive = !isImmersive;
+      document.body.classList.toggle('immersive-mode', isImmersive);
+      document.body.classList.toggle('controls-active', !isImmersive);
+    }
+    
+    // Toggle Play/Pause
+    function togglePlay() {
+      const v = videos[index];
+      if (!v) return;
+      
+      if (v.paused) {
+        v.play();
+        playStatusIcon.classList.remove('visible');
+      } else {
+        v.pause();
+        playStatusIcon.classList.add('visible');
+      }
+    }
 
     async function loadVideos() {
       if (loadingVideos) return;
@@ -156,7 +404,7 @@ video.active {
         const res = await fetch('/api/videos');
         const newVideos = await res.json();
 
-        // 内存管理：保留最近50个视频元素
+        // Memory management
         if (videos.length > 50) {
           const removeCount = 20;
           const toRemove = videos.splice(0, removeCount);
@@ -168,10 +416,41 @@ video.active {
           const v = document.createElement('video');
           v.muted = true;
           v.loop = true;
-          v.controls = true;
           v.playsInline = true;
+          v.controls = false; // Explicitly disable native controls
           v.dataset.name = videoPath;
           v.dataset.src = `/media/${videoPath}`;
+          
+          // Time Update for Progress Bar
+          v.addEventListener('timeupdate', () => {
+            if (v === videos[index] && !isDragging) {
+              // Fallback: Update duration if it was missed or changed from NaN/Infinity
+              if (timeTotal.textContent === "00:00" || timeTotal.textContent === "") {
+                const duration = v.duration;
+                if (duration && !isNaN(duration) && duration !== Infinity) {
+                  timeTotal.textContent = formatTime(duration);
+                }
+              }
+
+              const pct = (v.currentTime / v.duration) * 100;
+              progressBar.value = isNaN(pct) ? 0 : pct;
+              progressFill.style.width = (isNaN(pct) ? 0 : pct) + '%';
+              timeCurrent.textContent = formatTime(v.currentTime);
+            }
+          });
+
+          // Metadata/Duration loaded
+          const updateDuration = () => {
+             if (v === videos[index]) {
+               const duration = v.duration;
+               if (duration && !isNaN(duration) && duration !== Infinity) {
+                 timeTotal.textContent = formatTime(duration);
+               }
+             }
+          };
+          v.addEventListener('loadedmetadata', updateDuration);
+          v.addEventListener('durationchange', updateDuration);
+
           videoContainer.appendChild(v);
         });
         videos = Array.from(videoContainer.querySelectorAll('video'));
@@ -188,7 +467,7 @@ video.active {
       if (videos[prev]) {
         videos[prev].classList.remove('active');
         videos[prev].pause();
-        videos[prev].muted = true;  // 重新静音，防止意外恢复播放时有声音
+        videos[prev].muted = true;
         videos[prev].style.display = 'none';
       }
 
@@ -203,10 +482,25 @@ video.active {
           }
           currVid.muted = false;
           currVid.playbackRate = speedOptions[currentSpeedIndex];
-          currVid.play().catch(e => console.log(e));
+          
+          // Reset UI
+          progressBar.value = 0;
+          progressFill.style.width = '0%';
+          timeCurrent.textContent = "00:00";
+          timeTotal.textContent = formatTime(currVid.duration); // Set total time if already loaded
+          playStatusIcon.classList.remove('visible'); // Assume playing starts
+          
+          const playPromise = currVid.play();
+          if (playPromise !== undefined) {
+              playPromise.catch(error => {
+                  console.log("Auto-play prevented:", error);
+                  playStatusIcon.classList.add('visible'); // Show play icon if blocked
+              });
+          }
+          
           updateControls(currVid);
 
-          // 预加载下一个视频以减少切换卡顿
+          // Preload next
           const nextIndex = (index + 1) % videos.length;
           if (videos[nextIndex] && !videos[nextIndex].src) {
             videos[nextIndex].src = videos[nextIndex].dataset.src;
@@ -225,26 +519,44 @@ video.active {
         .then(d => favoriteBtn.classList.toggle('is-active', d.favorite));
     }
 
-    const hammer = new Hammer(videoContainer);
+    // Gestures on Overlay
+    const hammer = new Hammer(overlayLayer);
     hammer.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
     hammer.on('swipeup', () => {
       if (index >= videos.length - 3) loadVideos();
       showVideo(index + 1);
     });
     hammer.on('swipedown', () => showVideo(index - 1));
-    hammer.on('tap', () => {
-      const now = Date.now();
-      const v = videos[index];
-
-      // 如果刚刚通过原生控制条操作过，忽略此次tap
-      if (now - lastPlayPauseTime < 100) return;
-
-      if (v) {
-        v.paused ? v.play() : v.pause();
-        lastPlayPauseTime = now;
-      }
+    
+    // Robust Click Logic (Single vs Double)
+    overlayLayer.addEventListener('click', (e) => {
+        const now = Date.now();
+        const timeDiff = now - lastClickTime;
+        
+        if (timeDiff < 250 && timeDiff > 0) {
+            // Double Click
+            if (clickTimer) clearTimeout(clickTimer);
+            clickTimer = null;
+            togglePlay();
+        } else {
+            // Potential Single Click
+            if (clickTimer) clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => {
+                toggleUI();
+                clickTimer = null;
+            }, 250);
+        }
+        lastClickTime = now;
     });
 
+    // Center Icon Click -> Play
+    playStatusIcon.addEventListener('click', (e) => {
+        e.stopPropagation(); 
+        togglePlay();
+    });
+
+
+    // Controls Sidebar Events
     speedBtn.addEventListener('click', () => {
       currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.length;
       const rate = speedOptions[currentSpeedIndex];
@@ -259,18 +571,39 @@ video.active {
       await fetch(`/api/favorite/${encodeURIComponent(val)}`, { method: 'POST' });
     });
 
-    // 使用事件委托修复控制条冲突，避免事件监听器内存泄漏
-    videoContainer.addEventListener('play', (e) => {
-      if (e.target.tagName === 'VIDEO') {
-        lastPlayPauseTime = Date.now();
-      }
-    }, true);
+    // Progress Bar Interaction
+    progressBar.addEventListener('input', () => {
+        const v = videos[index];
+        if (!v) return;
+        
+        if (!isDragging) {
+            isDragging = true;
+            wasPlayingBeforeDrag = !v.paused;
+            v.pause();
+        }
+        
+        // Update time display instantly
+        const seekTime = (progressBar.value / 100) * v.duration;
+        timeCurrent.textContent = formatTime(seekTime);
+        progressFill.style.width = progressBar.value + '%'; // Sync visual
+    });
 
-    videoContainer.addEventListener('pause', (e) => {
-      if (e.target.tagName === 'VIDEO') {
-        lastPlayPauseTime = Date.now();
-      }
-    }, true);
+    progressBar.addEventListener('change', () => {
+        const v = videos[index];
+        if (!v) return;
+        
+        const seekTime = (progressBar.value / 100) * v.duration;
+        v.currentTime = seekTime;
+        
+        if (wasPlayingBeforeDrag) {
+            v.play();
+            playStatusIcon.classList.remove('visible');
+        }
+        isDragging = false;
+    });
+    
+    // Initial State
+    document.body.classList.add('controls-active'); // Start with controls visible
 
     await loadVideos();
     showVideo(0);
