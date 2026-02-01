@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "TikLocal"
-version = "0.6.0"
+version = "0.7.0"
 description = "A local media server that combines the features of TikTok and Pinterest"
 authors = ["ChanMo <chan.mo@outlook.com>"]
 readme = "README.md"
