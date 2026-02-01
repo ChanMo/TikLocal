@@ -24,6 +24,24 @@
   .stat-item:hover {
     transform: translateY(-2px);
   }
+
+  #caption-generate-btn.is-loading::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(251, 191, 36, 0.9);
+    border-top-color: transparent;
+    animation: caption-spin 0.9s linear infinite;
+  }
+  #caption-generate-btn.is-loading {
+    cursor: default;
+  }
+  @keyframes caption-spin {
+    to { transform: rotate(360deg); }
+  }
 </style>
 {% endblock %}
 
@@ -121,6 +139,26 @@
           </div>
         </div>
 
+        <!-- 智能标题 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6" id="caption-card">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <i data-feather="zap" class="w-5 h-5 text-amber-500"></i>
+              智能标题
+            </h2>
+            <button
+              id="caption-generate-btn"
+              class="relative inline-flex items-center gap-1 px-3 pr-7 py-1.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30 transition-colors"
+            >
+              生成/刷新
+            </button>
+          </div>
+          <div id="caption-content" class="hidden">
+            <p id="caption-title" class="text-sm text-gray-700 dark:text-gray-200 mb-3"></p>
+            <div id="caption-tags" class="flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+
         <!-- 操作按钮 -->
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
           <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -214,6 +252,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const fullscreenModal = document.getElementById('fullscreen-modal');
   const closeFullscreen = document.getElementById('close-fullscreen');
   const copyLinkBtn = document.getElementById('copy-link-btn');
+  const captionBtn = document.getElementById('caption-generate-btn');
+  const captionContent = document.getElementById('caption-content');
+  const captionTitle = document.getElementById('caption-title');
+  const captionTags = document.getElementById('caption-tags');
+  const imageUri = "{{ uri }}";
+  let currentCaption = null;
   
   let isZoomed = false;
   
@@ -273,6 +317,82 @@ document.addEventListener('DOMContentLoaded', () => {
       showNotification('复制失败，请手动复制', 'error');
     }
   });
+
+  const renderCaption = (data) => {
+    currentCaption = data || null;
+    if (!data) {
+      captionTitle.textContent = '';
+      captionTags.innerHTML = '';
+      captionTitle.classList.add('hidden');
+      captionContent.classList.add('hidden');
+      return;
+    }
+    const title = data.title || '';
+    const tags = Array.isArray(data.tags) ? data.tags : [];
+    if (!title && tags.length === 0) {
+      captionTitle.textContent = '';
+      captionTags.innerHTML = '';
+      captionTitle.classList.add('hidden');
+      captionContent.classList.add('hidden');
+      return;
+    }
+    captionContent.classList.remove('hidden');
+    captionTitle.textContent = title;
+    captionTitle.classList.toggle('hidden', !title);
+    captionTags.innerHTML = '';
+    tags.forEach(tag => {
+      const chip = document.createElement('span');
+      chip.className = 'inline-flex items-center px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-xs text-gray-600 dark:text-gray-200';
+      chip.textContent = tag;
+      captionTags.appendChild(chip);
+    });
+  };
+
+  const loadCaption = async () => {
+    try {
+      const res = await fetch(`/api/image/metadata?uri=${encodeURIComponent(imageUri)}`);
+      const data = await res.json();
+      if (data.success) {
+        renderCaption(data.data);
+      } else {
+        showNotification(data.error || '读取失败', 'error');
+      }
+    } catch (err) {
+      showNotification('读取失败', 'error');
+    }
+  };
+
+  const generateCaption = async (force = false) => {
+    if (currentCaption && !force) {
+      const ok = window.confirm('已存在标题，是否覆盖？');
+      if (!ok) return;
+      force = true;
+    }
+    captionBtn.disabled = true;
+    captionBtn.classList.add('is-loading');
+    try {
+      const res = await fetch('/api/image/metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uri: imageUri, force })
+      });
+      const data = await res.json();
+      if (data.success) {
+        renderCaption(data.data);
+        showNotification('标题已更新', 'success');
+      } else {
+        showNotification('生成失败', 'error');
+      }
+    } catch (err) {
+      showNotification('生成失败', 'error');
+    } finally {
+      captionBtn.disabled = false;
+      captionBtn.classList.remove('is-loading');
+    }
+  };
+
+  captionBtn?.addEventListener('click', () => generateCaption());
+  loadCaption();
   
   // 键盘导航
   document.addEventListener('keydown', (e) => {

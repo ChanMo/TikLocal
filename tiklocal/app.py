@@ -12,6 +12,8 @@ from flask import Flask, render_template, send_from_directory, request, redirect
 # Service Imports
 from tiklocal.services import LibraryService, FavoriteService, RecommendService
 from tiklocal.services.thumbnail import ThumbnailService
+from tiklocal.services.metadata import ImageMetadataStore, CaptionService
+from tiklocal.paths import get_metadata_path
 
 
 def get_app_version():
@@ -63,6 +65,8 @@ def create_app(test_config=None):
     favorite_service = FavoriteService(media_root_str)
     recommend_service = RecommendService(library_service, favorite_service)
     thumbnail_service = ThumbnailService(Path(media_root_str))
+    metadata_store = ImageMetadataStore(get_metadata_path())
+    caption_service = CaptionService()
 
     # --- Template Filters ---
     @app.template_filter('timestamp_to_date')
@@ -289,6 +293,35 @@ def create_app(test_config=None):
             'has_more': end < total,
             'seed': seed
         }
+
+    @app.route('/api/image/metadata', methods=['GET', 'POST'])
+    def api_image_metadata():
+        if request.method == 'GET':
+            uri = request.args.get('uri')
+            if not uri:
+                return {'success': False, 'error': 'Missing uri'}, 400
+            return {'success': True, 'data': metadata_store.get(uri)}
+
+        payload = request.get_json(silent=True) or {}
+        uri = payload.get('uri')
+        force = bool(payload.get('force'))
+        if not uri:
+            return {'success': False, 'error': 'Missing uri'}, 400
+
+        existing = metadata_store.get(uri)
+        if existing and not force:
+            return {'success': True, 'data': existing, 'skipped': True}
+
+        target = library_service.resolve_path(uri)
+        if not target or not target.exists():
+            return {'success': False, 'error': 'File not found'}, 404
+
+        try:
+            result = caption_service.generate(target, tags_limit=5)
+            metadata_store.set(uri, result, overwrite=True)
+            return {'success': True, 'data': result}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}, 500
 
     @app.route('/api/favorite/<path:name>', methods=['GET', 'POST'])
     def api_favorite(name):

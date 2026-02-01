@@ -91,6 +91,7 @@
     transition: all 0.2s ease;
     cursor: pointer;
     border: 1px solid rgba(255,255,255,0.1);
+    position: relative;
   }
   .tool-btn:active { transform: scale(0.95); }
   .tool-btn.active {
@@ -197,6 +198,70 @@
     padding: 10px;
     cursor: pointer;
   }
+
+  /* Caption Panel */
+  .caption-panel {
+    position: fixed;
+    left: 20px;
+    bottom: 90px;
+    max-width: min(70vw, 420px);
+    padding: 14px 16px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    color: white;
+    backdrop-filter: blur(10px);
+    z-index: 215;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .caption-title {
+    font-size: 14px;
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  .caption-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .caption-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .caption-panel.is-hidden {
+    display: none;
+  }
+
+  #caption-btn.is-loading::after {
+    content: '';
+    position: absolute;
+    inset: 7px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
+    border-top-color: transparent;
+    animation: caption-spin 0.9s linear infinite;
+  }
+  #caption-btn.is-loading i {
+    opacity: 0.35;
+  }
+  #caption-btn.is-error::after {
+    content: '';
+    position: absolute;
+    inset: 7px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(248, 113, 113, 0.9);
+  }
+  @keyframes caption-spin {
+    to { transform: rotate(360deg); }
+  }
 </style>
 {% endblock %}
 
@@ -218,8 +283,16 @@
         <div class="mag-badge" id="mag-badge">2.5x</div>
     </div>
 
+    <div class="caption-panel is-hidden" id="caption-panel">
+        <div class="caption-title" id="caption-title"></div>
+        <div class="caption-tags" id="caption-tags"></div>
+    </div>
+
     <!-- Toolbar & Controls -->
     <div class="toolbar">
+        <button id="caption-btn" class="tool-btn" title="生成标题">
+            <i data-feather="zap"></i>
+        </button>
         <a id="modal-info" href="#" class="tool-btn">
             <i data-feather="info"></i>
         </a>
@@ -250,6 +323,10 @@
     const magToggle = document.getElementById('magnifier-toggle');
     const zoomOptions = document.getElementById('zoom-options');
     const magBadge = document.getElementById('mag-badge');
+    const captionBtn = document.getElementById('caption-btn');
+    const captionPanel = document.getElementById('caption-panel');
+    const captionTitle = document.getElementById('caption-title');
+    const captionTags = document.getElementById('caption-tags');
 
     let page = 1;
     let seed = null;
@@ -259,6 +336,7 @@
     let currentIndex = -1;
     let isMagnifying = false;
     let zoomLevel = 2.5; // Current Zoom Level
+    let currentCaption = null;
     
     // Magnifier State
     let magX = 0;
@@ -316,6 +394,7 @@
         const uri = encodeURIComponent(allImages[currentIndex]);
         modalImg.src = `/media?uri=${uri}`;
         modalInfo.href = `/image?uri=${uri}`;
+        loadCaption(allImages[currentIndex]);
         
         // Reset state
         toggleMagnifier(false);
@@ -343,6 +422,7 @@
         
         modalImg.src = '';
         toggleMagnifier(false);
+        clearCaption();
         document.body.style.overflow = '';
     };
 
@@ -395,6 +475,98 @@
     magToggle.addEventListener('click', (e) => {
         e.stopPropagation(); 
         toggleMagnifier(!isMagnifying);
+    });
+
+    const clearCaption = () => {
+        currentCaption = null;
+        captionTitle.textContent = '';
+        captionTitle.classList.add('hidden');
+        captionTags.innerHTML = '';
+        captionPanel.classList.add('is-hidden');
+    };
+
+    const renderCaption = (data) => {
+        currentCaption = data || null;
+        if (!data) {
+            clearCaption();
+            return;
+        }
+        const title = data.title || '';
+        const tags = Array.isArray(data.tags) ? data.tags : [];
+        if (!title && tags.length === 0) {
+            clearCaption();
+            return;
+        }
+        captionPanel.classList.remove('is-hidden');
+        captionTitle.textContent = title;
+        captionTitle.classList.toggle('hidden', !title);
+        captionTags.innerHTML = '';
+        tags.forEach(tag => {
+            const chip = document.createElement('span');
+            chip.className = 'caption-tag';
+            chip.textContent = tag;
+            captionTags.appendChild(chip);
+        });
+    };
+
+    const setCaptionLoading = (loading) => {
+        captionBtn.disabled = loading;
+        captionBtn.classList.toggle('is-loading', loading);
+    };
+
+    const loadCaption = async (uri) => {
+        clearCaption();
+        try {
+            const res = await fetch(`/api/image/metadata?uri=${encodeURIComponent(uri)}`);
+            const data = await res.json();
+            if (data.success) {
+                renderCaption(data.data);
+            } else {
+                captionBtn.title = data.error || '读取失败';
+                captionBtn.classList.add('is-error');
+                setTimeout(() => captionBtn.classList.remove('is-error'), 1500);
+            }
+        } catch (err) {
+            captionBtn.title = '读取失败';
+            captionBtn.classList.add('is-error');
+            setTimeout(() => captionBtn.classList.remove('is-error'), 1500);
+        }
+    };
+
+    const generateCaption = async (uri, force = false) => {
+        if (currentCaption && !force) {
+            const ok = window.confirm('已存在标题，是否覆盖？');
+            if (!ok) return;
+            force = true;
+        }
+        setCaptionLoading(true);
+        try {
+            const res = await fetch('/api/image/metadata', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uri, force })
+            });
+            const data = await res.json();
+            if (data.success) {
+                renderCaption(data.data);
+            } else {
+                captionBtn.title = data.error || '生成失败';
+                captionBtn.classList.add('is-error');
+                setTimeout(() => captionBtn.classList.remove('is-error'), 1500);
+            }
+        } catch (err) {
+            captionBtn.title = '生成失败';
+            captionBtn.classList.add('is-error');
+            setTimeout(() => captionBtn.classList.remove('is-error'), 1500);
+        } finally {
+            setCaptionLoading(false);
+        }
+    };
+
+    captionBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentIndex < 0) return;
+        generateCaption(allImages[currentIndex]);
     });
 
     // Update Magnifier DOM Position

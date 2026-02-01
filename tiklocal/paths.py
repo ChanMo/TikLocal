@@ -24,3 +24,6 @@ def get_thumbnails_dir() -> Path:
 def get_thumbs_map_path() -> Path:
     return get_data_dir() / 'thumbs.json'
 
+
+def get_metadata_path() -> Path:
+    return get_data_dir() / 'metadata.json'
