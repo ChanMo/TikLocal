@@ -1,5 +1,6 @@
 import base64
 import datetime
+import io
 import json
 import mimetypes
 import os
@@ -7,6 +8,8 @@ import re
 import requests
 from pathlib import Path
 from typing import Any
+
+from PIL import Image
 
 
 class ImageMetadataStore:
@@ -92,12 +95,41 @@ class CaptionService:
             "prompt_version": 1,
         }
 
-    def _to_data_url(self, image_path: Path) -> str:
-        mime, _ = mimetypes.guess_type(image_path.name)
-        mime = mime or "image/jpeg"
-        with image_path.open("rb") as f:
-            encoded = base64.b64encode(f.read()).decode("ascii")
-        return f"data:{mime};base64,{encoded}"
+    def _to_data_url(self, image_path: Path, max_size: int = 1536, quality: int = 85) -> str:
+        """将图片转换为 base64 data URL，自动压缩以减少 token 消耗。
+
+        Args:
+            image_path: 图片文件路径
+            max_size: 最长边最大像素，默认 1536px
+            quality: JPEG 质量 (1-100)，默认 85
+
+        Returns:
+            压缩后的 base64 data URL
+        """
+        with Image.open(image_path) as img:
+            # 转换为 RGB（处理 RGBA、灰度等格式）
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            # 调整尺寸
+            width, height = img.size
+            if max(width, height) > max_size:
+                ratio = max_size / max(width, height)
+                new_size = (int(width * ratio), int(height * ratio))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+            # 压缩为 JPEG
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=quality, optimize=True)
+            encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+
+        return f"data:image/jpeg;base64,{encoded}"
 
     def _request_chat_completion(self, system_prompt: str, user_prompt: str, data_url: str) -> str:
         base_url = (self.base_url or "https://api.openai.com/v1").rstrip("/")
