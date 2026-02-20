@@ -76,6 +76,29 @@ Options for `dedupe`:
 - `--execute`: Execute actual deletion
 - `--auto-confirm`: Skip confirmation prompt
 
+### URL Download (Web)
+
+TikLocal includes a `/download` page where you can paste a media URL and enqueue a background download job.
+
+Requirements:
+- `yt-dlp` (required)
+- `ffmpeg` (recommended for format merge)
+
+Cookie for login-only content (optional):
+- Put exported cookie files in `~/.tiklocal/cookies`
+- Filename should include domain, e.g. `x.com.txt`, `youtube.com.cookies`
+- The download page supports `Auto match` or manual file selection per task
+- The download page also supports cookie file upload/replace, history delete/clear, and retry for failed tasks
+
+Example installs:
+```bash
+# macOS (Homebrew)
+brew install yt-dlp ffmpeg
+
+# Ubuntu / Debian
+sudo apt install yt-dlp ffmpeg
+```
+
 ### Configuration
 
 TikLocal provides some configuration options that you can adjust to your needs.

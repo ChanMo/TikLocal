@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .download-card {
+    border-radius: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(4px);
+  }
+
+  [data-theme="dark"] .download-card {
+    background: rgba(17, 24, 39, 0.72);
+    border-color: rgba(148, 163, 184, 0.22);
+  }
+
+  .dl-input,
+  .dl-select {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.62rem 0.8rem;
+    font-size: 0.9rem;
+    color: rgb(31 41 55);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  [data-theme="dark"] .dl-input,
+  [data-theme="dark"] .dl-select {
+    background: rgba(15, 23, 42, 0.82);
+    border-color: rgba(148, 163, 184, 0.32);
+    color: rgb(229 231 235);
+  }
+
+  .dl-input:focus,
+  .dl-select:focus {
+    border-color: rgba(59, 130, 246, 0.55);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  }
+
+  .dl-primary-btn {
+    border-radius: 0.75rem;
+    background: rgb(30 64 175);
+    color: white;
+    font-weight: 600;
+    padding: 0.62rem 1rem;
+    transition: background-color 0.15s ease;
+  }
+
+  .dl-primary-btn:hover { background: rgb(30 58 138); }
+  .dl-primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .dl-muted-btn {
+    border-radius: 0.7rem;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: transparent;
+    color: rgb(55 65 81);
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 0.45rem 0.72rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  [data-theme="dark"] .dl-muted-btn { color: rgb(226 232 240); }
+  .dl-muted-btn:hover { background: rgba(148, 163, 184, 0.12); }
+
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid;
+    border-radius: 999px;
+    padding: 0.14rem 0.56rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .chip-queued { border-color: rgba(148, 163, 184, 0.45); color: rgb(71, 85, 105); background: rgba(241, 245, 249, 0.9); }
+  .chip-running { border-color: rgba(125, 211, 252, 0.6); color: rgb(3, 105, 161); background: rgba(240, 249, 255, 0.85); }
+  .chip-success { border-color: rgba(110, 231, 183, 0.6); color: rgb(6, 95, 70); background: rgba(236, 253, 245, 0.88); }
+  .chip-failed { border-color: rgba(253, 164, 175, 0.65); color: rgb(159, 18, 57); background: rgba(255, 241, 242, 0.9); }
+  .chip-canceled { border-color: rgba(253, 186, 116, 0.7); color: rgb(154, 52, 18); background: rgba(255, 247, 237, 0.9); }
+
+  [data-theme="dark"] .chip-queued { color: rgb(203, 213, 225); background: rgba(30, 41, 59, 0.55); border-color: rgba(148, 163, 184, 0.42); }
+  [data-theme="dark"] .chip-running { color: rgb(125, 211, 252); background: rgba(7, 89, 133, 0.28); border-color: rgba(125, 211, 252, 0.45); }
+  [data-theme="dark"] .chip-success { color: rgb(110, 231, 183); background: rgba(6, 78, 59, 0.3); border-color: rgba(110, 231, 183, 0.45); }
+  [data-theme="dark"] .chip-failed { color: rgb(251, 113, 133); background: rgba(136, 19, 55, 0.25); border-color: rgba(251, 113, 133, 0.45); }
+  [data-theme="dark"] .chip-canceled { color: rgb(251, 191, 36); background: rgba(120, 53, 15, 0.25); border-color: rgba(251, 191, 36, 0.45); }
+
+  .job-row + .job-row {
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+  }
+
+  .toast-wrap {
+    position: fixed;
+    top: 72px;
+    right: 16px;
+    z-index: 120;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(320px, calc(100vw - 24px));
+  }
+
+  .toast {
+    border-radius: 0.75rem;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(255, 255, 255, 0.96);
+    color: rgb(31, 41, 55);
+    padding: 0.65rem 0.78rem;
+    font-size: 0.82rem;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+    animation: fadeIn 0.15s ease;
+  }
+
+  [data-theme="dark"] .toast {
+    background: rgba(17, 24, 39, 0.95);
+    color: rgb(226, 232, 240);
+    border-color: rgba(148, 163, 184, 0.28);
+  }
+
+  .toast.error { border-left: 3px solid rgb(244, 63, 94); }
+  .toast.success { border-left: 3px solid rgb(34, 197, 94); }
+  .toast.info { border-left: 3px solid rgb(59, 130, 246); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+  <main class="container mx-auto px-4 py-8 lg:py-10">
+    <div class="max-w-6xl mx-auto space-y-6">
+      <header>
+        <h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">Download</h1>
+        <p class="mt-2 text-sm lg:text-base text-gray-500 dark:text-gray-400">粘贴链接，轻量下载到本地媒体库。需要登录的平台可选择登录凭据文件。</p>
+      </header>
+
+      <section class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="download-card p-5 xl:col-span-2">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white">新建任务</h2>
+          <form id="download-form" class="mt-4 space-y-3">
+            <div>
+              <label for="download-url" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">媒体链接</label>
+              <input id="download-url" type="url" required placeholder="https://..." class="dl-input">
+            </div>
+
+            <div>
+              <label for="cookie-select" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">登录凭据（可选）</label>
+              <select id="cookie-select" class="dl-select">
+                <option value="__auto__">自动选择（按域名）</option>
+                <option value="__none__">不使用登录凭据</option>
+              </select>
+              <p id="cookie-dir-hint" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">登录凭据目录：检测中...</p>
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+              <button type="submit" id="download-submit" class="dl-primary-btn">开始下载</button>
+              <span class="text-xs text-gray-500 dark:text-gray-400">默认写入媒体根目录</span>
+            </div>
+          </form>
+        </div>
+
+        <aside class="download-card p-5 space-y-4">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">运行状态</h3>
+            <div id="probe-panel" class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
+              <p>检测中...</p>
+            </div>
+          </div>
+
+          <details class="group border border-gray-200/80 dark:border-gray-700 rounded-xl">
+            <summary class="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-between">
+              <span>管理登录凭据</span>
+              <span class="text-xs text-gray-500 group-open:rotate-180 transition-transform">⌄</span>
+            </summary>
+            <div class="px-3 pb-3 pt-1 space-y-2">
+              <p class="text-xs text-gray-500 dark:text-gray-400">上传 `.txt/.cookies`。同名文件将自动覆盖更新。</p>
+              <input id="cookie-upload-file" type="file" accept=".txt,.cookies,text/plain" class="text-xs text-gray-600 dark:text-gray-300 w-full">
+              <button type="button" id="cookie-upload-btn" class="dl-muted-btn">上传凭据文件</button>
+            </div>
+          </details>
+
+          <div class="pt-1">
+            <label for="max-concurrent" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">并发数（0=不限）</label>
+            <input id="max-concurrent" type="number" min="0" max="16" value="2" class="dl-input">
+            <button id="save-config-btn" class="dl-muted-btn mt-2">保存设置</button>
+          </div>
+        </aside>
+      </section>
+
+      <section class="download-card p-5">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white">任务记录</h2>
+          <div class="flex items-center gap-2">
+            <button id="clear-history-btn" class="dl-muted-btn">清理已完成</button>
+            <button id="refresh-jobs-btn" class="dl-muted-btn">刷新</button>
+          </div>
+        </div>
+
+        <div id="jobs-empty" class="text-sm text-gray-500 dark:text-gray-400 mt-4">暂无任务。</div>
+        <div id="jobs-list" class="mt-3"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div id="toast-wrap" class="toast-wrap"></div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+const statusMeta = {
+  queued: { label: '排队中', cls: 'chip-queued' },
+  running: { label: '下载中', cls: 'chip-running' },
+  success: { label: '成功', cls: 'chip-success' },
+  failed: { label: '失败', cls: 'chip-failed' },
+  canceled: { label: '已取消', cls: 'chip-canceled' }
+};
+
+let pollTimer = null;
+let cookieMeta = { files: [], cookie_dir: '', cookie_enabled: true };
+
+function notify(message, type = 'info') {
+  const wrap = document.getElementById('toast-wrap');
+  if (!wrap) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  wrap.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-4px)';
+    setTimeout(() => toast.remove(), 160);
+  }, 2600);
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  return data.data || {};
+}
+
+async function apiForm(path, formData) {
+  const res = await fetch(path, { method: 'POST', body: formData });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  return data.data || {};
+}
+
+function formatDate(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
+function statusBadge(status) {
+  const meta = statusMeta[status] || statusMeta.failed;
+  return `<span class="status-chip ${meta.cls}">${meta.label}</span>`;
+}
+
+function formatCookieUsage(job) {
+  const file = (job.cookie_file || '').trim();
+  const mode = (job.cookie_match_mode || 'none').trim();
+  if (!file || mode === 'none') return '未使用';
+  if (mode === 'auto') return `自动（${file}）`;
+  if (mode === 'manual') return `手动（${file}）`;
+  return file;
+}
+
+function renderJobs(jobs) {
+  const listEl = document.getElementById('jobs-list');
+  const emptyEl = document.getElementById('jobs-empty');
+  if (!listEl || !emptyEl) return;
+
+  if (!jobs.length) {
+    emptyEl.classList.remove('hidden');
+    listEl.innerHTML = '';
+    return;
+  }
+
+  emptyEl.classList.add('hidden');
+  listEl.innerHTML = jobs.map((job) => {
+    const progress = typeof job.progress_percent === 'number' ? Math.max(0, Math.min(100, job.progress_percent)) : null;
+    const canCancel = (job.status === 'queued' || job.status === 'running');
+    const canRetry = (job.status === 'failed' || job.status === 'canceled');
+    const canDelete = (job.status === 'success' || job.status === 'failed' || job.status === 'canceled');
+    const cookieUsed = formatCookieUsage(job);
+    const outputLink = job.output_path_rel
+      ? `<a class="text-xs text-blue-600 dark:text-blue-300 hover:underline" href="/detail/${encodeURIComponent(job.output_path_rel)}">查看文件</a>`
+      : '';
+
+    return `
+      <article class="job-row py-3 first:pt-0 last:pb-0">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0 flex-1 space-y-2">
+            <div class="flex items-center gap-2">${statusBadge(job.status)} <span class="text-xs text-gray-500 dark:text-gray-400">${formatDate(job.created_at)}</span></div>
+            <p class="text-sm text-gray-800 dark:text-gray-200 break-all">${job.url}</p>
+            ${progress !== null ? `
+              <div class="w-full h-1.5 rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div class="h-1.5 bg-blue-500/85" style="width:${progress.toFixed(1)}%"></div>
+              </div>
+            ` : ''}
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+              <span>凭据：${cookieUsed}</span>
+              <span>开始：${formatDate(job.started_at)}</span>
+              <span>结束：${formatDate(job.finished_at)}</span>
+              ${outputLink}
+            </div>
+            ${job.error_message ? `<details class="text-xs text-rose-600 dark:text-rose-300"><summary class="cursor-pointer">查看错误</summary><div class="pt-1 break-all">${job.error_message}</div></details>` : ''}
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            ${canCancel ? `<button data-action="cancel" data-job-id="${job.id}" class="dl-muted-btn">取消</button>` : ''}
+            ${canRetry ? `<button data-action="retry" data-job-id="${job.id}" class="dl-muted-btn">重试</button>` : ''}
+            ${canDelete ? `<button data-action="delete" data-job-id="${job.id}" class="dl-muted-btn">删除</button>` : ''}
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('button[data-action]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const action = btn.getAttribute('data-action');
+      const jobId = btn.getAttribute('data-job-id');
+      if (!action || !jobId) return;
+      try {
+        if (action === 'cancel') {
+          await api(`/api/download/jobs/${jobId}/cancel`, { method: 'POST' });
+        } else if (action === 'retry') {
+          await api(`/api/download/jobs/${jobId}/retry`, { method: 'POST' });
+          notify('已创建重试任务', 'success');
+        } else if (action === 'delete') {
+          await api(`/api/download/jobs/${jobId}`, { method: 'DELETE' });
+        }
+        await refreshJobs();
+      } catch (error) {
+        notify(error.message, 'error');
+      }
+    });
+  });
+}
+
+async function refreshProbe() {
+  const panel = document.getElementById('probe-panel');
+  if (!panel) return;
+  try {
+    const data = await api('/api/download/probe', { method: 'POST' });
+    panel.innerHTML = `
+      <p>yt-dlp：<strong>${data.yt_dlp_available ? '可用' : '不可用'}</strong> ${data.yt_dlp_version ? `(${data.yt_dlp_version})` : ''}</p>
+      <p>ffmpeg：<strong>${data.ffmpeg_available ? '可用' : '不可用'}</strong></p>
+      <p class="text-gray-500 dark:text-gray-400">依赖缺失时请先安装后再重试下载。</p>
+    `;
+  } catch (error) {
+    panel.innerHTML = `<p class="text-rose-600 dark:text-rose-300">${error.message}</p>`;
+  }
+}
+
+async function refreshConfig() {
+  try {
+    const data = await api('/api/download/config');
+    const maxConcurrentEl = document.getElementById('max-concurrent');
+    const cookieDirHint = document.getElementById('cookie-dir-hint');
+    if (maxConcurrentEl && data.effective) {
+      maxConcurrentEl.value = String(data.effective.max_concurrent ?? 2);
+    }
+    if (cookieDirHint && data.effective) {
+      const dir = data.effective.cookie_dir || '~/.tiklocal/cookies';
+      const enabled = data.effective.cookie_enabled !== false;
+      cookieDirHint.textContent = `登录凭据目录：${dir}${enabled ? '' : '（已禁用）'}`;
+    }
+  } catch (error) {
+    notify(error.message, 'error');
+  }
+}
+
+function updateCookieSelect(preferred = '') {
+  const selectEl = document.getElementById('cookie-select');
+  if (!selectEl) return;
+
+  const previous = preferred || selectEl.value || '__auto__';
+  const options = [
+    { value: '__auto__', label: '自动选择（按域名）' },
+    { value: '__none__', label: '不使用登录凭据' },
+  ];
+  (cookieMeta.files || []).forEach((name) => {
+    options.push({ value: name, label: `使用文件：${name}` });
+  });
+
+  selectEl.innerHTML = options.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
+  const hasPrevious = options.some((item) => item.value === previous);
+  selectEl.value = hasPrevious ? previous : '__auto__';
+  selectEl.disabled = cookieMeta.cookie_enabled === false;
+}
+
+async function refreshCookies(preferred = '') {
+  try {
+    const data = await api('/api/download/cookies');
+    cookieMeta = data;
+    updateCookieSelect(preferred);
+  } catch (error) {
+    notify(error.message, 'error');
+  }
+}
+
+async function refreshJobs() {
+  try {
+    const data = await api('/api/download/jobs?limit=80');
+    renderJobs(data.jobs || []);
+  } catch (error) {
+    notify(error.message, 'error');
+  }
+}
+
+function restartPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  const delay = document.hidden ? 9000 : 2200;
+  pollTimer = setInterval(refreshJobs, delay);
+}
+
+document.addEventListener('visibilitychange', restartPolling);
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const form = document.getElementById('download-form');
+  const saveConfigBtn = document.getElementById('save-config-btn');
+  const refreshBtn = document.getElementById('refresh-jobs-btn');
+  const clearHistoryBtn = document.getElementById('clear-history-btn');
+  const cookieUploadBtn = document.getElementById('cookie-upload-btn');
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const urlInput = document.getElementById('download-url');
+    const submitBtn = document.getElementById('download-submit');
+    const cookieSelect = document.getElementById('cookie-select');
+    const url = (urlInput?.value || '').trim();
+    if (!url) {
+      notify('请输入链接', 'error');
+      return;
+    }
+
+    try {
+      if (submitBtn) submitBtn.disabled = true;
+      const selectedCookie = (cookieSelect?.value || '__auto__').trim();
+      const payload = { url, save_mode: 'root' };
+      if (selectedCookie === '__none__') {
+        payload.cookie_mode = 'none';
+      } else if (selectedCookie === '__auto__') {
+        payload.cookie_mode = 'auto';
+      } else {
+        payload.cookie_mode = 'manual';
+        payload.cookie_file = selectedCookie;
+      }
+      await api('/api/download/jobs', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (urlInput) urlInput.value = '';
+      notify('任务已创建', 'success');
+      await refreshJobs();
+    } catch (error) {
+      notify(error.message, 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+
+  saveConfigBtn?.addEventListener('click', async () => {
+    const maxConcurrentEl = document.getElementById('max-concurrent');
+    const maxConcurrent = Number.parseInt((maxConcurrentEl?.value || '2').trim(), 10);
+    if (Number.isNaN(maxConcurrent)) {
+      notify('并发配置必须是整数', 'error');
+      return;
+    }
+
+    try {
+      await api('/api/download/config', {
+        method: 'POST',
+        body: JSON.stringify({
+          enabled: true,
+          default_to_root: true,
+          allow_playlist: false,
+          max_concurrent: maxConcurrent,
+        })
+      });
+      notify('设置已保存', 'success');
+      await refreshConfig();
+    } catch (error) {
+      notify(error.message, 'error');
+    }
+  });
+
+  refreshBtn?.addEventListener('click', refreshJobs);
+
+  clearHistoryBtn?.addEventListener('click', async () => {
+    try {
+      const data = await api('/api/download/jobs/clear', { method: 'POST' });
+      notify(`已清理 ${data.deleted || 0} 条记录`, 'success');
+      await refreshJobs();
+    } catch (error) {
+      notify(error.message, 'error');
+    }
+  });
+
+  cookieUploadBtn?.addEventListener('click', async () => {
+    const fileInput = document.getElementById('cookie-upload-file');
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      notify('请选择要上传的文件', 'error');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const data = await apiForm('/api/download/cookies/upload', formData);
+      notify('登录凭据已更新', 'success');
+      if (fileInput) fileInput.value = '';
+      await refreshCookies(data.filename || '');
+    } catch (error) {
+      notify(error.message, 'error');
+    }
+  });
+
+  await Promise.all([refreshProbe(), refreshConfig(), refreshCookies(), refreshJobs()]);
+  restartPolling();
+});
+</script>
+{% endblock %}

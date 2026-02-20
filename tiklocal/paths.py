@@ -35,3 +35,11 @@ def get_prompt_config_path() -> Path:
 
 def get_llm_config_path() -> Path:
     return get_data_dir() / 'llm_config.json'
+
+
+def get_download_config_path() -> Path:
+    return get_data_dir() / 'download_config.json'
+
+
+def get_download_jobs_path() -> Path:
+    return get_data_dir() / 'download_jobs.json'

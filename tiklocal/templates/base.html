@@ -28,7 +28,7 @@
         left: 50%;
         transform: translateX(-50%);
         width: calc(100% - 32px);
-        max-width: 400px;
+        max-width: 460px;
         height: 64px;
         background: var(--dock-bg);
         backdrop-filter: blur(24px) saturate(180%);
@@ -123,6 +123,10 @@
 
       <a href="/browse" class="dock-item {% if menu == 'browse' %}active{% endif %}" aria-label="Library">
         <i data-feather="folder"></i>
+      </a>
+
+      <a href="/download" class="dock-item {% if menu == 'download' %}active{% endif %}" aria-label="Download">
+        <i data-feather="download-cloud"></i>
       </a>
 
       <a href="/settings" class="dock-item {% if menu == 'settings' %}active{% endif %}" aria-label="Settings">

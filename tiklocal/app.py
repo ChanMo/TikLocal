@@ -25,7 +25,21 @@ from tiklocal.services.metadata import (
     validate_llm_config,
     compute_prompt_hash,
 )
-from tiklocal.paths import get_metadata_path, get_prompt_config_path, get_llm_config_path
+from tiklocal.services.downloader import (
+    DEFAULT_DOWNLOAD_CONFIG,
+    DownloadConfigStore,
+    DownloadHistoryStore,
+    DownloadManager,
+    validate_download_config,
+    validate_download_url,
+)
+from tiklocal.paths import (
+    get_metadata_path,
+    get_prompt_config_path,
+    get_llm_config_path,
+    get_download_config_path,
+    get_download_jobs_path,
+)
 
 
 def get_app_version():
@@ -82,6 +96,13 @@ def create_app(test_config=None):
     metadata_store = ImageMetadataStore(get_metadata_path())
     prompt_config_store = PromptConfigStore(get_prompt_config_path())
     llm_config_store = LLMConfigStore(get_llm_config_path())
+    download_config_store = DownloadConfigStore(get_download_config_path())
+    download_history_store = DownloadHistoryStore(get_download_jobs_path())
+    download_manager = DownloadManager(
+        Path(media_root_str),
+        download_config_store,
+        download_history_store,
+    )
 
     def build_prompt_config_payload(custom_config=None):
         default_config = get_default_prompt_config()
@@ -144,6 +165,16 @@ def create_app(test_config=None):
         source = 'custom' if has_override else 'default'
         return effective, source
 
+    def build_download_config_payload():
+        config = download_manager.get_config()
+        effective = {key: config.get(key) for key in DEFAULT_DOWNLOAD_CONFIG.keys()}
+        payload = {
+            'config': config,
+            'defaults': dict(DEFAULT_DOWNLOAD_CONFIG),
+            'effective': effective,
+        }
+        return payload
+
     # --- Template Filters ---
     @app.template_filter('timestamp_to_date')
     def timestamp_to_date(timestamp):
@@ -172,6 +203,11 @@ def create_app(test_config=None):
     def gallery():
         """Immersive Image Discovery"""
         return render_template('gallery.html', menu='gallery')
+
+    @app.route('/download')
+    def download_view():
+        """URL Download Center"""
+        return render_template('download.html', menu='download')
 
     @app.route('/browse')
     def browse():
@@ -369,6 +405,112 @@ def create_app(test_config=None):
             'has_more': end < total,
             'seed': seed
         }
+
+    @app.route('/api/download/probe', methods=['GET', 'POST'])
+    def api_download_probe():
+        return {'success': True, 'data': download_manager.probe_dependencies()}
+
+    @app.route('/api/download/config', methods=['GET', 'POST'])
+    def api_download_config():
+        if request.method == 'GET':
+            return {'success': True, 'data': build_download_config_payload()}
+
+        payload = request.get_json(silent=True) or {}
+        validated, error = validate_download_config(payload, partial=True)
+        if error:
+            return {'success': False, 'error': error}, 400
+
+        try:
+            download_manager.update_config(validated)
+        except ValueError as exc:
+            return {'success': False, 'error': str(exc)}, 400
+
+        return {'success': True, 'data': build_download_config_payload()}
+
+    @app.route('/api/download/cookies')
+    def api_download_cookies():
+        return {'success': True, 'data': download_manager.list_cookie_files()}
+
+    @app.route('/api/download/cookies/upload', methods=['POST'])
+    def api_download_cookies_upload():
+        file = request.files.get('file')
+        if not file:
+            return {'success': False, 'error': '缺少上传文件。'}, 400
+
+        filename = str(file.filename or '').strip()
+        if not filename:
+            return {'success': False, 'error': '文件名不能为空。'}, 400
+
+        content = file.read()
+        try:
+            # 上传语义统一为“同名覆盖更新”，避免多按钮分叉。
+            data = download_manager.upload_cookie_file(filename, content, replace=True)
+        except ValueError as exc:
+            return {'success': False, 'error': str(exc)}, 400
+        return {'success': True, 'data': data}
+
+    @app.route('/api/download/jobs', methods=['GET', 'POST'])
+    def api_download_jobs():
+        if request.method == 'GET':
+            limit = request.args.get('limit', 50)
+            try:
+                limit_value = int(limit)
+            except (TypeError, ValueError):
+                limit_value = 50
+            jobs = download_manager.list_jobs(limit=limit_value)
+            return {'success': True, 'data': {'jobs': jobs}}
+
+        payload = request.get_json(silent=True) or {}
+        validated, error = validate_download_url(payload)
+        if error:
+            return {'success': False, 'error': error}, 400
+
+        try:
+            job = download_manager.enqueue(
+                validated['url'],
+                save_mode=validated['save_mode'],
+                cookie_mode=validated.get('cookie_mode', 'auto'),
+                cookie_file=validated.get('cookie_file', ''),
+            )
+        except RuntimeError as exc:
+            return {'success': False, 'error': str(exc)}, 400
+
+        return {'success': True, 'data': {'job': job}}
+
+    @app.route('/api/download/jobs/<job_id>')
+    def api_download_job_detail(job_id):
+        job = download_manager.get_job(job_id)
+        if not job:
+            return {'success': False, 'error': 'Job not found'}, 404
+        return {'success': True, 'data': {'job': job}}
+
+    @app.route('/api/download/jobs/<job_id>/cancel', methods=['POST'])
+    def api_download_job_cancel(job_id):
+        job = download_manager.cancel(job_id)
+        if not job:
+            return {'success': False, 'error': 'Job not found'}, 404
+        return {'success': True, 'data': {'job': job}}
+
+    @app.route('/api/download/jobs/<job_id>', methods=['DELETE'])
+    def api_download_job_delete(job_id):
+        ok, error = download_manager.delete_job(job_id)
+        if not ok:
+            status = 404 if error == 'Job not found' else 400
+            return {'success': False, 'error': error}, status
+        return {'success': True, 'data': {'deleted': True}}
+
+    @app.route('/api/download/jobs/clear', methods=['POST'])
+    def api_download_jobs_clear():
+        deleted = download_manager.clear_history()
+        return {'success': True, 'data': {'deleted': deleted}}
+
+    @app.route('/api/download/jobs/<job_id>/retry', methods=['POST'])
+    def api_download_job_retry(job_id):
+        job, error = download_manager.retry_job(job_id)
+        if error:
+            status = 404 if error == 'Job not found' else 400
+            return {'success': False, 'error': error}, status
+        return {'success': True, 'data': {'job': job}}
 
     @app.route('/api/ai/prompt-config', methods=['GET', 'POST'])
     def api_prompt_config():

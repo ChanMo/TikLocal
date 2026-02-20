@@ -74,6 +74,29 @@ tiklocal dedupe /path --keep newest         # 保留最新的文件
 - `--execute`: 执行实际删除
 - `--auto-confirm`: 跳过确认提示
 
+### URL 下载（Web）
+
+TikLocal 新增了 `/download` 页面，可粘贴媒体 URL 并创建后台下载任务。
+
+依赖要求：
+- `yt-dlp`（必需）
+- `ffmpeg`（建议，用于格式合并）
+
+登录态内容（可选）：
+- 将导出的 cookie 文件放到 `~/.tiklocal/cookies`
+- 文件名建议包含域名，例如 `x.com.txt`、`youtube.com.cookies`
+- 下载页面支持“自动匹配”或按任务手动指定 cookie 文件
+- 下载页面也支持凭据文件上传/覆盖、历史删除/清空，以及失败任务重试
+
+安装示例：
+```bash
+# macOS (Homebrew)
+brew install yt-dlp ffmpeg
+
+# Ubuntu / Debian
+sudo apt install yt-dlp ffmpeg
+```
+
 ### 配置
 
 TikLocal 提供了一些配置选项，您可以根据自己的需要进行调整。
@@ -106,5 +129,3 @@ TikLocal 是一个开源项目，您可以通过以下方式进行贡献：
 
 * GitHub 项目地址：[https://github.com/ChanMo/TikLocal/](https://github.com/ChanMo/TikLocal/)
 * 邮箱：[chan.mo@outlook.com]
-
-
