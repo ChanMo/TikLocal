@@ -27,3 +27,11 @@ def get_thumbs_map_path() -> Path:
 
 def get_metadata_path() -> Path:
     return get_data_dir() / 'metadata.json'
+
+
+def get_prompt_config_path() -> Path:
+    return get_data_dir() / 'prompt_config.json'
+
+
+def get_llm_config_path() -> Path:
+    return get_data_dir() / 'llm_config.json'

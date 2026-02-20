@@ -146,13 +146,22 @@
               <i data-feather="zap" class="w-5 h-5 text-amber-500"></i>
               智能标题
             </h2>
-            <button
-              id="caption-generate-btn"
-              class="relative inline-flex items-center gap-1 px-3 pr-7 py-1.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30 transition-colors"
-            >
-              生成/刷新
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                id="caption-advanced-btn"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:hover:bg-blue-500/30 transition-colors"
+              >
+                高级
+              </button>
+              <button
+                id="caption-generate-btn"
+                class="relative inline-flex items-center gap-1 px-3 pr-7 py-1.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30 transition-colors"
+              >
+                生成/刷新
+              </button>
+            </div>
           </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">默认使用设置页中的 AI Prompt，你也可以在“高级”里仅本次覆盖。</p>
           <div id="caption-content" class="hidden">
             <p id="caption-title" class="text-sm text-gray-700 dark:text-gray-200 mb-3"></p>
             <div id="caption-tags" class="flex flex-wrap gap-2"></div>
@@ -240,6 +249,43 @@
       </button>
     </div>
   </div>
+
+  <!-- 提示词覆盖模态框 -->
+  <div id="caption-prompt-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+    <div class="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+      <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white">本次生成覆盖配置</h3>
+        <button id="caption-prompt-close" class="w-8 h-8 inline-flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+          <i data-feather="x" class="w-4 h-4 text-gray-500"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4 max-h-screen overflow-y-auto">
+        <div>
+          <label for="caption-override-system" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">System Prompt</label>
+          <textarea id="caption-override-system" rows="4" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+        <div>
+          <label for="caption-override-user" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">User Prompt</label>
+          <textarea id="caption-override-user" rows="6" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">可使用 <code>{tags_limit}</code> 或 <code>{% raw %}{{tags_limit}}{% endraw %}</code> 占位符。</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="caption-override-temperature" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">temperature (0-2)</label>
+            <input id="caption-override-temperature" type="number" min="0" max="2" step="0.1" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label for="caption-override-tags" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">tags_limit (1-20)</label>
+            <input id="caption-override-tags" type="number" min="1" max="20" step="1" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+      </div>
+      <div class="px-5 py-4 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl flex flex-wrap justify-end gap-3">
+        <button id="caption-override-cancel" class="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">取消</button>
+        <button id="caption-override-generate" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">仅本次覆盖生成</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -253,11 +299,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeFullscreen = document.getElementById('close-fullscreen');
   const copyLinkBtn = document.getElementById('copy-link-btn');
   const captionBtn = document.getElementById('caption-generate-btn');
+  const captionAdvancedBtn = document.getElementById('caption-advanced-btn');
   const captionContent = document.getElementById('caption-content');
   const captionTitle = document.getElementById('caption-title');
   const captionTags = document.getElementById('caption-tags');
+  const promptModal = document.getElementById('caption-prompt-modal');
+  const promptCloseBtn = document.getElementById('caption-prompt-close');
+  const promptCancelBtn = document.getElementById('caption-override-cancel');
+  const promptGenerateBtn = document.getElementById('caption-override-generate');
+  const promptSystemInput = document.getElementById('caption-override-system');
+  const promptUserInput = document.getElementById('caption-override-user');
+  const promptTemperatureInput = document.getElementById('caption-override-temperature');
+  const promptTagsInput = document.getElementById('caption-override-tags');
   const imageUri = "{{ uri }}";
   let currentCaption = null;
+  let promptConfigCache = null;
   
   let isZoomed = false;
   
@@ -301,7 +357,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // ESC键关闭全屏
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !fullscreenModal.classList.contains('hidden')) {
+    if (e.key !== 'Escape') return;
+    if (promptModal && !promptModal.classList.contains('hidden')) {
+      closePromptModal();
+      return;
+    }
+    if (!fullscreenModal.classList.contains('hidden')) {
       fullscreenModal.classList.add('hidden');
       fullscreenModal.classList.remove('flex');
     }
@@ -362,7 +423,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const generateCaption = async (force = false) => {
+  const openPromptModal = () => {
+    if (!promptModal) return;
+    promptModal.classList.remove('hidden');
+    promptModal.classList.add('flex');
+  };
+
+  const closePromptModal = () => {
+    if (!promptModal) return;
+    promptModal.classList.add('hidden');
+    promptModal.classList.remove('flex');
+  };
+
+  const loadPromptConfig = async () => {
+    if (promptConfigCache) return promptConfigCache;
+    const res = await fetch('/api/ai/prompt-config');
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error(data.error || '读取提示词配置失败');
+    }
+    promptConfigCache = data.data;
+    return promptConfigCache;
+  };
+
+  const fillPromptModal = async () => {
+    try {
+      const configData = await loadPromptConfig();
+      const source = configData.custom || configData.default;
+      if (!source) return;
+      promptSystemInput.value = source.system_prompt || '';
+      promptUserInput.value = source.user_prompt || '';
+      promptTemperatureInput.value = Number(source.temperature ?? 0.6).toFixed(1);
+      promptTagsInput.value = Number(source.tags_limit ?? 5);
+      openPromptModal();
+    } catch (err) {
+      showNotification(err.message || '读取提示词配置失败', 'error');
+    }
+  };
+
+  const collectPromptOverride = () => {
+    const systemPrompt = (promptSystemInput?.value || '').trim();
+    const userPrompt = (promptUserInput?.value || '').trim();
+    const temperature = Number(promptTemperatureInput?.value || 0.6);
+    const tagsLimit = Number(promptTagsInput?.value || 5);
+    if (!systemPrompt || !userPrompt) {
+      throw new Error('System Prompt 和 User Prompt 不能为空');
+    }
+    if (temperature < 0 || temperature > 2) {
+      throw new Error('temperature 必须在 0 到 2 之间');
+    }
+    if (!Number.isInteger(tagsLimit) || tagsLimit < 1 || tagsLimit > 20) {
+      throw new Error('tags_limit 必须在 1 到 20 之间');
+    }
+    return {
+      system_prompt: systemPrompt,
+      user_prompt: userPrompt,
+      temperature,
+      tags_limit: tagsLimit
+    };
+  };
+
+  const generateCaption = async (force = false, promptOverride = null) => {
     if (currentCaption && !force) {
       const ok = window.confirm('已存在标题，是否覆盖？');
       if (!ok) return;
@@ -371,20 +492,24 @@ document.addEventListener('DOMContentLoaded', () => {
     captionBtn.disabled = true;
     captionBtn.classList.add('is-loading');
     try {
+      const payload = { uri: imageUri, force };
+      if (promptOverride) {
+        payload.prompt_override = promptOverride;
+      }
       const res = await fetch('/api/image/metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uri: imageUri, force })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
         renderCaption(data.data);
         showNotification('标题已更新', 'success');
       } else {
-        showNotification('生成失败', 'error');
+        showNotification(data.error || '生成失败', 'error');
       }
     } catch (err) {
-      showNotification('生成失败', 'error');
+      showNotification(err.message || '生成失败', 'error');
     } finally {
       captionBtn.disabled = false;
       captionBtn.classList.remove('is-loading');
@@ -392,6 +517,23 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   captionBtn?.addEventListener('click', () => generateCaption());
+  captionAdvancedBtn?.addEventListener('click', fillPromptModal);
+  promptCloseBtn?.addEventListener('click', closePromptModal);
+  promptCancelBtn?.addEventListener('click', closePromptModal);
+  promptModal?.addEventListener('click', (e) => {
+    if (e.target === promptModal) {
+      closePromptModal();
+    }
+  });
+  promptGenerateBtn?.addEventListener('click', async () => {
+    try {
+      const override = collectPromptOverride();
+      closePromptModal();
+      await generateCaption(false, override);
+    } catch (err) {
+      showNotification(err.message || '覆盖配置无效', 'error');
+    }
+  });
   loadCaption();
   
   // 键盘导航

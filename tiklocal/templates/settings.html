@@ -41,6 +41,115 @@
               </button>
             </div>
           </section>
+
+          <!-- LLM Provider -->
+          <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
+            <header class="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div class="flex items-center justify-between gap-4">
+                <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                  <i data-feather="server" class="w-6 h-6 text-blue-500"></i>
+                  <span>LLM Provider</span>
+                </h2>
+                <span id="llm-config-state" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                  已保存
+                </span>
+              </div>
+            </header>
+            <div class="p-6 space-y-4">
+              <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <div>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-white">API Key 状态</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">API Key 仍通过环境变量管理，不在页面内保存。</p>
+                </div>
+                <span id="llm-api-key-state" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">检测中...</span>
+              </div>
+              <div>
+                <label for="llm-model-name" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Model Name</label>
+                <input id="llm-model-name" type="text" maxlength="256" placeholder="例如 gpt-4.1-mini" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label for="llm-base-url" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Base URL</label>
+                <input id="llm-base-url" type="text" maxlength="512" placeholder="例如 https://api.openai.com/v1" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">留空将回退到环境变量配置。</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-3 pt-2">
+                <button id="llm-save-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors">
+                  <i data-feather="save" class="w-4 h-4"></i>
+                  保存配置
+                </button>
+                <button id="llm-reset-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <i data-feather="rotate-ccw" class="w-4 h-4"></i>
+                  恢复默认
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- AI Prompt -->
+          <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
+            <header class="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div class="flex items-center justify-between gap-4">
+                <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                  <i data-feather="cpu" class="w-6 h-6 text-amber-500"></i>
+                  <span>AI Prompt</span>
+                </h2>
+                <span id="ai-prompt-state" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                  已保存
+                </span>
+              </div>
+            </header>
+            <div class="p-6 space-y-4">
+              <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <div>
+                  <p class="text-sm font-semibold text-gray-900 dark:text-white">启用自定义提示词</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">关闭后将使用内置默认提示词。</p>
+                </div>
+                <input type="checkbox" id="ai-prompt-enabled" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <label for="ai-system-prompt" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">System Prompt</label>
+                  <span id="ai-system-count" class="text-xs text-gray-500 dark:text-gray-400">0/4000</span>
+                </div>
+                <textarea id="ai-system-prompt" rows="5" maxlength="4000" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <label for="ai-user-prompt" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">User Prompt</label>
+                  <span id="ai-user-count" class="text-xs text-gray-500 dark:text-gray-400">0/8000</span>
+                </div>
+                <textarea id="ai-user-prompt" rows="7" maxlength="8000" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">支持占位符 <code>{tags_limit}</code> 或 <code>{% raw %}{{tags_limit}}{% endraw %}</code>。</p>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                  <div class="flex items-center justify-between">
+                    <label for="ai-temperature" class="text-sm font-semibold text-gray-800 dark:text-gray-200">temperature</label>
+                    <span id="ai-temperature-value" class="text-xs text-gray-500 dark:text-gray-400">0.60</span>
+                  </div>
+                  <input id="ai-temperature" type="range" min="0" max="2" step="0.1" value="0.6" class="w-full mt-2">
+                </div>
+                <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                  <label for="ai-tags-limit" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">tags_limit (1-20)</label>
+                  <input id="ai-tags-limit" type="number" min="1" max="20" value="5" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-3 pt-2">
+                <button id="ai-prompt-save-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors">
+                  <i data-feather="save" class="w-4 h-4"></i>
+                  保存配置
+                </button>
+                <button id="ai-prompt-reset-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <i data-feather="rotate-ccw" class="w-4 h-4"></i>
+                  恢复默认
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
 
         <!-- Right Column / Info -->
@@ -148,9 +257,20 @@
 
 {% block extra_body %}
 <script>
+let promptConfigState = {
+  baseline: null,
+  dirty: false
+};
+let llmConfigState = {
+  baseline: null,
+  dirty: false
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   // 页面加载时获取统计信息
   loadStats();
+  initLLMConfig();
+  initPromptConfig();
 });
 
 async function loadStats() {
@@ -199,6 +319,314 @@ async function refreshLibrary() {
       showNotification('媒体库刷新成功！', 'success');
     } catch (err) {
       showNotification('刷新失败，请重试', 'error');
+    }
+  });
+}
+
+function initLLMConfig() {
+  const modelInput = document.getElementById('llm-model-name');
+  const baseUrlInput = document.getElementById('llm-base-url');
+  const saveBtn = document.getElementById('llm-save-btn');
+  const resetBtn = document.getElementById('llm-reset-btn');
+
+  if (!modelInput || !baseUrlInput) return;
+
+  const onInput = () => {
+    setLLMDirty(isLLMFormChanged());
+  };
+
+  [modelInput, baseUrlInput].forEach((el) => {
+    el.addEventListener('input', onInput);
+    el.addEventListener('change', onInput);
+  });
+
+  saveBtn?.addEventListener('click', saveLLMConfig);
+  resetBtn?.addEventListener('click', resetLLMConfig);
+  loadLLMConfig();
+}
+
+function currentLLMFormValue() {
+  const modelInput = document.getElementById('llm-model-name');
+  const baseUrlInput = document.getElementById('llm-base-url');
+  return {
+    model_name: (modelInput?.value || '').trim(),
+    base_url: (baseUrlInput?.value || '').trim()
+  };
+}
+
+function setLLMDirty(dirty) {
+  llmConfigState.dirty = !!dirty;
+  const state = document.getElementById('llm-config-state');
+  if (!state) return;
+  if (llmConfigState.dirty) {
+    state.textContent = '未保存';
+    state.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300';
+  } else {
+    state.textContent = '已保存';
+    state.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200';
+  }
+}
+
+function isLLMFormChanged() {
+  if (!llmConfigState.baseline) return false;
+  return JSON.stringify(currentLLMFormValue()) !== JSON.stringify(llmConfigState.baseline);
+}
+
+function applyLLMConfig(data) {
+  const modelInput = document.getElementById('llm-model-name');
+  const baseUrlInput = document.getElementById('llm-base-url');
+  const apiKeyState = document.getElementById('llm-api-key-state');
+  const sourceConfig = data.custom || data.default || {};
+
+  if (!modelInput || !baseUrlInput) return;
+
+  modelInput.value = sourceConfig.model_name || '';
+  baseUrlInput.value = sourceConfig.base_url || '';
+  if (apiKeyState) {
+    apiKeyState.textContent = data.has_api_key ? '已配置（环境变量）' : '未配置';
+    apiKeyState.className = data.has_api_key
+      ? 'text-xs px-2 py-1 rounded bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
+      : 'text-xs px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300';
+  }
+
+  llmConfigState.baseline = currentLLMFormValue();
+  setLLMDirty(false);
+}
+
+async function loadLLMConfig() {
+  try {
+    const res = await fetch('/api/ai/llm-config');
+    const data = await res.json();
+    if (!data.success) {
+      showNotification(data.error || '读取 LLM 配置失败', 'error');
+      return;
+    }
+    applyLLMConfig(data.data);
+  } catch (err) {
+    showNotification('读取 LLM 配置失败', 'error');
+  }
+}
+
+async function saveLLMConfig() {
+  const payload = currentLLMFormValue();
+  if (payload.base_url && !/^https?:\/\//i.test(payload.base_url)) {
+    showNotification('base_url 必须以 http:// 或 https:// 开头', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('llm-save-btn');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    const res = await fetch('/api/ai/llm-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.success) {
+      showNotification(data.error || '保存 LLM 配置失败', 'error');
+      return;
+    }
+    applyLLMConfig(data.data);
+    showNotification('LLM 配置已保存', 'success');
+  } catch (err) {
+    showNotification('保存 LLM 配置失败', 'error');
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+async function resetLLMConfig() {
+  showModal('恢复默认 LLM 配置？', '这会清空你保存的 model_name/base_url，回退到环境变量。', async () => {
+    try {
+      const res = await fetch('/api/ai/llm-config/reset', { method: 'POST' });
+      const data = await res.json();
+      if (!data.success) {
+        showNotification(data.error || '恢复失败', 'error');
+        return;
+      }
+      applyLLMConfig(data.data);
+      showNotification('已恢复默认 LLM 配置', 'success');
+    } catch (err) {
+      showNotification('恢复失败，请重试', 'error');
+    }
+  });
+}
+
+function initPromptConfig() {
+  const enabledInput = document.getElementById('ai-prompt-enabled');
+  const systemInput = document.getElementById('ai-system-prompt');
+  const userInput = document.getElementById('ai-user-prompt');
+  const temperatureInput = document.getElementById('ai-temperature');
+  const tagsLimitInput = document.getElementById('ai-tags-limit');
+  const saveBtn = document.getElementById('ai-prompt-save-btn');
+  const resetBtn = document.getElementById('ai-prompt-reset-btn');
+
+  if (!enabledInput || !systemInput || !userInput || !temperatureInput || !tagsLimitInput) {
+    return;
+  }
+
+  const onInput = () => {
+    updatePromptCounters();
+    setPromptDirty(isPromptFormChanged());
+  };
+
+  [enabledInput, systemInput, userInput, temperatureInput, tagsLimitInput].forEach((el) => {
+    el.addEventListener('input', onInput);
+    el.addEventListener('change', onInput);
+  });
+
+  saveBtn?.addEventListener('click', savePromptConfig);
+  resetBtn?.addEventListener('click', resetPromptConfig);
+
+  window.addEventListener('beforeunload', (event) => {
+    if (!promptConfigState.dirty && !llmConfigState.dirty) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+
+  loadPromptConfig();
+}
+
+function updatePromptCounters() {
+  const systemInput = document.getElementById('ai-system-prompt');
+  const userInput = document.getElementById('ai-user-prompt');
+  const systemCount = document.getElementById('ai-system-count');
+  const userCount = document.getElementById('ai-user-count');
+  const temperatureInput = document.getElementById('ai-temperature');
+  const temperatureValue = document.getElementById('ai-temperature-value');
+
+  if (systemInput && systemCount) {
+    systemCount.textContent = `${systemInput.value.length}/4000`;
+  }
+  if (userInput && userCount) {
+    userCount.textContent = `${userInput.value.length}/8000`;
+  }
+  if (temperatureInput && temperatureValue) {
+    temperatureValue.textContent = Number(temperatureInput.value || 0).toFixed(2);
+  }
+}
+
+function currentPromptFormValue() {
+  const enabledInput = document.getElementById('ai-prompt-enabled');
+  const systemInput = document.getElementById('ai-system-prompt');
+  const userInput = document.getElementById('ai-user-prompt');
+  const temperatureInput = document.getElementById('ai-temperature');
+  const tagsLimitInput = document.getElementById('ai-tags-limit');
+  return {
+    enabled: !!enabledInput?.checked,
+    system_prompt: (systemInput?.value || '').trim(),
+    user_prompt: (userInput?.value || '').trim(),
+    temperature: Number(temperatureInput?.value || 0.6),
+    tags_limit: Number(tagsLimitInput?.value || 5)
+  };
+}
+
+function setPromptDirty(dirty) {
+  promptConfigState.dirty = !!dirty;
+  const state = document.getElementById('ai-prompt-state');
+  if (!state) return;
+  if (promptConfigState.dirty) {
+    state.textContent = '未保存';
+    state.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300';
+  } else {
+    state.textContent = '已保存';
+    state.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200';
+  }
+}
+
+function isPromptFormChanged() {
+  if (!promptConfigState.baseline) return false;
+  return JSON.stringify(currentPromptFormValue()) !== JSON.stringify(promptConfigState.baseline);
+}
+
+function applyPromptConfig(data) {
+  const enabledInput = document.getElementById('ai-prompt-enabled');
+  const systemInput = document.getElementById('ai-system-prompt');
+  const userInput = document.getElementById('ai-user-prompt');
+  const temperatureInput = document.getElementById('ai-temperature');
+  const tagsLimitInput = document.getElementById('ai-tags-limit');
+  const sourceConfig = data.custom || data.default;
+
+  if (!sourceConfig || !enabledInput || !systemInput || !userInput || !temperatureInput || !tagsLimitInput) {
+    return;
+  }
+
+  enabledInput.checked = Boolean(data.custom?.enabled);
+  systemInput.value = sourceConfig.system_prompt || '';
+  userInput.value = sourceConfig.user_prompt || '';
+  temperatureInput.value = Number(sourceConfig.temperature ?? 0.6).toFixed(1);
+  tagsLimitInput.value = Number(sourceConfig.tags_limit ?? 5);
+
+  promptConfigState.baseline = currentPromptFormValue();
+  setPromptDirty(false);
+  updatePromptCounters();
+}
+
+async function loadPromptConfig() {
+  try {
+    const res = await fetch('/api/ai/prompt-config');
+    const data = await res.json();
+    if (!data.success) {
+      showNotification(data.error || '读取提示词配置失败', 'error');
+      return;
+    }
+    applyPromptConfig(data.data);
+  } catch (err) {
+    showNotification('读取提示词配置失败', 'error');
+  }
+}
+
+async function savePromptConfig() {
+  const payload = currentPromptFormValue();
+  if (!payload.system_prompt || !payload.user_prompt) {
+    showNotification('System Prompt 和 User Prompt 不能为空', 'error');
+    return;
+  }
+  if (payload.temperature < 0 || payload.temperature > 2) {
+    showNotification('temperature 必须在 0 到 2 之间', 'error');
+    return;
+  }
+  if (!Number.isInteger(payload.tags_limit) || payload.tags_limit < 1 || payload.tags_limit > 20) {
+    showNotification('tags_limit 必须在 1 到 20 之间', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('ai-prompt-save-btn');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    const res = await fetch('/api/ai/prompt-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.success) {
+      showNotification(data.error || '保存失败', 'error');
+      return;
+    }
+    applyPromptConfig(data.data);
+    showNotification('AI 提示词已保存', 'success');
+  } catch (err) {
+    showNotification('保存失败，请重试', 'error');
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+async function resetPromptConfig() {
+  showModal('恢复默认提示词？', '这会清空当前自定义提示词并回到内置默认配置。', async () => {
+    try {
+      const res = await fetch('/api/ai/prompt-config/reset', { method: 'POST' });
+      const data = await res.json();
+      if (!data.success) {
+        showNotification(data.error || '恢复失败', 'error');
+        return;
+      }
+      applyPromptConfig(data.data);
+      showNotification('已恢复默认提示词', 'success');
+    } catch (err) {
+      showNotification('恢复失败，请重试', 'error');
     }
   });
 }

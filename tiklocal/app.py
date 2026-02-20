@@ -12,8 +12,20 @@ from flask import Flask, render_template, send_from_directory, request, redirect
 # Service Imports
 from tiklocal.services import LibraryService, FavoriteService, RecommendService
 from tiklocal.services.thumbnail import ThumbnailService
-from tiklocal.services.metadata import ImageMetadataStore, CaptionService
-from tiklocal.paths import get_metadata_path
+from tiklocal.services.metadata import (
+    ImageMetadataStore,
+    PromptConfigStore,
+    LLMConfigStore,
+    CaptionService,
+    get_default_prompt_config,
+    get_default_llm_config,
+    merge_prompt_config,
+    merge_llm_config,
+    validate_prompt_config,
+    validate_llm_config,
+    compute_prompt_hash,
+)
+from tiklocal.paths import get_metadata_path, get_prompt_config_path, get_llm_config_path
 
 
 def get_app_version():
@@ -54,6 +66,8 @@ def create_app(test_config=None):
         MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', '.'))
     )
     app.config.from_pyfile('config.py', silent=True)
+    if test_config is not None:
+        app.config.update(test_config)
     try:
         os.makedirs(app.instance_path)
     except OSError:
@@ -66,7 +80,69 @@ def create_app(test_config=None):
     recommend_service = RecommendService(library_service, favorite_service)
     thumbnail_service = ThumbnailService(Path(media_root_str))
     metadata_store = ImageMetadataStore(get_metadata_path())
-    caption_service = CaptionService()
+    prompt_config_store = PromptConfigStore(get_prompt_config_path())
+    llm_config_store = LLMConfigStore(get_llm_config_path())
+
+    def build_prompt_config_payload(custom_config=None):
+        default_config = get_default_prompt_config()
+        default_config.pop('enabled', None)
+
+        custom = custom_config if custom_config is not None else prompt_config_store.get()
+        active_profile = 'custom' if custom and custom.get('enabled', True) else 'default'
+        return {
+            'active_profile': active_profile,
+            'custom': custom,
+            'default': default_config,
+        }
+
+    def build_llm_config_payload(custom_config=None):
+        default_config = get_default_llm_config()
+        default_config['base_url'] = str(os.environ.get('TIKLOCAL_LLM_BASE_URL', '')).strip()
+        default_config['model_name'] = str(os.environ.get('TIKLOCAL_LLM_MODEL', '')).strip()
+
+        custom = custom_config if custom_config is not None else llm_config_store.get()
+        has_override = bool(
+            custom and (str(custom.get('base_url', '')).strip() or str(custom.get('model_name', '')).strip())
+        )
+        effective = merge_llm_config(default_config, custom)
+        active_profile = 'custom' if has_override else 'default'
+        return {
+            'active_profile': active_profile,
+            'custom': custom,
+            'default': default_config,
+            'effective': effective,
+            'has_api_key': bool(os.environ.get('OPENAI_API_KEY')),
+        }
+
+    def resolve_effective_prompt_config(override_config=None):
+        effective = get_default_prompt_config()
+        source = 'default'
+
+        custom = prompt_config_store.get()
+        if custom and custom.get('enabled', True):
+            effective = merge_prompt_config(effective, custom)
+            source = 'custom'
+
+        if override_config:
+            effective = merge_prompt_config(effective, override_config)
+            source = 'override'
+
+        effective.pop('enabled', None)
+        effective.pop('updated_at', None)
+        return effective, source
+
+    def resolve_effective_llm_config():
+        default_config = get_default_llm_config()
+        default_config['base_url'] = str(os.environ.get('TIKLOCAL_LLM_BASE_URL', '')).strip()
+        default_config['model_name'] = str(os.environ.get('TIKLOCAL_LLM_MODEL', '')).strip()
+
+        custom = llm_config_store.get()
+        effective = merge_llm_config(default_config, custom)
+        has_override = bool(
+            custom and (str(custom.get('base_url', '')).strip() or str(custom.get('model_name', '')).strip())
+        )
+        source = 'custom' if has_override else 'default'
+        return effective, source
 
     # --- Template Filters ---
     @app.template_filter('timestamp_to_date')
@@ -294,6 +370,42 @@ def create_app(test_config=None):
             'seed': seed
         }
 
+    @app.route('/api/ai/prompt-config', methods=['GET', 'POST'])
+    def api_prompt_config():
+        if request.method == 'GET':
+            return {'success': True, 'data': build_prompt_config_payload()}
+
+        payload = request.get_json(silent=True) or {}
+        validated, error = validate_prompt_config(payload, partial=False, include_enabled=True)
+        if error:
+            return {'success': False, 'error': error}, 400
+
+        saved = prompt_config_store.set(validated)
+        return {'success': True, 'data': build_prompt_config_payload(saved)}
+
+    @app.route('/api/ai/prompt-config/reset', methods=['POST'])
+    def api_prompt_config_reset():
+        prompt_config_store.reset()
+        return {'success': True, 'data': build_prompt_config_payload()}
+
+    @app.route('/api/ai/llm-config', methods=['GET', 'POST'])
+    def api_llm_config():
+        if request.method == 'GET':
+            return {'success': True, 'data': build_llm_config_payload()}
+
+        payload = request.get_json(silent=True) or {}
+        validated, error = validate_llm_config(payload, partial=False)
+        if error:
+            return {'success': False, 'error': error}, 400
+
+        saved = llm_config_store.set(validated)
+        return {'success': True, 'data': build_llm_config_payload(saved)}
+
+    @app.route('/api/ai/llm-config/reset', methods=['POST'])
+    def api_llm_config_reset():
+        llm_config_store.reset()
+        return {'success': True, 'data': build_llm_config_payload()}
+
     @app.route('/api/image/metadata', methods=['GET', 'POST'])
     def api_image_metadata():
         if request.method == 'GET':
@@ -305,8 +417,17 @@ def create_app(test_config=None):
         payload = request.get_json(silent=True) or {}
         uri = payload.get('uri')
         force = bool(payload.get('force'))
+        prompt_override = payload.get('prompt_override')
         if not uri:
             return {'success': False, 'error': 'Missing uri'}, 400
+
+        override_config = None
+        if prompt_override is not None:
+            override_config, error = validate_prompt_config(prompt_override, partial=True, include_enabled=False)
+            if error:
+                return {'success': False, 'error': error}, 400
+            if not override_config:
+                override_config = None
 
         existing = metadata_store.get(uri)
         if existing and not force:
@@ -317,7 +438,21 @@ def create_app(test_config=None):
             return {'success': False, 'error': 'File not found'}, 404
 
         try:
-            result = caption_service.generate(target, tags_limit=5)
+            effective_prompt, prompt_source = resolve_effective_prompt_config(override_config)
+            effective_llm, llm_source = resolve_effective_llm_config()
+            caption_service = CaptionService(
+                model=effective_llm.get('model_name') or None,
+                base_url=effective_llm.get('base_url') or None,
+                api_key=os.environ.get('OPENAI_API_KEY') or None,
+            )
+            result = caption_service.generate(
+                target,
+                tags_limit=int(effective_prompt.get('tags_limit', 5)),
+                prompt_config=effective_prompt,
+            )
+            result['prompt_source'] = prompt_source
+            result['llm_source'] = llm_source
+            result.setdefault('prompt_hash', compute_prompt_hash(effective_prompt))
             metadata_store.set(uri, result, overwrite=True)
             return {'success': True, 'data': result}
         except Exception as e:
