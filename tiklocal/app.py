@@ -10,7 +10,7 @@ from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, redirect, send_file
 
 # Service Imports
-from tiklocal.services import LibraryService, FavoriteService, RecommendService
+from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS
 from tiklocal.services.thumbnail import ThumbnailService
 from tiklocal.services.metadata import (
     ImageMetadataStore,
@@ -287,6 +287,9 @@ def create_app(test_config=None):
         target = library_service.resolve_path(name)
         if not target or not target.exists():
             return "File not found", 404
+
+        if target.suffix.lower() in IMAGE_EXTENSIONS:
+            return redirect(f"/image?uri={quote(name)}")
         
         # Context navigation (prev/next)
         # Note: Re-scanning every request is inefficient for large libraries, 
@@ -469,6 +472,7 @@ def create_app(test_config=None):
             job = download_manager.enqueue(
                 validated['url'],
                 save_mode=validated['save_mode'],
+                engine=validated.get('engine', 'yt-dlp'),
                 cookie_mode=validated.get('cookie_mode', 'auto'),
                 cookie_file=validated.get('cookie_file', ''),
             )

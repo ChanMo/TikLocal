@@ -82,7 +82,13 @@ TikLocal includes a `/download` page where you can paste a media URL and enqueue
 
 Requirements:
 - `yt-dlp` (required)
+- `gallery-dl` (recommended for image/gallery posts)
 - `ffmpeg` (recommended for format merge)
+
+Download engine:
+- `yt-dlp`: video-oriented sites and links
+- `gallery-dl`: image posts/albums (Instagram/X/Pinterest, etc.)
+- Download form allows manual engine selection per task (default: `yt-dlp`)
 
 Cookie for login-only content (optional):
 - Put exported cookie files in `~/.tiklocal/cookies`
@@ -93,10 +99,10 @@ Cookie for login-only content (optional):
 Example installs:
 ```bash
 # macOS (Homebrew)
-brew install yt-dlp ffmpeg
+brew install yt-dlp gallery-dl ffmpeg
 
 # Ubuntu / Debian
-sudo apt install yt-dlp ffmpeg
+sudo apt install yt-dlp gallery-dl ffmpeg
 ```
 
 ### Configuration

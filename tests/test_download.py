@@ -48,6 +48,8 @@ def test_download_config_api(client):
     assert res.status_code == 200
     assert data["success"] is True
     assert data["data"]["effective"]["max_concurrent"] == 2
+    assert data["data"]["effective"]["gallery_archive_enabled"] is True
+    assert "gallery_archive_file" in data["data"]["effective"]
 
     res = client.post(
         "/api/download/config",
@@ -90,7 +92,40 @@ def test_create_download_job_success(client):
     final_job = _wait_for_job(client, job_id)
     assert final_job["status"] == "success"
     assert final_job["output_path_rel"] == "mock-output.mp4"
+    assert final_job["output_files_rel"] == ["mock-output.mp4"]
+    assert final_job["file_count"] == 1
+    assert final_job["engine"] == "yt-dlp"
     assert final_job["cookie_match_mode"] == "none"
+
+
+def test_create_download_job_with_gallery_engine(client):
+    res = client.post("/api/download/jobs", json={"url": "https://example.com/post", "engine": "gallery-dl"})
+    data = res.get_json()
+    assert res.status_code == 200
+    assert data["success"] is True
+    final_job = _wait_for_job(client, data["data"]["job"]["id"])
+    assert final_job["status"] == "success"
+    assert final_job["engine"] == "gallery-dl"
+
+
+def test_create_download_job_rejects_invalid_engine(client):
+    res = client.post("/api/download/jobs", json={"url": "https://example.com/video", "engine": "wget"})
+    data = res.get_json()
+    assert res.status_code == 400
+    assert data["success"] is False
+    assert "engine" in data["error"]
+
+
+def test_detail_route_redirects_image_to_image_view(client):
+    media_root = client.application.config["MEDIA_ROOT"]
+    image_file = media_root / "from-download.JPG"
+    image_file.write_bytes(b"\x89PNG\r\n")
+
+    res = client.get("/detail/from-download.JPG", follow_redirects=False)
+    assert res.status_code in {301, 302, 308}
+    location = res.headers.get("Location", "")
+    assert location.startswith("/image?uri=")
+    assert "from-download.JPG" in location
 
 
 def test_create_download_job_validation(client):
@@ -128,6 +163,7 @@ def test_download_probe_api(client):
     assert res.status_code == 200
     assert data["success"] is True
     assert "yt_dlp_available" in data["data"]
+    assert "gallery_dl_available" in data["data"]
     assert "ffmpeg_available" in data["data"]
 
 
@@ -200,7 +236,7 @@ def test_retry_failed_job(client, monkeypatch):
         return 1, "network", ""
 
     monkeypatch.setattr("tiklocal.services.downloader.DownloadManager._execute_download", fail_execute)
-    res = client.post("/api/download/jobs", json={"url": "https://example.com/fail"})
+    res = client.post("/api/download/jobs", json={"url": "https://example.com/fail", "engine": "gallery-dl"})
     data = res.get_json()
     assert res.status_code == 200
     failed_job = _wait_for_job(client, data["data"]["job"]["id"])
@@ -216,6 +252,7 @@ def test_retry_failed_job(client, monkeypatch):
     new_job_id = retry_data["data"]["job"]["id"]
     assert new_job_id != failed_job["id"]
     assert retry_data["data"]["job"]["retry_of"] == failed_job["id"]
+    assert retry_data["data"]["job"]["engine"] == "gallery-dl"
     final = _wait_for_job(client, new_job_id)
     assert final["status"] == "success"
 

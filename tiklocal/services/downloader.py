@@ -18,6 +18,8 @@ DOWNLOAD_HISTORY_LIMIT = 200
 COOKIE_MAX_UPLOAD_BYTES = 1024 * 1024
 COOKIE_MATCH_MODE = "filename_contains_domain"
 COOKIE_FILE_EXTENSIONS = {".txt", ".cookies"}
+DOWNLOAD_ENGINES = {"yt-dlp", "gallery-dl"}
+DEFAULT_DOWNLOAD_ENGINE = "yt-dlp"
 
 DEFAULT_DOWNLOAD_CONFIG = {
     "enabled": True,
@@ -27,6 +29,8 @@ DEFAULT_DOWNLOAD_CONFIG = {
     "cookie_enabled": True,
     "cookie_dir": "~/.tiklocal/cookies",
     "cookie_match_mode": COOKIE_MATCH_MODE,
+    "gallery_archive_enabled": True,
+    "gallery_archive_file": "~/.tiklocal/gallery-dl-archive.txt",
 }
 
 TERMINAL_JOB_STATUS = {"success", "failed", "canceled"}
@@ -63,6 +67,8 @@ def _merge_download_config(base: dict[str, Any], override: dict[str, Any] | None
         "cookie_enabled",
         "cookie_dir",
         "cookie_match_mode",
+        "gallery_archive_enabled",
+        "gallery_archive_file",
     ):
         if key in override:
             merged[key] = override[key]
@@ -92,7 +98,7 @@ def validate_download_config(payload: Any, *, partial: bool = False) -> tuple[di
         cleaned[field] = value
         return None
 
-    for field in ("enabled", "default_to_root", "allow_playlist", "cookie_enabled"):
+    for field in ("enabled", "default_to_root", "allow_playlist", "cookie_enabled", "gallery_archive_enabled"):
         error = _read_bool(field)
         if error:
             return None, error
@@ -118,6 +124,12 @@ def validate_download_config(payload: Any, *, partial: bool = False) -> tuple[di
             return None, f"cookie_match_mode 仅支持 {COOKIE_MATCH_MODE}。"
         cleaned["cookie_match_mode"] = mode
 
+    if "gallery_archive_file" in payload or not partial:
+        archive_file = str(payload.get("gallery_archive_file", defaults["gallery_archive_file"])).strip()
+        if not archive_file:
+            return None, "gallery_archive_file 不能为空。"
+        cleaned["gallery_archive_file"] = archive_file
+
     return cleaned, None
 
 
@@ -138,6 +150,10 @@ def validate_download_url(payload: Any) -> tuple[dict[str, Any] | None, str | No
     save_mode = str(payload.get("save_mode", "root")).strip() or "root"
     if save_mode != "root":
         return None, "首版仅支持保存到媒体根目录。"
+
+    engine = str(payload.get("engine", DEFAULT_DOWNLOAD_ENGINE)).strip().lower() or DEFAULT_DOWNLOAD_ENGINE
+    if engine not in DOWNLOAD_ENGINES:
+        return None, "engine 必须是 yt-dlp 或 gallery-dl。"
 
     cookie_mode = str(payload.get("cookie_mode", "")).strip().lower()
     cookie_file_raw = payload.get("cookie_file")
@@ -162,6 +178,7 @@ def validate_download_url(payload: Any) -> tuple[dict[str, Any] | None, str | No
     return {
         "url": url,
         "save_mode": save_mode,
+        "engine": engine,
         "cookie_mode": cookie_mode,
         "cookie_file": cookie_file,
     }, None
@@ -291,21 +308,17 @@ class DownloadManager:
         self._ensure_workers()
 
     def probe_dependencies(self) -> dict[str, Any]:
-        yt_dlp_path = shutil.which("yt-dlp")
-        ffmpeg_path = shutil.which("ffmpeg")
-        version = ""
-
-        if yt_dlp_path:
-            try:
-                out = sp.check_output([yt_dlp_path, "--version"], text=True, timeout=3)
-                version = (out or "").strip()
-            except Exception:
-                version = ""
+        yt_dlp_path, yt_dlp_version = self._probe_binary("yt-dlp")
+        gallery_dl_path, gallery_dl_version = self._probe_binary("gallery-dl")
+        ffmpeg_path, _ = self._probe_binary("ffmpeg")
 
         return {
             "yt_dlp_available": bool(yt_dlp_path),
             "yt_dlp_path": yt_dlp_path or "",
-            "yt_dlp_version": version,
+            "yt_dlp_version": yt_dlp_version,
+            "gallery_dl_available": bool(gallery_dl_path),
+            "gallery_dl_path": gallery_dl_path or "",
+            "gallery_dl_version": gallery_dl_version,
             "ffmpeg_available": bool(ffmpeg_path),
             "ffmpeg_path": ffmpeg_path or "",
         }
@@ -354,11 +367,16 @@ class DownloadManager:
         url: str,
         *,
         save_mode: str = "root",
+        engine: str = DEFAULT_DOWNLOAD_ENGINE,
         cookie_mode: str = "auto",
         cookie_file: str = "",
         retry_of: str = "",
         output_token: str = "",
     ) -> dict[str, Any]:
+        engine = (engine or DEFAULT_DOWNLOAD_ENGINE).strip().lower()
+        if engine not in DOWNLOAD_ENGINES:
+            raise RuntimeError("不支持的下载引擎。")
+
         chosen_file, chosen_mode, cookie_error = self._resolve_cookie_choice(
             url=url,
             cookie_mode=cookie_mode,
@@ -377,6 +395,8 @@ class DownloadManager:
                 "id": job_id,
                 "url": url,
                 "save_mode": save_mode,
+                "engine": engine,
+                "engine_version": self._probe_binary(engine)[1],
                 "status": "queued",
                 "progress_percent": None,
                 "eta_sec": None,
@@ -384,6 +404,8 @@ class DownloadManager:
                 "started_at": None,
                 "finished_at": None,
                 "output_path_rel": "",
+                "output_files_rel": [],
+                "file_count": 0,
                 "error_message": "",
                 "requested_format": "mp4_preferred",
                 "cancel_requested": False,
@@ -485,6 +507,7 @@ class DownloadManager:
                 return None, "仅失败或已取消任务支持重试"
             url = str(job.get("url") or "")
             save_mode = str(job.get("save_mode") or "root")
+            engine = str(job.get("engine") or DEFAULT_DOWNLOAD_ENGINE)
             cookie_file = str(job.get("cookie_file") or "")
             cookie_match_mode = str(job.get("cookie_match_mode") or "none")
             output_token = str(job.get("output_token") or "")
@@ -497,6 +520,7 @@ class DownloadManager:
             new_job = self.enqueue(
                 url,
                 save_mode=save_mode,
+                engine=engine,
                 cookie_mode=cookie_mode,
                 cookie_file=cookie_file,
                 retry_of=job_id,
@@ -557,11 +581,15 @@ class DownloadManager:
                     status = "failed"
                     item["error_message"] = "任务因服务重启中断。"
                     item["finished_at"] = now
+                raw_output_files = item.get("output_files_rel")
+                output_files_rel = raw_output_files if isinstance(raw_output_files, list) else []
 
                 job = {
                     "id": job_id,
                     "url": str(item.get("url") or ""),
                     "save_mode": str(item.get("save_mode") or "root"),
+                    "engine": str(item.get("engine") or DEFAULT_DOWNLOAD_ENGINE),
+                    "engine_version": str(item.get("engine_version") or ""),
                     "status": status,
                     "progress_percent": item.get("progress_percent"),
                     "eta_sec": item.get("eta_sec"),
@@ -569,6 +597,8 @@ class DownloadManager:
                     "started_at": item.get("started_at"),
                     "finished_at": item.get("finished_at"),
                     "output_path_rel": str(item.get("output_path_rel") or ""),
+                    "output_files_rel": [str(v) for v in output_files_rel if str(v).strip()],
+                    "file_count": _to_int(item.get("file_count")) or 0,
                     "error_message": str(item.get("error_message") or ""),
                     "requested_format": str(item.get("requested_format") or "mp4_preferred"),
                     "cancel_requested": False,
@@ -580,6 +610,11 @@ class DownloadManager:
                         or str(item.get("created_at") or now).replace(":", "").replace("-", "").replace("Z", "")
                     ),
                 }
+                if not job["file_count"] and job["output_files_rel"]:
+                    job["file_count"] = len(job["output_files_rel"])
+                if not job["output_files_rel"] and job["output_path_rel"]:
+                    job["output_files_rel"] = [job["output_path_rel"]]
+                    job["file_count"] = max(1, job["file_count"])
                 self._jobs[job_id] = job
                 self._job_order.append(job_id)
                 self._cancel_events[job_id] = threading.Event()
@@ -634,7 +669,8 @@ class DownloadManager:
             self._persist_locked()
 
         try:
-            return_code, error_message, output_rel = self._execute_download(job_id)
+            result = self._execute_download(job_id)
+            return_code, error_message, output_rel_list = self._normalize_execute_result(result)
 
             with self._lock:
                 job = self._jobs.get(job_id)
@@ -650,8 +686,9 @@ class DownloadManager:
                     job["status"] = "success"
                     job["progress_percent"] = 100.0
                     job["eta_sec"] = 0
-                    if output_rel:
-                        job["output_path_rel"] = output_rel
+                    job["output_files_rel"] = output_rel_list
+                    job["file_count"] = len(output_rel_list)
+                    job["output_path_rel"] = output_rel_list[0] if output_rel_list else ""
                     job["error_message"] = ""
                 else:
                     job["status"] = "failed"
@@ -659,14 +696,19 @@ class DownloadManager:
 
                 job["finished_at"] = _utc_now_iso()
                 self._persist_locked()
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
             with self._lock:
                 job = self._jobs.get(job_id)
                 if not job:
                     return
+                engine = str(job.get("engine") or DEFAULT_DOWNLOAD_ENGINE)
                 job["status"] = "failed"
                 job["finished_at"] = _utc_now_iso()
-                job["error_message"] = "未检测到 yt-dlp，请先安装后再使用下载功能。"
+                missing_text = str(exc or "").lower()
+                if "gallery-dl" in missing_text or engine == "gallery-dl":
+                    job["error_message"] = "未检测到 gallery-dl，请先安装后再使用该引擎。"
+                else:
+                    job["error_message"] = "未检测到 yt-dlp，请先安装后再使用下载功能。"
                 self._persist_locked()
         except Exception as exc:  # pragma: no cover - defensive branch
             with self._lock:
@@ -681,7 +723,18 @@ class DownloadManager:
             with self._lock:
                 self._processes.pop(job_id, None)
 
-    def _execute_download(self, job_id: str) -> tuple[int, str, str]:
+    def _execute_download(self, job_id: str) -> tuple[int, str, list[str]] | tuple[int, str, str]:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job:
+                return 1, "任务不存在。", ""
+            engine = str(job.get("engine") or DEFAULT_DOWNLOAD_ENGINE)
+
+        if engine == "gallery-dl":
+            return self._execute_download_gallery_dl(job_id)
+        return self._execute_download_yt_dlp(job_id)
+
+    def _execute_download_yt_dlp(self, job_id: str) -> tuple[int, str, list[str]]:
         yt_dlp_bin = shutil.which("yt-dlp")
         if not yt_dlp_bin:
             raise FileNotFoundError("yt-dlp not found")
@@ -689,7 +742,7 @@ class DownloadManager:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
-                return 1, "任务不存在。", ""
+                return 1, "任务不存在。", []
             url = job["url"]
             created_at = str(job.get("created_at") or _utc_now_iso())
             output_token = str(job.get("output_token") or created_at.replace(":", "").replace("-", "").replace("Z", ""))
@@ -723,7 +776,7 @@ class DownloadManager:
         if cookie_file and cookie_match_mode in {"auto", "manual"}:
             cookie_path, error = self._resolve_cookie_path(cookie_file)
             if error:
-                return 1, error, ""
+                return 1, error, []
             cmd.extend(["--cookies", str(cookie_path)])
 
         cmd.append(url)
@@ -758,19 +811,110 @@ class DownloadManager:
                 if found_path:
                     output_path_abs = found_path
 
-                if "ERROR:" in line or line.lower().startswith("error:"):
-                    error_message = line
+                extracted_error = self._extract_error_line(line)
+                if extracted_error:
+                    error_message = extracted_error
+
+                if cancel_event and cancel_event.is_set():
+                    self._terminate_process(process)
+
+        return_code = process.wait()
+        if not error_message and return_code != 0:
+            error_message = f"yt-dlp exited with code {return_code}."
+
+        output_rel = self._to_media_relative(output_path_abs)
+        return return_code, error_message, [output_rel] if output_rel else []
+
+    def _execute_download_gallery_dl(self, job_id: str) -> tuple[int, str, list[str]]:
+        gallery_dl_bin = shutil.which("gallery-dl")
+        if not gallery_dl_bin:
+            raise FileNotFoundError("gallery-dl not found")
+
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job:
+                return 1, "任务不存在。", []
+            url = str(job.get("url") or "")
+            cookie_file = str(job.get("cookie_file") or "")
+            cookie_match_mode = str(job.get("cookie_match_mode") or "none")
+            archive_enabled = bool(self._config.get("gallery_archive_enabled", True))
+            archive_file_text = str(self._config.get("gallery_archive_file", DEFAULT_DOWNLOAD_CONFIG["gallery_archive_file"])).strip()
+
+        temp_dir = (self.media_root / ".tiklocal-download-tmp" / job_id).resolve()
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        log_file = temp_dir / "gallery-dl.log"
+
+        cmd = [
+            gallery_dl_bin,
+            "--no-colors",
+            "--directory",
+            str(temp_dir),
+            "--retries",
+            "10",
+            "--http-timeout",
+            "30",
+            "--sleep-429",
+            "8",
+        ]
+
+        if archive_enabled:
+            archive_path = self._expand_user_path(archive_file_text)
+            archive_path.parent.mkdir(parents=True, exist_ok=True)
+            cmd.extend(["--download-archive", str(archive_path)])
+
+        if cookie_file and cookie_match_mode in {"auto", "manual"}:
+            cookie_path, error = self._resolve_cookie_path(cookie_file)
+            if error:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return 1, error, []
+            cmd.extend(["--cookies", str(cookie_path)])
+
+        cmd.extend(["--write-log", str(log_file), url])
+
+        process = sp.Popen(
+            cmd,
+            stdout=sp.PIPE,
+            stderr=sp.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+
+        with self._lock:
+            self._processes[job_id] = process
+
+        cancel_event = self._cancel_events.get(job_id)
+        error_message = ""
+
+        stream = process.stdout
+        if stream is not None:
+            for raw_line in stream:
+                line = raw_line.strip()
+                if not line:
+                    continue
+
+                extracted_error = self._extract_error_line(line)
+                if extracted_error:
+                    error_message = extracted_error
 
                 if cancel_event and cancel_event.is_set():
                     self._terminate_process(process)
 
         return_code = process.wait()
 
-        if not error_message and return_code != 0:
-            error_message = f"yt-dlp exited with code {return_code}."
+        try:
+            if return_code != 0:
+                if not error_message:
+                    error_message = f"gallery-dl exited with code {return_code}."
+                return return_code, error_message, []
 
-        output_rel = self._to_media_relative(output_path_abs)
-        return return_code, error_message, output_rel
+            outputs = self._collect_gallery_outputs(temp_dir, excluded={log_file.resolve()})
+            moved_outputs = [self._move_file_to_media_root(path) for path in outputs]
+            moved_outputs = [path for path in moved_outputs if path]
+            if not moved_outputs:
+                return 1, "gallery-dl 未下载到可用文件。", []
+            return 0, "", moved_outputs
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     def _update_progress(self, job_id: str, progress: dict[str, Any]) -> None:
         with self._lock:
@@ -862,6 +1006,83 @@ class DownloadManager:
         if len(nums) == 3:
             return nums[0] * 3600 + nums[1] * 60 + nums[2]
         return None
+
+    def _normalize_execute_result(self, result: Any) -> tuple[int, str, list[str]]:
+        if not isinstance(result, tuple):
+            return 1, "下载器返回结果格式错误。", []
+
+        return_code = _to_int(result[0]) if len(result) >= 1 else 1
+        if return_code is None:
+            return_code = 1
+        error_message = str(result[1] or "") if len(result) >= 2 else ""
+        raw_output = result[2] if len(result) >= 3 else ""
+
+        if isinstance(raw_output, str):
+            outputs = [raw_output] if raw_output else []
+        elif isinstance(raw_output, list):
+            outputs = [str(item).strip() for item in raw_output if str(item).strip()]
+        else:
+            outputs = []
+        return return_code, error_message, outputs
+
+    def _probe_binary(self, command: str) -> tuple[str | None, str]:
+        binary_path = shutil.which(command)
+        if not binary_path:
+            return None, ""
+        try:
+            out = sp.check_output([binary_path, "--version"], text=True, timeout=3)
+            return binary_path, (out or "").strip().splitlines()[0]
+        except Exception:
+            return binary_path, ""
+
+    def _extract_error_line(self, line: str) -> str:
+        lowered = line.lower()
+        if "error:" in lowered:
+            return line
+        return ""
+
+    def _expand_user_path(self, path_text: str) -> Path:
+        return Path(path_text).expanduser()
+
+    def _collect_gallery_outputs(self, temp_dir: Path, *, excluded: set[Path]) -> list[Path]:
+        outputs: list[Path] = []
+        for entry in temp_dir.rglob("*"):
+            if not entry.is_file():
+                continue
+            resolved = entry.resolve()
+            if resolved in excluded:
+                continue
+            if resolved.name.endswith(".part"):
+                continue
+            outputs.append(resolved)
+        outputs.sort(key=lambda p: str(p))
+        return outputs
+
+    def _move_file_to_media_root(self, source_path: Path) -> str:
+        if not source_path.exists() or not source_path.is_file():
+            return ""
+
+        target_name = source_path.name
+        target = (self.media_root / target_name).resolve()
+        target = self._next_available_path(target)
+        try:
+            source_path.replace(target)
+        except OSError:
+            shutil.move(str(source_path), str(target))
+        return self._to_media_relative(str(target))
+
+    def _next_available_path(self, path: Path) -> Path:
+        if not path.exists():
+            return path
+        stem = path.stem
+        suffix = path.suffix
+        parent = path.parent
+        idx = 1
+        while True:
+            candidate = parent / f"{stem} ({idx}){suffix}"
+            if not candidate.exists():
+                return candidate
+            idx += 1
 
     def _resolve_cookie_choice(self, *, url: str, cookie_mode: str, cookie_file: str) -> tuple[str, str, str | None]:
         with self._lock:
