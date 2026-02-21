@@ -9,7 +9,7 @@ import threading
 import uuid
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 
 DOWNLOAD_MAX_URL_LENGTH = 2048
@@ -20,6 +20,7 @@ COOKIE_MATCH_MODE = "filename_contains_domain"
 COOKIE_FILE_EXTENSIONS = {".txt", ".cookies"}
 DOWNLOAD_ENGINES = {"yt-dlp", "gallery-dl"}
 DEFAULT_DOWNLOAD_ENGINE = "yt-dlp"
+SOURCE_MAP_VERSION = 1
 
 DEFAULT_DOWNLOAD_CONFIG = {
     "enabled": True,
@@ -42,6 +43,8 @@ _DESTINATION_PATTERNS = [
     re.compile(r'^\[Merger\] Merging formats into "(?P<path>.+)"$'),
     re.compile(r'^\[ExtractAudio\] Destination: (?P<path>.+)$'),
 ]
+_TRACKING_QUERY_KEYS = {"fbclid", "gclid", "igshid"}
+_OLD_TEMPLATE_ID_RE = re.compile(r"\[(?P<id>[^\]]+)\]")
 
 
 def _utc_now_iso() -> str:
@@ -211,6 +214,58 @@ def _domain_candidates(host: str) -> list[str]:
     return candidates
 
 
+def _normalize_file_rel(value: str) -> str:
+    text = str(value or "").strip().replace("\\", "/")
+    while text.startswith("./"):
+        text = text[2:]
+    return text
+
+
+def _derive_source_domain(url: str) -> str:
+    parsed = urlparse(url)
+    return (parsed.hostname or "").strip().lower()
+
+
+def _strip_tracking_query(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return url
+    pairs = parse_qsl(parsed.query, keep_blank_values=True)
+    filtered = []
+    for key, value in pairs:
+        lowered = key.lower()
+        if lowered.startswith("utm_"):
+            continue
+        if lowered in _TRACKING_QUERY_KEYS:
+            continue
+        filtered.append((key, value))
+    cleaned = parsed._replace(query=urlencode(filtered, doseq=True), fragment="")
+    return urlunparse(cleaned)
+
+
+def _normalize_source_meta(meta: dict[str, Any], *, resolved_by: str | None = None) -> dict[str, Any] | None:
+    raw = str(meta.get("source_url_raw") or "").strip()
+    display = str(meta.get("source_url_display") or "").strip()
+    if not raw and not display:
+        return None
+
+    raw = raw or display
+    display = display or _strip_tracking_query(raw)
+    domain = str(meta.get("source_domain") or "").strip().lower() or _derive_source_domain(raw)
+    payload = {
+        "source_url_raw": raw,
+        "source_url_display": display,
+        "source_domain": domain,
+        "engine": str(meta.get("engine") or "").strip(),
+        "job_id": str(meta.get("job_id") or "").strip(),
+        "created_at": str(meta.get("created_at") or _utc_now_iso()).strip(),
+    }
+    if resolved_by:
+        payload["resolved_by"] = resolved_by
+    payload["url"] = payload["source_url_display"] or payload["source_url_raw"]
+    return payload
+
+
 class DownloadConfigStore:
     def __init__(self, store_path: Path):
         self.store_path = store_path
@@ -282,16 +337,106 @@ class DownloadHistoryStore:
         os.replace(tmp_path, self.store_path)
 
 
+class DownloadSourceStore:
+    def __init__(self, store_path: Path):
+        self.store_path = store_path
+        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
+
+    def _read(self) -> dict[str, Any]:
+        if not self.store_path.exists():
+            return {"version": SOURCE_MAP_VERSION, "items": {}, "updated_at": _utc_now_iso()}
+        try:
+            with self.store_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            return {"version": SOURCE_MAP_VERSION, "items": {}, "updated_at": _utc_now_iso()}
+        return {"version": SOURCE_MAP_VERSION, "items": {}, "updated_at": _utc_now_iso()}
+
+    def _normalized_payload(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        data = payload if isinstance(payload, dict) else self._read()
+        items = data.get("items")
+        if not isinstance(items, dict):
+            items = {}
+        return {
+            "version": _to_int(data.get("version")) or SOURCE_MAP_VERSION,
+            "items": {str(k): v for k, v in items.items() if isinstance(v, dict)},
+            "updated_at": str(data.get("updated_at") or _utc_now_iso()),
+        }
+
+    def _write(self, payload: dict[str, Any]) -> None:
+        tmp_path = self.store_path.with_name(self.store_path.name + ".tmp")
+        with tmp_path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, self.store_path)
+
+    def get(self, file_rel: str) -> dict[str, Any] | None:
+        key = _normalize_file_rel(file_rel)
+        if not key:
+            return None
+        with self._lock:
+            payload = self._normalized_payload()
+            value = payload["items"].get(key)
+            return dict(value) if isinstance(value, dict) else None
+
+    def get_many(self, file_rels: list[str]) -> dict[str, dict[str, Any] | None]:
+        normalized = [_normalize_file_rel(item) for item in file_rels]
+        normalized = [item for item in normalized if item]
+        result: dict[str, dict[str, Any] | None] = {}
+        if not normalized:
+            return result
+        with self._lock:
+            payload = self._normalized_payload()
+            items = payload["items"]
+            for key in normalized:
+                value = items.get(key)
+                result[key] = dict(value) if isinstance(value, dict) else None
+        return result
+
+    def set_many(self, records: dict[str, dict[str, Any]]) -> int:
+        cleaned: dict[str, dict[str, Any]] = {}
+        for file_rel, meta in records.items():
+            key = _normalize_file_rel(file_rel)
+            if not key or not isinstance(meta, dict):
+                continue
+            cleaned[key] = dict(meta)
+        if not cleaned:
+            return 0
+        with self._lock:
+            payload = self._normalized_payload()
+            payload["items"].update(cleaned)
+            payload["updated_at"] = _utc_now_iso()
+            self._write(payload)
+        return len(cleaned)
+
+    def delete(self, file_rel: str) -> bool:
+        key = _normalize_file_rel(file_rel)
+        if not key:
+            return False
+        with self._lock:
+            payload = self._normalized_payload()
+            if key not in payload["items"]:
+                return False
+            payload["items"].pop(key, None)
+            payload["updated_at"] = _utc_now_iso()
+            self._write(payload)
+        return True
+
+
 class DownloadManager:
     def __init__(
         self,
         media_root: Path,
         config_store: DownloadConfigStore,
         history_store: DownloadHistoryStore,
+        source_store: DownloadSourceStore | None = None,
     ):
         self.media_root = media_root.resolve()
         self.config_store = config_store
         self.history_store = history_store
+        self.source_store = source_store
 
         self._lock = threading.Lock()
         self._shutdown = threading.Event()
@@ -541,6 +686,35 @@ class DownloadManager:
             job = self._jobs.get(job_id)
             return dict(job) if job else None
 
+    def resolve_source_for_file(self, file_rel: str) -> dict[str, Any] | None:
+        key = _normalize_file_rel(file_rel)
+        if not key:
+            return None
+
+        mapped = self._resolve_source_from_map(key)
+        if mapped:
+            return mapped
+
+        info_meta = self._resolve_source_from_info_json(key)
+        if info_meta:
+            return info_meta
+
+        return self._resolve_source_from_filename(key)
+
+    def resolve_sources_for_files(self, file_rels: list[str]) -> dict[str, dict[str, Any] | None]:
+        normalized = [_normalize_file_rel(item) for item in file_rels]
+        normalized = [item for item in normalized if item]
+        normalized = list(dict.fromkeys(normalized))
+        result: dict[str, dict[str, Any] | None] = {}
+        for file_rel in normalized:
+            result[file_rel] = self.resolve_source_for_file(file_rel)
+        return result
+
+    def delete_source_for_file(self, file_rel: str) -> bool:
+        if not self.source_store:
+            return False
+        return self.source_store.delete(file_rel)
+
     def cancel(self, job_id: str) -> dict[str, Any] | None:
         process: sp.Popen[str] | None = None
         with self._lock:
@@ -671,6 +845,7 @@ class DownloadManager:
         try:
             result = self._execute_download(job_id)
             return_code, error_message, output_rel_list = self._normalize_execute_result(result)
+            source_context: dict[str, Any] | None = None
 
             with self._lock:
                 job = self._jobs.get(job_id)
@@ -690,12 +865,22 @@ class DownloadManager:
                     job["file_count"] = len(output_rel_list)
                     job["output_path_rel"] = output_rel_list[0] if output_rel_list else ""
                     job["error_message"] = ""
+                    source_context = {
+                        "url": str(job.get("url") or ""),
+                        "engine": str(job.get("engine") or ""),
+                        "job_id": str(job.get("id") or ""),
+                        "created_at": str(job.get("created_at") or _utc_now_iso()),
+                        "files": list(output_rel_list),
+                    }
                 else:
                     job["status"] = "failed"
                     job["error_message"] = error_message or "下载失败，请检查 URL 与网络环境。"
 
                 job["finished_at"] = _utc_now_iso()
                 self._persist_locked()
+
+            if source_context:
+                self._record_job_sources_on_success(source_context)
         except FileNotFoundError as exc:
             with self._lock:
                 job = self._jobs.get(job_id)
@@ -744,13 +929,14 @@ class DownloadManager:
             if not job:
                 return 1, "任务不存在。", []
             url = job["url"]
-            created_at = str(job.get("created_at") or _utc_now_iso())
-            output_token = str(job.get("output_token") or created_at.replace(":", "").replace("-", "").replace("Z", ""))
             allow_playlist = bool(self._config.get("allow_playlist", False))
             cookie_file = str(job.get("cookie_file") or "")
             cookie_match_mode = str(job.get("cookie_match_mode") or "none")
 
-        output_template = str(self.media_root / f"%(title).180B [%(id)s] {output_token}.%(ext)s")
+        output_template = str(
+            self.media_root
+            / "%(extractor_key|na)s__%(uploader_id|na).24B__%(display_id|na)s__%(id|na)s__%(upload_date|na)s__%(autonumber)02d.%(ext)s"
+        )
 
         cmd = [
             yt_dlp_bin,
@@ -758,6 +944,7 @@ class DownloadManager:
             "--restrict-filenames",
             "--merge-output-format",
             "mp4",
+            "--write-info-json",
             "--continue",
             "--retries",
             "10",
@@ -1083,6 +1270,187 @@ class DownloadManager:
             if not candidate.exists():
                 return candidate
             idx += 1
+
+    def _record_job_sources_on_success(self, context: dict[str, Any]) -> None:
+        if not self.source_store:
+            return
+
+        files = context.get("files")
+        if not isinstance(files, list):
+            return
+        raw_url = str(context.get("url") or "").strip()
+        if not raw_url:
+            return
+
+        base_meta = _normalize_source_meta(
+            {
+                "source_url_raw": raw_url,
+                "source_url_display": _strip_tracking_query(raw_url),
+                "source_domain": _derive_source_domain(raw_url),
+                "engine": str(context.get("engine") or "").strip(),
+                "job_id": str(context.get("job_id") or "").strip(),
+                "created_at": str(context.get("created_at") or _utc_now_iso()),
+            },
+            resolved_by="map",
+        )
+        if not base_meta:
+            return
+
+        records: dict[str, dict[str, Any]] = {}
+        for rel in files:
+            key = _normalize_file_rel(str(rel or ""))
+            if not key:
+                continue
+            records[key] = dict(base_meta)
+        if records:
+            self.source_store.set_many(records)
+
+    def _resolve_source_from_map(self, file_rel: str) -> dict[str, Any] | None:
+        if not self.source_store:
+            return None
+        mapped = self.source_store.get(file_rel)
+        if not mapped:
+            return None
+        return _normalize_source_meta(mapped, resolved_by="map")
+
+    def _resolve_source_from_info_json(self, file_rel: str) -> dict[str, Any] | None:
+        media_file = self._resolve_media_file_path(file_rel)
+        if not media_file or not media_file.exists():
+            return None
+
+        candidates = [
+            media_file.with_suffix(".info.json"),
+            Path(str(media_file) + ".info.json"),
+        ]
+        data: dict[str, Any] | None = None
+        for path in candidates:
+            if not path.exists() or not path.is_file():
+                continue
+            try:
+                with path.open("r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+                    break
+            except Exception:
+                continue
+        if not data:
+            return None
+
+        raw_url = ""
+        for field in ("webpage_url", "original_url", "url"):
+            value = str(data.get(field) or "").strip()
+            if value:
+                raw_url = value
+                break
+        if not raw_url:
+            return None
+
+        meta = _normalize_source_meta(
+            {
+                "source_url_raw": raw_url,
+                "source_url_display": _strip_tracking_query(raw_url),
+                "source_domain": _derive_source_domain(raw_url),
+                "engine": str(data.get("extractor_key") or "").strip(),
+                "created_at": _utc_now_iso(),
+            },
+            resolved_by="infojson",
+        )
+        if meta and self.source_store:
+            self.source_store.set_many({file_rel: dict(meta)})
+        return meta
+
+    def _resolve_source_from_filename(self, file_rel: str) -> dict[str, Any] | None:
+        name = Path(file_rel).name
+        stem = Path(name).stem
+
+        if "__" in stem:
+            parts = stem.split("__")
+            if len(parts) >= 4:
+                extractor = parts[0].strip().lower()
+                uploader_id = parts[1].strip()
+                display_id = parts[2].strip()
+                media_id = parts[3].strip()
+                display_id = "" if display_id.lower() == "na" else display_id
+                media_id = "" if media_id.lower() == "na" else media_id
+                uploader_id = "" if uploader_id.lower() == "na" else uploader_id
+
+                if extractor in {"twitter", "x"} and display_id:
+                    url = f"https://x.com/i/web/status/{display_id}"
+                    if uploader_id:
+                        url = f"https://x.com/{uploader_id}/status/{display_id}"
+                    return _normalize_source_meta(
+                        {
+                            "source_url_raw": url,
+                            "source_url_display": url,
+                            "source_domain": "x.com",
+                            "engine": "yt-dlp",
+                        },
+                        resolved_by="filename",
+                    )
+
+                if extractor.startswith("youtube") and media_id:
+                    url = f"https://www.youtube.com/watch?v={media_id}"
+                    return _normalize_source_meta(
+                        {
+                            "source_url_raw": url,
+                            "source_url_display": url,
+                            "source_domain": "youtube.com",
+                            "engine": "yt-dlp",
+                        },
+                        resolved_by="filename",
+                    )
+
+                if extractor.startswith("tiktok") and media_id:
+                    url = f"https://www.tiktok.com/@_/video/{media_id}"
+                    return _normalize_source_meta(
+                        {
+                            "source_url_raw": url,
+                            "source_url_display": url,
+                            "source_domain": "tiktok.com",
+                            "engine": "yt-dlp",
+                        },
+                        resolved_by="filename",
+                    )
+
+                if extractor.startswith("instagram") and display_id:
+                    url = f"https://www.instagram.com/p/{display_id}/"
+                    return _normalize_source_meta(
+                        {
+                            "source_url_raw": url,
+                            "source_url_display": url,
+                            "source_domain": "instagram.com",
+                            "engine": "yt-dlp",
+                        },
+                        resolved_by="filename",
+                    )
+
+        old_match = _OLD_TEMPLATE_ID_RE.search(name)
+        if old_match:
+            old_id = old_match.group("id").strip()
+            if old_id.isdigit():
+                url = f"https://x.com/i/web/status/{old_id}"
+                return _normalize_source_meta(
+                    {
+                        "source_url_raw": url,
+                        "source_url_display": url,
+                        "source_domain": "x.com",
+                        "engine": "yt-dlp",
+                    },
+                    resolved_by="filename",
+                )
+        return None
+
+    def _resolve_media_file_path(self, file_rel: str) -> Path | None:
+        key = _normalize_file_rel(file_rel)
+        if not key:
+            return None
+        path = (self.media_root / key).resolve()
+        try:
+            path.relative_to(self.media_root)
+        except ValueError:
+            return None
+        return path
 
     def _resolve_cookie_choice(self, *, url: str, cookie_mode: str, cookie_file: str) -> tuple[str, str, str | None]:
         with self._lock:

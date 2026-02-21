@@ -29,6 +29,7 @@ from tiklocal.services.downloader import (
     DEFAULT_DOWNLOAD_CONFIG,
     DownloadConfigStore,
     DownloadHistoryStore,
+    DownloadSourceStore,
     DownloadManager,
     validate_download_config,
     validate_download_url,
@@ -39,6 +40,7 @@ from tiklocal.paths import (
     get_llm_config_path,
     get_download_config_path,
     get_download_jobs_path,
+    get_download_sources_path,
 )
 
 
@@ -98,10 +100,12 @@ def create_app(test_config=None):
     llm_config_store = LLMConfigStore(get_llm_config_path())
     download_config_store = DownloadConfigStore(get_download_config_path())
     download_history_store = DownloadHistoryStore(get_download_jobs_path())
+    download_source_store = DownloadSourceStore(get_download_sources_path())
     download_manager = DownloadManager(
         Path(media_root_str),
         download_config_store,
         download_history_store,
+        source_store=download_source_store,
     )
 
     def build_prompt_config_payload(custom_config=None):
@@ -290,6 +294,7 @@ def create_app(test_config=None):
 
         if target.suffix.lower() in IMAGE_EXTENSIONS:
             return redirect(f"/image?uri={quote(name)}")
+        source_meta = download_manager.resolve_source_for_file(name)
         
         # Context navigation (prev/next)
         # Note: Re-scanning every request is inefficient for large libraries, 
@@ -310,7 +315,8 @@ def create_app(test_config=None):
             mtime=datetime.datetime.fromtimestamp(target.stat().st_mtime).strftime('%Y-%m-%d %H:%M'),
             size=target.stat().st_size,
             previous_item=prev_item,
-            next_item=next_item
+            next_item=next_item,
+            source_meta=source_meta,
         )
     
     @app.route('/image')
@@ -320,8 +326,8 @@ def create_app(test_config=None):
         
         target = library_service.resolve_path(uri)
         if not target or not target.exists(): return "File not found", 404
-        
-        return render_template('image_detail.html', image=target, uri=uri, stat=target.stat())
+        source_meta = download_manager.resolve_source_for_file(uri)
+        return render_template('image_detail.html', image=target, uri=uri, stat=target.stat(), source_meta=source_meta)
 
     @app.route("/delete/<path:name>", methods=['POST', 'GET'])
     def delete_view(name):
@@ -330,6 +336,7 @@ def create_app(test_config=None):
             if target and target.exists():
                 try:
                     target.unlink()
+                    download_manager.delete_source_for_file(name)
                     # Thumbnails are handled by OS or periodic cleanup, but ideally Service should handle it
                 except Exception as e:
                     return f"Error deleting file: {e}", 500
@@ -515,6 +522,31 @@ def create_app(test_config=None):
             status = 404 if error == 'Job not found' else 400
             return {'success': False, 'error': error}, status
         return {'success': True, 'data': {'job': job}}
+
+    @app.route('/api/source')
+    def api_source_single():
+        file_rel = str(request.args.get('file', '')).strip()
+        if not file_rel:
+            return {'success': False, 'error': 'file 不能为空。'}, 400
+        source = download_manager.resolve_source_for_file(file_rel)
+        return {'success': True, 'data': {'file': file_rel, 'source': source}}
+
+    @app.route('/api/source/batch', methods=['POST'])
+    def api_source_batch():
+        payload = request.get_json(silent=True) or {}
+        files = payload.get('files')
+        if not isinstance(files, list):
+            return {'success': False, 'error': 'files 必须是数组。'}, 400
+
+        normalized: list[str] = []
+        for item in files:
+            value = str(item or '').strip()
+            if value:
+                normalized.append(value)
+            if len(normalized) >= 200:
+                break
+        items = download_manager.resolve_sources_for_files(normalized)
+        return {'success': True, 'data': {'items': items}}
 
     @app.route('/api/ai/prompt-config', methods=['GET', 'POST'])
     def api_prompt_config():

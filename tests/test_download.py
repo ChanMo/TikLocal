@@ -276,3 +276,103 @@ def test_delete_and_clear_history(client):
     assert clear_res.status_code == 200
     assert clear_data["success"] is True
     assert clear_data["data"]["deleted"] >= 0
+
+
+def test_source_api_from_job_map(client):
+    res = client.post("/api/download/jobs", json={"url": "https://x.com/i/web/status/1234567890123456789?utm_source=test"})
+    data = res.get_json()
+    assert res.status_code == 200
+    job_id = data["data"]["job"]["id"]
+    _wait_for_job(client, job_id)
+
+    source_res = client.get("/api/source", query_string={"file": "mock-output.mp4"})
+    source_data = source_res.get_json()
+    assert source_res.status_code == 200
+    assert source_data["success"] is True
+    assert source_data["data"]["source"]["resolved_by"] == "map"
+    assert source_data["data"]["source"]["source_domain"] == "x.com"
+    assert source_data["data"]["source"]["source_url_display"] == "https://x.com/i/web/status/1234567890123456789"
+
+
+def test_source_map_kept_after_clear_history(client):
+    res = client.post("/api/download/jobs", json={"url": "https://example.com/keep-source"})
+    job_id = res.get_json()["data"]["job"]["id"]
+    _wait_for_job(client, job_id)
+
+    clear_res = client.post("/api/download/jobs/clear")
+    assert clear_res.status_code == 200
+
+    source_res = client.get("/api/source", query_string={"file": "mock-output.mp4"})
+    source_data = source_res.get_json()
+    assert source_res.status_code == 200
+    assert source_data["success"] is True
+    assert source_data["data"]["source"]["source_url_raw"] == "https://example.com/keep-source"
+
+
+def test_source_resolve_from_info_json(client):
+    media_root = client.application.config["MEDIA_ROOT"]
+    media_file = media_root / "fallback-info.mp4"
+    media_file.write_bytes(b"00")
+    info_file = media_root / "fallback-info.info.json"
+    info_file.write_text(
+        '{"webpage_url":"https://www.youtube.com/watch?v=abc123&utm_source=mail"}',
+        encoding="utf-8",
+    )
+
+    source_res = client.get("/api/source", query_string={"file": "fallback-info.mp4"})
+    source_data = source_res.get_json()
+    assert source_res.status_code == 200
+    assert source_data["success"] is True
+    assert source_data["data"]["source"]["resolved_by"] == "infojson"
+    assert source_data["data"]["source"]["source_url_display"] == "https://www.youtube.com/watch?v=abc123"
+    assert source_data["data"]["source"]["source_domain"] == "www.youtube.com"
+
+
+def test_source_resolve_from_filename(client):
+    media_root = client.application.config["MEDIA_ROOT"]
+    name = "twitter__alice__189111222333444555__189111222333444555__20260221__01.mp4"
+    (media_root / name).write_bytes(b"00")
+
+    source_res = client.get("/api/source", query_string={"file": name})
+    source_data = source_res.get_json()
+    assert source_res.status_code == 200
+    assert source_data["success"] is True
+    assert source_data["data"]["source"]["resolved_by"] == "filename"
+    assert source_data["data"]["source"]["source_url_display"] == "https://x.com/alice/status/189111222333444555"
+    assert source_data["data"]["source"]["source_domain"] == "x.com"
+
+
+def test_source_batch_api(client):
+    media_root = client.application.config["MEDIA_ROOT"]
+    media_file = media_root / "batch-fallback.mp4"
+    media_file.write_bytes(b"00")
+    (media_root / "batch-fallback.info.json").write_text(
+        '{"webpage_url":"https://www.tiktok.com/@u/video/12345"}',
+        encoding="utf-8",
+    )
+
+    res = client.post("/api/source/batch", json={"files": ["batch-fallback.mp4", "missing.mp4"]})
+    data = res.get_json()
+    assert res.status_code == 200
+    assert data["success"] is True
+    assert data["data"]["items"]["batch-fallback.mp4"]["source_domain"] == "www.tiktok.com"
+    assert data["data"]["items"]["missing.mp4"] is None
+
+
+def test_delete_file_also_deletes_source_map(client):
+    media_root = client.application.config["MEDIA_ROOT"]
+    media_file = media_root / "mock-output.mp4"
+    media_file.write_bytes(b"00")
+
+    res = client.post("/api/download/jobs", json={"url": "https://example.com/delete-source"})
+    job_id = res.get_json()["data"]["job"]["id"]
+    _wait_for_job(client, job_id)
+
+    delete_res = client.post("/delete/mock-output.mp4", follow_redirects=False)
+    assert delete_res.status_code in {301, 302, 303, 307, 308}
+
+    source_res = client.get("/api/source", query_string={"file": "mock-output.mp4"})
+    source_data = source_res.get_json()
+    assert source_res.status_code == 200
+    assert source_data["success"] is True
+    assert source_data["data"]["source"] is None

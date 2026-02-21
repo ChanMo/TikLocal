@@ -236,6 +236,15 @@ let cookieMeta = { files: [], cookie_dir: '', cookie_enabled: true };
 let dependencyMeta = { yt_dlp_available: false, gallery_dl_available: false, ffmpeg_available: false };
 const imageExts = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']);
 
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function notify(message, type = 'info') {
   const wrap = document.getElementById('toast-wrap');
   if (!wrap) return;
@@ -312,13 +321,53 @@ function renderOutputLinks(job) {
   }
   if (!files.length) return '';
 
-  const links = files.slice(0, 3).map((file) => (
-    `<a class="text-xs text-blue-600 dark:text-blue-300 hover:underline" href="${buildMediaDetailHref(file)}">${file}</a>`
-  ));
+  const links = files.slice(0, 3).map((file) => {
+    const encoded = encodeURIComponent(file);
+    return `
+      <span class="inline-flex items-center gap-1.5 max-w-full">
+        <a class="text-xs text-blue-600 dark:text-blue-300 hover:underline break-all" href="${buildMediaDetailHref(file)}">${escapeHtml(file)}</a>
+        <a data-source-link data-file="${encoded}" class="hidden text-[11px] text-slate-600 dark:text-slate-300 hover:underline whitespace-nowrap" target="_blank" rel="noopener noreferrer"></a>
+      </span>
+    `;
+  });
   if (files.length > 3) {
     links.push(`<span class="text-xs text-gray-500 dark:text-gray-400">+${files.length - 3} 个文件</span>`);
   }
   return links.join(' · ');
+}
+
+async function hydrateSourceLinks(containerEl) {
+  if (!containerEl) return;
+  const nodes = Array.from(containerEl.querySelectorAll('[data-source-link]'));
+  if (!nodes.length) return;
+
+  const files = Array.from(new Set(
+    nodes.map((node) => decodeURIComponent(node.getAttribute('data-file') || ''))
+      .filter((item) => item)
+  ));
+  if (!files.length) return;
+
+  let items = {};
+  try {
+    const data = await api('/api/source/batch', {
+      method: 'POST',
+      body: JSON.stringify({ files }),
+    });
+    items = data.items || {};
+  } catch (error) {
+    return;
+  }
+
+  nodes.forEach((node) => {
+    const file = decodeURIComponent(node.getAttribute('data-file') || '');
+    const source = items[file];
+    if (!source || !source.url) return;
+
+    const domain = (source.source_domain || '').trim();
+    node.href = source.url;
+    node.textContent = domain ? `来源·${domain}` : '来源';
+    node.classList.remove('hidden');
+  });
 }
 
 function renderJobs(jobs) {
@@ -396,6 +445,8 @@ function renderJobs(jobs) {
       }
     });
   });
+
+  hydrateSourceLinks(listEl);
 }
 
 async function refreshProbe() {

@@ -210,6 +210,22 @@
               <i data-feather="download" class="w-4 h-4"></i>
               下载视频
             </a>
+
+            {% if source_meta and source_meta.url %}
+            <a
+              href="{{ source_meta.url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-100 rounded-lg transition-colors duration-200 font-medium"
+            >
+              <i data-feather="external-link" class="w-4 h-4"></i>
+              查看来源{% if source_meta.source_domain %}（{{ source_meta.source_domain }}）{% endif %}
+            </a>
+            {% else %}
+            <div class="w-full px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+              未记录来源链接
+            </div>
+            {% endif %}
             
             <button 
               id="copy-link-btn"
