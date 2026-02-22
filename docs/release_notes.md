@@ -1,5 +1,17 @@
 # Release Notes
 
+## Unreleased
+
+## v0.8.8 (2026-02-22)
+- 首页沉浸流升级为混合媒体 Feed：在同一滑动流中混排视频与图片，替代原纯视频首页链路。
+- 新增 `/api/feed/mix`，统一返回 typed media items（`video` / `image`），并使用“目标比率 + 轻随机约束”混排，避免固定节奏可预测性。
+- 首页图片条目复用 Gallery 关键交互：AI 标题/标签面板、2.5x/5x 圆形放大镜、单击专注模式（仅隐藏左下信息层）。
+- 交互收敛：视频不显示 AI 按钮，图片不显示倍速按钮；图片不再自动计时切换，改为手动滑动切换。
+- 修复首页放大镜取样计算：按 `object-fit: contain` 的真实内容框计算，避免横向压扁。
+- 修复首页图片 AI 标题/标签不显示问题：调整 `currentCaptionUri` 生命周期，避免异步回写被错误丢弃。
+- 清理首页混合流过期代码：移除无效 `controls-active` 状态切换与不可触发的播放图标点击监听。
+- 新增 `tests/test_feed_mix.py` 覆盖混合 Feed API 基本行为，并新增混合流设计文档索引。
+
 ## v0.8.7 (2026-02-21)
 - 新增“来源回跳”能力：下载成功后将文件与原始 URL 建立映射，并新增 `~/.tiklocal/download_sources.json` 持久化来源索引。
 - 新增来源解析三层兜底：优先来源映射，其次 `.info.json`（`webpage_url/original_url`），最后按文件名结构推断平台链接（x/youtube/tiktok/instagram）。

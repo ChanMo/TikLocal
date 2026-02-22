@@ -200,7 +200,7 @@ def create_app(test_config=None):
     # --- Web Routes ---
     @app.route('/')
     def tiktok():
-        """Immersive Video Feed"""
+        """Immersive Mixed Media Feed"""
         return render_template('tiktok.html', menu='index')
 
     @app.route('/gallery')
@@ -385,6 +385,18 @@ def create_app(test_config=None):
 
 
     # --- API Routes ---
+    def _read_int_arg(name: str, default: int, minimum: int | None = None, maximum: int | None = None) -> int:
+        raw = request.args.get(name, default)
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            value = default
+
+        if minimum is not None:
+            value = max(minimum, value)
+        if maximum is not None:
+            value = min(maximum, value)
+        return value
 
     @app.route('/api/videos')
     def api_videos():
@@ -394,8 +406,8 @@ def create_app(test_config=None):
 
     @app.route('/api/random-images')
     def api_random_images():
-        page = int(request.args.get('page', 1))
-        size = int(request.args.get('size', 30))
+        page = _read_int_arg('page', 1, minimum=1)
+        size = _read_int_arg('size', 30, minimum=1, maximum=100)
         seed = request.args.get('seed') or str(random.randint(1, 999999))
         
         # Get recommended images (all of them, weighted)
@@ -414,6 +426,117 @@ def create_app(test_config=None):
             'total': total,
             'has_more': end < total,
             'seed': seed
+        }
+
+    @app.route('/api/feed/mix')
+    def api_feed_mix():
+        page = _read_int_arg('page', 1, minimum=1)
+        size = _read_int_arg('size', 24, minimum=8, maximum=60)
+        seed = request.args.get('seed') or str(random.randint(1, 999999))
+        # 首页混合流固定为视频主导密度，降低可预测性由随机混排完成。
+        video_ratio = 4
+        image_ratio = 1
+
+        ratio_total = video_ratio + image_ratio
+        end = page * size
+        start = max(0, end - size)
+        request_window = end + size
+        video_need = max(size, int(request_window * (video_ratio / ratio_total)) + video_ratio * 2)
+        image_need = max(size, int(request_window * (image_ratio / ratio_total)) + image_ratio * 2)
+
+        videos = recommend_service.get_weighted_selection(
+            file_type='video',
+            limit=video_need,
+            seed=f"{seed}:video",
+        )
+        images = recommend_service.get_weighted_selection(
+            file_type='image',
+            limit=image_need,
+            seed=f"{seed}:image",
+        )
+
+        # 混排策略：目标比率 + 轻随机约束（避免固定 4V+1I 的可预测节奏）
+        target_image_prob = image_ratio / max(1, ratio_total)
+        max_video_streak = 6
+        max_image_streak = 2
+        rng = random.Random(f"{seed}:mix")
+
+        mixed: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        vi = 0
+        ii = 0
+        used_video = 0
+        used_image = 0
+        video_streak = 0
+        image_streak = 0
+
+        def pick_next_available(kind: str) -> tuple[str, str]:
+            nonlocal vi, ii
+            if kind == 'video':
+                while vi < len(videos):
+                    name = videos[vi]
+                    vi += 1
+                    if name:
+                        return 'video', name
+                return '', ''
+            while ii < len(images):
+                name = images[ii]
+                ii += 1
+                if name:
+                    return 'image', name
+            return '', ''
+
+        while len(mixed) < request_window and (vi < len(videos) or ii < len(images)):
+            # 先应用连续上限约束，避免出现过长单一类型段落
+            if video_streak >= max_video_streak and ii < len(images):
+                want_type = 'image'
+            elif image_streak >= max_image_streak and vi < len(videos):
+                want_type = 'video'
+            else:
+                total_used = used_video + used_image
+                current_image_ratio = (used_image / total_used) if total_used > 0 else target_image_prob
+                # 动态修正：当前图片占比低于目标，则提高本次抽到图片概率
+                correction = (target_image_prob - current_image_ratio) * 0.65
+                p_image = max(0.05, min(0.5, target_image_prob + correction))
+                want_type = 'image' if rng.random() < p_image else 'video'
+
+            chosen_type, chosen_name = pick_next_available(want_type)
+            if not chosen_name:
+                fallback = 'video' if want_type == 'image' else 'image'
+                chosen_type, chosen_name = pick_next_available(fallback)
+
+            if not chosen_name or chosen_name in seen:
+                continue
+            seen.add(chosen_name)
+            mixed.append((chosen_type, chosen_name))
+            if chosen_type == 'video':
+                used_video += 1
+                video_streak += 1
+                image_streak = 0
+            else:
+                used_image += 1
+                image_streak += 1
+                video_streak = 0
+
+        page_items = mixed[start:end]
+        items = []
+        for media_type, name in page_items:
+            encoded = quote(name)
+            detail_url = f"/detail/{encoded}" if media_type == 'video' else f"/image?uri={encoded}"
+            media_url = f"/media?uri={encoded}"
+            items.append({
+                'type': media_type,
+                'name': name,
+                'media_url': media_url,
+                'thumb_url': f"/thumb?uri={encoded}" if media_type == 'video' else media_url,
+                'detail_url': detail_url,
+            })
+
+        return {
+            'items': items,
+            'page': page,
+            'has_more': len(mixed) > end,
+            'seed': seed,
         }
 
     @app.route('/api/download/probe', methods=['GET', 'POST'])

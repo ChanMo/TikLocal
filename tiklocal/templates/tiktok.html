@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block extra_head %}
 <style>
-/* Immersive Video Feed Layout */
+/* Immersive Media Feed Layout */
 body {
   padding-bottom: 0 !important;
   overscroll-behavior-y: none;
@@ -12,7 +12,6 @@ html, body {
   overflow: hidden;
 }
 
-/* Main Container */
 #container {
   position: absolute;
   inset: 0;
@@ -22,8 +21,12 @@ html, body {
   background: #000;
 }
 
-/* Video Player */
-video {
+#feed-container {
+  position: absolute;
+  inset: 0;
+}
+
+.feed-media {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -32,21 +35,18 @@ video {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  pointer-events: none; /* Let clicks pass to overlay */
+  pointer-events: none;
 }
-video.active {
+.feed-media.active {
   display: block;
 }
 
-/* Interaction Layer */
 #overlay-layer {
   position: absolute;
   inset: 0;
   z-index: 10;
-  /* background: rgba(255,0,0,0.1); Debug tap area */
 }
 
-/* Center Play Icon */
 #play-status-icon {
   position: absolute;
   top: 50%;
@@ -71,7 +71,6 @@ video.active {
   transform: translate(-50%, -50%) scale(1.1);
 }
 
-/* Custom Progress Bar */
 #custom-controls {
   position: absolute;
   bottom: calc(90px + env(safe-area-inset-bottom));
@@ -94,19 +93,20 @@ video.active {
   align-items: center;
 }
 
-/* Invisible Interactive Layer */
 input[type=range] {
   -webkit-appearance: none;
   position: absolute;
   width: 100%;
   height: 100%;
   opacity: 0;
-  z-index: 2; /* On top */
+  z-index: 2;
   cursor: pointer;
   margin: 0;
 }
+input[type=range]:disabled {
+  cursor: default;
+}
 
-/* Visual Track Background */
 .progress-track {
   position: absolute;
   left: 0;
@@ -118,20 +118,18 @@ input[type=range] {
   pointer-events: none;
 }
 
-/* Visual Progress Fill */
 .progress-fill {
   position: absolute;
   left: 0;
   height: 4px;
   background: #fff;
   border-radius: 2px;
-  width: 0%; /* JS will update this */
+  width: 0%;
   transition: width 0.1s linear, height 0.2s ease;
   pointer-events: none;
   z-index: 1;
 }
 
-/* Thumb Indicator (Pseudo-element on fill or separate div? Using ::after on fill for simplicity) */
 .progress-fill::after {
   content: '';
   position: absolute;
@@ -142,41 +140,33 @@ input[type=range] {
   height: 12px;
   background: #fff;
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* Time Display */
 .time-display {
   color: rgba(255, 255, 255, 0.9);
   font-size: 11px;
   font-family: system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-  width: 35px; /* Fixed width prevents jitter */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  width: 35px;
   text-align: center;
   opacity: 1;
   transition: opacity 0.2s;
 }
 
-/* Immersive / Playing State */
-/* When immersive (playing & idle):
-   1. Controls go down.
-   2. Track becomes thin.
-   3. Time hidden.
-   4. Sidebar hidden.
-*/
 body.immersive-mode #custom-controls {
-  bottom: calc(0px + env(safe-area-inset-bottom)); /* Hug bottom */
-  left: 0; 
+  bottom: calc(0px + env(safe-area-inset-bottom));
+  left: 0;
   right: 0;
   padding: 0;
   gap: 0;
 }
 
 body.immersive-mode .progress-track {
-  height: 2px; /* Micro bar */
+  height: 2px;
   background: rgba(255, 255, 255, 0.15);
   border-radius: 0;
 }
@@ -193,8 +183,6 @@ body.immersive-mode .time-display {
   margin: 0;
 }
 
-/* Hover/Active State Handling */
-/* When controls are active (paused or tapped): Show Thumb */
 body:not(.immersive-mode) .progress-fill::after {
   transform: translateY(-50%) scale(1);
 }
@@ -213,15 +201,13 @@ body.immersive-mode #quick-theme-toggle {
   transform: translateY(-20px);
 }
 
-
-/* Right Side Controls */
 .controls-sidebar {
   position: absolute;
   right: 16px;
-  bottom: calc(140px + env(safe-area-inset-bottom)); /* Adjusted for dock + progress */
+  bottom: calc(140px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   z-index: 20;
   align-items: center;
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -253,14 +239,12 @@ body.immersive-mode #quick-theme-toggle {
   stroke-width: 2;
 }
 
-/* Speed Button Specifics */
 .speed-btn {
   font-size: 14px;
   font-weight: 700;
-  font-family: system-ui, sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
-/* Like Button Animation */
 @keyframes heart-burst {
   0% { transform: scale(1); }
   50% { transform: scale(1.3); }
@@ -278,58 +262,232 @@ body.immersive-mode #quick-theme-toggle {
   display: none;
 }
 
+/* Image overlay controls */
+.image-tool-wrap {
+  position: relative;
+}
+.zoom-options {
+  position: absolute;
+  right: 58px;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(8px);
+  transition: all 0.2s ease;
+}
+.zoom-options.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+.zoom-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(5px);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.zoom-btn.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-color: white;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.magnifier {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  background-repeat: no-repeat;
+  background-color: #000;
+  cursor: grab;
+  z-index: 210;
+  display: none;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.3s ease, height 0.3s ease;
+}
+.magnifier.magnifier-large {
+  width: 300px;
+  height: 300px;
+}
+.magnifier.active {
+  display: block;
+  transform: translate(-50%, -50%) scale(1);
+}
+.magnifier:active {
+  cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.02);
+}
+.mag-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.magnifier.active .mag-badge {
+  opacity: 1;
+}
+
+.caption-panel {
+  position: fixed;
+  left: 20px;
+  bottom: 90px;
+  max-width: min(72vw, 420px);
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: white;
+  backdrop-filter: blur(10px);
+  z-index: 215;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.caption-title {
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.caption-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.caption-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.86);
+}
+.caption-panel.is-hidden {
+  display: none;
+}
+#container.image-focus-mode .caption-panel:not(.is-hidden) {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+}
+
+#caption-btn.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  border-top-color: transparent;
+  animation: caption-spin 0.9s linear infinite;
+}
+#caption-btn {
+  position: relative;
+}
+#caption-btn.is-loading i {
+  opacity: 0.35;
+}
+#caption-btn.is-error::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(248, 113, 113, 0.9);
+}
+@keyframes caption-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .caption-panel {
+    max-width: min(82vw, 320px);
+    left: 12px;
+  }
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div id="container">
-  
-  <!-- Video Feed Container -->
-  <div id="video-container">
-    <!-- Videos will be injected here -->
-  </div>
+  <div id="feed-container"></div>
 
-  <!-- Interaction Layer -->
   <div id="overlay-layer"></div>
 
-  <!-- Play Status Icon -->
   <div id="play-status-icon">
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="currentColor" stroke="none">
       <polygon points="5 3 19 12 5 21 5 3"></polygon>
     </svg>
   </div>
 
-  <!-- Custom Progress Bar -->
   <div id="custom-controls">
     <span class="time-display" id="time-current">00:00</span>
-    
     <div class="progress-container">
-        <!-- The interactive layer -->
-        <input type="range" id="video-progress" min="0" max="100" step="0.1" value="0">
-        
-        <!-- The visual layer -->
-        <div class="progress-track"></div>
-        <div class="progress-fill" id="progress-fill"></div>
+      <input type="range" id="video-progress" min="0" max="100" step="0.1" value="0">
+      <div class="progress-track"></div>
+      <div class="progress-fill" id="progress-fill"></div>
     </div>
-
     <span class="time-display" id="time-total">00:00</span>
   </div>
 
-  <!-- Right Sidebar Controls -->
   <div class="controls-sidebar" id="controls">
-    <!-- Speed Control -->
     <div class="action-btn speed-btn" id="speed-btn">1x</div>
-    
-    <!-- Favorite Control -->
+
+    <button type="button" class="action-btn" id="caption-btn" title="生成标题" hidden>
+      <i data-feather="zap"></i>
+    </button>
+
+    <div class="image-tool-wrap" id="magnifier-tool-wrap" hidden>
+      <div class="zoom-options" id="zoom-options">
+        <button type="button" class="zoom-btn active" data-level="2.5">2.5x</button>
+        <button type="button" class="zoom-btn" data-level="5">5x</button>
+      </div>
+      <button type="button" class="action-btn" id="magnifier-toggle" title="放大镜">
+        <i data-feather="search"></i>
+      </button>
+    </div>
+
     <a href="#" class="action-btn" id="favorite-btn" data-value="">
       <svg class="heart-outline" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
       <svg class="heart-filled" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
     </a>
 
-    <!-- Info/Detail Control -->
     <a href="#" class="action-btn" id="info-btn">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
     </a>
+  </div>
+
+  <div class="caption-panel is-hidden" id="caption-panel">
+    <div class="caption-title hidden" id="caption-title"></div>
+    <div class="caption-tags" id="caption-tags"></div>
+  </div>
+
+  <div class="magnifier" id="magnifier">
+    <div class="mag-badge" id="mag-badge">2.5x</div>
   </div>
 </div>
 {% endblock %}
@@ -337,276 +495,665 @@ body.immersive-mode #quick-theme-toggle {
 {% block extra_body %}
 <script src="{{url_for('static', filename='hammer.min.js')}}"></script>
 <script>
-  (async() => {
-    // Add immersive class to body
+  (async () => {
     document.body.classList.add('immersive');
 
-    const videoContainer = document.getElementById('video-container');
+    const feedContainer = document.getElementById('feed-container');
     const overlayLayer = document.getElementById('overlay-layer');
     const speedBtn = document.getElementById('speed-btn');
+    const captionBtn = document.getElementById('caption-btn');
+    const magnifierToolWrap = document.getElementById('magnifier-tool-wrap');
+    const magnifierToggle = document.getElementById('magnifier-toggle');
+    const zoomOptions = document.getElementById('zoom-options');
+    const magBadge = document.getElementById('mag-badge');
     const favoriteBtn = document.getElementById('favorite-btn');
     const infoBtn = document.getElementById('info-btn');
-    
-    // Custom Controls
+
     const playStatusIcon = document.getElementById('play-status-icon');
+    const customControls = document.getElementById('custom-controls');
     const progressBar = document.getElementById('video-progress');
-    const progressFill = document.getElementById('progress-fill'); // New visual fill
+    const progressFill = document.getElementById('progress-fill');
     const timeCurrent = document.getElementById('time-current');
     const timeTotal = document.getElementById('time-total');
-    const customControls = document.getElementById('custom-controls');
 
-    let videos = [];
-    let index = 0;
-    let loadingVideos = false;
+    const magnifier = document.getElementById('magnifier');
+    const captionPanel = document.getElementById('caption-panel');
+    const captionTitle = document.getElementById('caption-title');
+    const captionTags = document.getElementById('caption-tags');
+
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
+
+    let feedItems = [];
+    let index = -1;
+    let page = 1;
+    let seed = '';
+    let hasMore = true;
+    let loadingFeed = false;
+
     let currentSpeedIndex = 1;
-    let isImmersive = false; // Starts with UI visible
+    let isImmersive = false;
     let isDragging = false;
     let wasPlayingBeforeDrag = false;
-    
-    // Tap Logic Variables
     let clickTimer = null;
     let lastClickTime = 0;
 
-    // Helper: Format time
+    let isMagnifying = false;
+    let magX = 0;
+    let magY = 0;
+    let zoomLevel = 2.5;
+
+    let isImageFocus = false;
+    let captionRequestId = 0;
+    let currentCaptionUri = '';
+    const captionCache = new Map();
+
     function formatTime(seconds) {
-      if (!seconds || isNaN(seconds) || seconds === Infinity || seconds < 0) return "00:00";
+      if (!seconds || isNaN(seconds) || seconds === Infinity || seconds < 0) return '00:00';
       const m = Math.floor(seconds / 60);
       const s = Math.floor(seconds % 60);
       return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
 
-    // Toggle Immersive Mode
-    function toggleUI() {
-      isImmersive = !isImmersive;
-      document.body.classList.toggle('immersive-mode', isImmersive);
-      document.body.classList.toggle('controls-active', !isImmersive);
+    function currentItem() {
+      if (index < 0 || index >= feedItems.length) return null;
+      return feedItems[index];
     }
-    
-    // Toggle Play/Pause
+
+    function setImmersive(enabled) {
+      isImmersive = !!enabled;
+      document.body.classList.toggle('immersive-mode', isImmersive);
+    }
+
+    function toggleUI() {
+      setImmersive(!isImmersive);
+    }
+
+    function setImageFocus(enabled) {
+      isImageFocus = !!enabled;
+      const container = document.getElementById('container');
+      container.classList.toggle('image-focus-mode', isImageFocus);
+    }
+
+    function clearCaption(resetUri = true) {
+      if (resetUri) currentCaptionUri = '';
+      captionTitle.textContent = '';
+      captionTitle.classList.add('hidden');
+      captionTags.innerHTML = '';
+      captionPanel.classList.add('is-hidden');
+    }
+
+    function renderCaption(data) {
+      if (!data) {
+        clearCaption(false);
+        return;
+      }
+      const title = String(data.title || '').trim();
+      const tags = Array.isArray(data.tags) ? data.tags : [];
+      if (!title && tags.length === 0) {
+        clearCaption(false);
+        return;
+      }
+      captionPanel.classList.remove('is-hidden');
+      captionTitle.textContent = title;
+      captionTitle.classList.toggle('hidden', !title);
+      captionTags.innerHTML = '';
+      tags.forEach((tag) => {
+        const chip = document.createElement('span');
+        chip.className = 'caption-tag';
+        chip.textContent = String(tag || '');
+        captionTags.appendChild(chip);
+      });
+    }
+
+    function setCaptionLoading(loading) {
+      captionBtn.disabled = !!loading;
+      captionBtn.classList.toggle('is-loading', !!loading);
+    }
+
+    async function loadCaption(uri) {
+      if (captionCache.has(uri)) {
+        currentCaptionUri = uri;
+        renderCaption(captionCache.get(uri));
+        return;
+      }
+
+      clearCaption();
+      currentCaptionUri = uri;
+      const reqId = ++captionRequestId;
+      try {
+        const res = await fetch(`/api/image/metadata?uri=${encodeURIComponent(uri)}`);
+        const data = await res.json();
+        if (reqId !== captionRequestId || currentCaptionUri !== uri) return;
+        if (data.success) {
+          captionCache.set(uri, data.data || null);
+          renderCaption(data.data || null);
+        } else {
+          captionBtn.classList.add('is-error');
+          setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
+        }
+      } catch (error) {
+        if (reqId !== captionRequestId || currentCaptionUri !== uri) return;
+        captionBtn.classList.add('is-error');
+        setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
+      }
+    }
+
+    async function generateCaption(uri, force = false) {
+      const cached = captionCache.get(uri);
+      const hasExisting = cached && ((cached.title && String(cached.title).trim()) || (Array.isArray(cached.tags) && cached.tags.length));
+      if (hasExisting && !force) {
+        const ok = window.confirm('已存在标题，是否覆盖生成？');
+        if (!ok) return;
+      }
+
+      setCaptionLoading(true);
+      try {
+        const res = await fetch('/api/image/metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uri, force: true }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          captionBtn.classList.add('is-error');
+          setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
+          return;
+        }
+        captionCache.set(uri, data.data || null);
+        if (currentCaptionUri === uri) {
+          renderCaption(data.data || null);
+        }
+      } catch (error) {
+        captionBtn.classList.add('is-error');
+        setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
+      } finally {
+        setCaptionLoading(false);
+      }
+    }
+
+    async function goNext() {
+      if (index >= feedItems.length - 1 && hasMore) {
+        await loadFeed();
+      }
+      if (index < feedItems.length - 1) {
+        await showItem(index + 1);
+      }
+    }
+
+    async function goPrev() {
+      if (index > 0) {
+        await showItem(index - 1);
+      }
+    }
+
+    function updateFavoriteState(name) {
+      fetch(`/api/favorite/${encodeURIComponent(name)}`)
+        .then((r) => r.json())
+        .then((d) => favoriteBtn.classList.toggle('is-active', !!d.favorite))
+        .catch(() => favoriteBtn.classList.remove('is-active'));
+    }
+
+    function updateControls(item) {
+      infoBtn.href = item.detail_url;
+      favoriteBtn.dataset.value = item.name;
+      updateFavoriteState(item.name);
+
+      const isVideo = item.type === 'video';
+      speedBtn.hidden = !isVideo;
+      captionBtn.hidden = isVideo;
+      magnifierToolWrap.hidden = isVideo;
+      customControls.hidden = !isVideo;
+
+      if (isVideo) {
+        progressBar.disabled = false;
+        playStatusIcon.classList.remove('hidden');
+      } else {
+        progressBar.disabled = true;
+        progressBar.value = 0;
+        progressFill.style.width = '0%';
+        timeCurrent.textContent = '';
+        timeTotal.textContent = '';
+        playStatusIcon.classList.add('hidden');
+        playStatusIcon.classList.remove('visible');
+      }
+    }
+
+    function ensureVideoSrc(videoEl) {
+      if (!videoEl) return;
+      if (!videoEl.src) {
+        videoEl.src = videoEl.dataset.src || '';
+        videoEl.load();
+      }
+    }
+
+    function preloadNextVideo() {
+      for (let i = index + 1; i < feedItems.length; i++) {
+        const item = feedItems[i];
+        if (item.type !== 'video') continue;
+        const v = item.el;
+        if (v && !v.src) {
+          ensureVideoSrc(v);
+        }
+        break;
+      }
+    }
+
+    function updateVideoProgress(videoEl) {
+      if (!videoEl || currentItem()?.el !== videoEl || isDragging) return;
+      if (timeTotal.textContent === '00:00' || timeTotal.textContent === '') {
+        const duration = videoEl.duration;
+        if (duration && !isNaN(duration) && duration !== Infinity) {
+          timeTotal.textContent = formatTime(duration);
+        }
+      }
+      const pct = (videoEl.currentTime / videoEl.duration) * 100;
+      progressBar.value = isNaN(pct) ? 0 : pct;
+      progressFill.style.width = `${isNaN(pct) ? 0 : pct}%`;
+      timeCurrent.textContent = formatTime(videoEl.currentTime);
+    }
+
+    function applyZoom(level) {
+      zoomLevel = level;
+      magBadge.textContent = `${level}x`;
+      document.querySelectorAll('.zoom-btn').forEach((btn) => {
+        const btnLevel = Number.parseFloat(btn.getAttribute('data-level') || '2.5');
+        btn.classList.toggle('active', btnLevel === level);
+      });
+      if (level >= 5) {
+        magnifier.classList.add('magnifier-large');
+      } else {
+        magnifier.classList.remove('magnifier-large');
+      }
+      if (isMagnifying) {
+        setTimeout(updateMagnifierContent, 40);
+      }
+    }
+
+    function currentImageEl() {
+      const item = currentItem();
+      if (!item || item.type !== 'image') return null;
+      return item.el;
+    }
+
+    function getImageContainRect(imgEl) {
+      if (!imgEl) return null;
+      const rect = imgEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+
+      const naturalW = imgEl.naturalWidth || 0;
+      const naturalH = imgEl.naturalHeight || 0;
+      if (!naturalW || !naturalH) {
+        return {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        };
+      }
+
+      const containerRatio = rect.width / rect.height;
+      const imageRatio = naturalW / naturalH;
+      let drawWidth = rect.width;
+      let drawHeight = rect.height;
+
+      if (imageRatio > containerRatio) {
+        drawHeight = rect.width / imageRatio;
+      } else {
+        drawWidth = rect.height * imageRatio;
+      }
+
+      const offsetX = (rect.width - drawWidth) / 2;
+      const offsetY = (rect.height - drawHeight) / 2;
+      return {
+        left: rect.left + offsetX,
+        top: rect.top + offsetY,
+        width: drawWidth,
+        height: drawHeight,
+      };
+    }
+
+    function updateMagnifierPosition() {
+      magnifier.style.left = `${magX}px`;
+      magnifier.style.top = `${magY}px`;
+    }
+
+    function updateMagnifierContent() {
+      const imgEl = currentImageEl();
+      if (!imgEl) return;
+      const rect = getImageContainRect(imgEl);
+      if (!rect || !rect.width || !rect.height) return;
+
+      const relX = Math.max(0, Math.min(1, (magX - rect.left) / rect.width));
+      const relY = Math.max(0, Math.min(1, (magY - rect.top) / rect.height));
+      magnifier.style.backgroundImage = `url('${imgEl.src}')`;
+      magnifier.style.backgroundSize = `${rect.width * zoomLevel}px ${rect.height * zoomLevel}px`;
+
+      const magWidth = magnifier.offsetWidth;
+      const magHeight = magnifier.offsetHeight;
+      const bgX = -(relX * rect.width * zoomLevel - magWidth / 2);
+      const bgY = -(relY * rect.height * zoomLevel - magHeight / 2);
+      magnifier.style.backgroundPosition = `${bgX}px ${bgY}px`;
+    }
+
+    function toggleMagnifier(active) {
+      const item = currentItem();
+      if (!item || item.type !== 'image') {
+        active = false;
+      }
+      isMagnifying = !!active;
+      if (isMagnifying) {
+        magnifierToggle.classList.add('active');
+        zoomOptions.classList.add('show');
+        magnifier.classList.add('active');
+        const contentRect = getImageContainRect(currentImageEl());
+        if (contentRect) {
+          magX = contentRect.left + contentRect.width / 2;
+          magY = contentRect.top + contentRect.height / 2;
+        } else {
+          magX = window.innerWidth / 2;
+          magY = window.innerHeight / 2;
+        }
+        updateMagnifierPosition();
+        updateMagnifierContent();
+      } else {
+        magnifierToggle.classList.remove('active');
+        zoomOptions.classList.remove('show');
+        magnifier.classList.remove('active');
+      }
+    }
+
+    function clearPreviousState(prevItem) {
+      toggleMagnifier(false);
+      setImageFocus(false);
+
+      if (!prevItem) return;
+      prevItem.el.classList.remove('active');
+      prevItem.el.style.display = 'none';
+      if (prevItem.type === 'video') {
+        prevItem.el.pause();
+        prevItem.el.muted = true;
+      }
+    }
+
+    async function showItem(nextIndex) {
+      if (!feedItems.length) return;
+      const safeIndex = Math.max(0, Math.min(nextIndex, feedItems.length - 1));
+      const prevItem = currentItem();
+      clearPreviousState(prevItem);
+
+      index = safeIndex;
+      const item = currentItem();
+      if (!item) return;
+
+      item.el.style.display = 'block';
+      requestAnimationFrame(() => item.el.classList.add('active'));
+      updateControls(item);
+
+      if (item.type === 'video') {
+        progressBar.disabled = false;
+        ensureVideoSrc(item.el);
+        item.el.muted = false;
+        item.el.playbackRate = speedOptions[currentSpeedIndex];
+        progressBar.value = 0;
+        progressFill.style.width = '0%';
+        timeCurrent.textContent = '00:00';
+        timeTotal.textContent = formatTime(item.el.duration);
+        clearCaption();
+
+        const playPromise = item.el.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => playStatusIcon.classList.remove('visible'))
+            .catch(() => playStatusIcon.classList.add('visible'));
+        }
+        preloadNextVideo();
+      } else {
+        setImmersive(false);
+        playStatusIcon.classList.remove('visible');
+        await loadCaption(item.name);
+      }
+
+      if (index >= feedItems.length - 4 && hasMore) {
+        loadFeed();
+      }
+    }
+
+    function buildMediaElement(item) {
+      if (item.type === 'video') {
+        const video = document.createElement('video');
+        video.className = 'feed-media feed-video';
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.controls = false;
+        video.preload = 'metadata';
+        video.poster = item.thumb_url || '';
+        video.dataset.src = item.media_url;
+        video.dataset.name = item.name;
+        video.addEventListener('timeupdate', () => updateVideoProgress(video));
+        const updateDuration = () => {
+          if (currentItem()?.el !== video) return;
+          const duration = video.duration;
+          if (duration && !isNaN(duration) && duration !== Infinity) {
+            timeTotal.textContent = formatTime(duration);
+          }
+        };
+        video.addEventListener('loadedmetadata', updateDuration);
+        video.addEventListener('durationchange', updateDuration);
+        return video;
+      }
+
+      const img = document.createElement('img');
+      img.className = 'feed-media feed-image';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = item.name;
+      img.src = item.media_url;
+      img.dataset.name = item.name;
+      return img;
+    }
+
+    async function loadFeed() {
+      if (loadingFeed || !hasMore) return;
+      loadingFeed = true;
+      try {
+        const query = new URLSearchParams({
+          page: String(page),
+          size: '24',
+        });
+        if (seed) query.set('seed', seed);
+
+        const res = await fetch(`/api/feed/mix?${query.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (!seed && data.seed) seed = String(data.seed);
+        hasMore = data.has_more !== false;
+
+        const incoming = Array.isArray(data.items) ? data.items : [];
+        incoming.forEach((item) => {
+          if (!item || !item.type || !item.name || !item.media_url) return;
+          const mediaEl = buildMediaElement(item);
+          feedContainer.appendChild(mediaEl);
+          feedItems.push({
+            type: item.type,
+            name: item.name,
+            media_url: item.media_url,
+            detail_url: item.detail_url || '#',
+            thumb_url: item.thumb_url || '',
+            el: mediaEl,
+          });
+        });
+        page += 1;
+
+        if (feedItems.length > 100) {
+          const removeCount = 30;
+          const removed = feedItems.splice(0, removeCount);
+          removed.forEach((entry) => entry.el.remove());
+          index = Math.max(0, index - removeCount);
+        }
+      } catch (error) {
+        hasMore = false;
+      } finally {
+        loadingFeed = false;
+      }
+    }
+
     function togglePlay() {
-      const v = videos[index];
-      if (!v) return;
-      
-      if (v.paused) {
-        v.play();
+      const item = currentItem();
+      if (!item || item.type !== 'video') return;
+      const video = item.el;
+      if (video.paused) {
+        video.play();
         playStatusIcon.classList.remove('visible');
       } else {
-        v.pause();
+        video.pause();
         playStatusIcon.classList.add('visible');
       }
     }
 
-    async function loadVideos() {
-      if (loadingVideos) return;
-      loadingVideos = true;
-      try {
-        const res = await fetch('/api/videos');
-        const newVideos = await res.json();
-
-        // Memory management
-        if (videos.length > 50) {
-          const removeCount = 20;
-          const toRemove = videos.splice(0, removeCount);
-          toRemove.forEach(v => v.remove());
-          index = Math.max(0, index - removeCount);
-        }
-
-        newVideos.forEach(videoPath => {
-          const v = document.createElement('video');
-          v.muted = true;
-          v.loop = true;
-          v.playsInline = true;
-          v.controls = false; // Explicitly disable native controls
-          v.dataset.name = videoPath;
-          v.dataset.src = `/media/${videoPath}`;
-          
-          // Time Update for Progress Bar
-          v.addEventListener('timeupdate', () => {
-            if (v === videos[index] && !isDragging) {
-              // Fallback: Update duration if it was missed or changed from NaN/Infinity
-              if (timeTotal.textContent === "00:00" || timeTotal.textContent === "") {
-                const duration = v.duration;
-                if (duration && !isNaN(duration) && duration !== Infinity) {
-                  timeTotal.textContent = formatTime(duration);
-                }
-              }
-
-              const pct = (v.currentTime / v.duration) * 100;
-              progressBar.value = isNaN(pct) ? 0 : pct;
-              progressFill.style.width = (isNaN(pct) ? 0 : pct) + '%';
-              timeCurrent.textContent = formatTime(v.currentTime);
-            }
-          });
-
-          // Metadata/Duration loaded
-          const updateDuration = () => {
-             if (v === videos[index]) {
-               const duration = v.duration;
-               if (duration && !isNaN(duration) && duration !== Infinity) {
-                 timeTotal.textContent = formatTime(duration);
-               }
-             }
-          };
-          v.addEventListener('loadedmetadata', updateDuration);
-          v.addEventListener('durationchange', updateDuration);
-
-          videoContainer.appendChild(v);
-        });
-        videos = Array.from(videoContainer.querySelectorAll('video'));
-      } finally {
-        loadingVideos = false;
-      }
-    }
-
-    function showVideo(i) {
-      if (!videos.length) return;
-      const prev = index;
-      index = (i + videos.length) % videos.length;
-
-      if (videos[prev]) {
-        videos[prev].classList.remove('active');
-        videos[prev].pause();
-        videos[prev].muted = true;
-        videos[prev].style.display = 'none';
-      }
-
-      const currVid = videos[index];
-      if (currVid) {
-        currVid.style.display = 'block';
-        requestAnimationFrame(() => {
-          currVid.classList.add('active');
-          if (!currVid.src) {
-            currVid.src = currVid.dataset.src;
-            currVid.load();
-          }
-          currVid.muted = false;
-          currVid.playbackRate = speedOptions[currentSpeedIndex];
-          
-          // Reset UI
-          progressBar.value = 0;
-          progressFill.style.width = '0%';
-          timeCurrent.textContent = "00:00";
-          timeTotal.textContent = formatTime(currVid.duration); // Set total time if already loaded
-          playStatusIcon.classList.remove('visible'); // Assume playing starts
-          
-          const playPromise = currVid.play();
-          if (playPromise !== undefined) {
-              playPromise.catch(error => {
-                  console.log("Auto-play prevented:", error);
-                  playStatusIcon.classList.add('visible'); // Show play icon if blocked
-              });
-          }
-          
-          updateControls(currVid);
-
-          // Preload next
-          const nextIndex = (index + 1) % videos.length;
-          if (videos[nextIndex] && !videos[nextIndex].src) {
-            videos[nextIndex].src = videos[nextIndex].dataset.src;
-            videos[nextIndex].load();
-          }
-        });
-      }
-    }
-
-    function updateControls(video) {
-      const name = video.dataset.name;
-      infoBtn.href = `/detail/${encodeURIComponent(name)}`;
-      favoriteBtn.dataset.value = name;
-      fetch(`/api/favorite/${encodeURIComponent(name)}`)
-        .then(r => r.json())
-        .then(d => favoriteBtn.classList.toggle('is-active', d.favorite));
-    }
-
-    // Gestures on Overlay
     const hammer = new Hammer(overlayLayer);
     hammer.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
     hammer.on('swipeup', () => {
-      if (index >= videos.length - 3) loadVideos();
-      showVideo(index + 1);
+      if (isMagnifying) return;
+      goNext();
     });
-    hammer.on('swipedown', () => showVideo(index - 1));
-    
-    // Robust Click Logic (Single vs Double)
-    overlayLayer.addEventListener('click', (e) => {
-        const now = Date.now();
-        const timeDiff = now - lastClickTime;
-        
-        if (timeDiff < 250 && timeDiff > 0) {
-            // Double Click
-            if (clickTimer) clearTimeout(clickTimer);
-            clickTimer = null;
-            togglePlay();
-        } else {
-            // Potential Single Click
-            if (clickTimer) clearTimeout(clickTimer);
-            clickTimer = setTimeout(() => {
-                toggleUI();
-                clickTimer = null;
-            }, 250);
+    hammer.on('swipedown', () => {
+      if (isMagnifying) return;
+      goPrev();
+    });
+
+    overlayLayer.addEventListener('click', () => {
+      const now = Date.now();
+      const delta = now - lastClickTime;
+
+      if (delta < 250 && delta > 0) {
+        if (clickTimer) clearTimeout(clickTimer);
+        clickTimer = null;
+        const item = currentItem();
+        if (item?.type === 'video') {
+          togglePlay();
         }
-        lastClickTime = now;
+      } else {
+        if (clickTimer) clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => {
+          const item = currentItem();
+          if (item?.type === 'image') {
+            setImageFocus(!isImageFocus);
+          } else {
+            toggleUI();
+          }
+          clickTimer = null;
+        }, 250);
+      }
+      lastClickTime = now;
     });
 
-    // Center Icon Click -> Play
-    playStatusIcon.addEventListener('click', (e) => {
-        e.stopPropagation(); 
-        togglePlay();
-    });
-
-
-    // Controls Sidebar Events
     speedBtn.addEventListener('click', () => {
       currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.length;
       const rate = speedOptions[currentSpeedIndex];
-      speedBtn.textContent = rate + 'x';
-      if (videos[index]) videos[index].playbackRate = rate;
+      speedBtn.textContent = `${rate}x`;
+      const item = currentItem();
+      if (item?.type === 'video') {
+        item.el.playbackRate = rate;
+      }
     });
 
     favoriteBtn.addEventListener('click', async (e) => {
       e.preventDefault();
-      const val = favoriteBtn.dataset.value;
+      const name = favoriteBtn.dataset.value || '';
+      if (!name) return;
       favoriteBtn.classList.toggle('is-active');
-      await fetch(`/api/favorite/${encodeURIComponent(val)}`, { method: 'POST' });
+      try {
+        await fetch(`/api/favorite/${encodeURIComponent(name)}`, { method: 'POST' });
+      } catch (error) {
+        favoriteBtn.classList.toggle('is-active');
+      }
     });
 
-    // Progress Bar Interaction
     progressBar.addEventListener('input', () => {
-        const v = videos[index];
-        if (!v) return;
-        
-        if (!isDragging) {
-            isDragging = true;
-            wasPlayingBeforeDrag = !v.paused;
-            v.pause();
-        }
-        
-        // Update time display instantly
-        const seekTime = (progressBar.value / 100) * v.duration;
-        timeCurrent.textContent = formatTime(seekTime);
-        progressFill.style.width = progressBar.value + '%'; // Sync visual
+      const item = currentItem();
+      if (!item || item.type !== 'video') return;
+      const video = item.el;
+
+      if (!isDragging) {
+        isDragging = true;
+        wasPlayingBeforeDrag = !video.paused;
+        video.pause();
+      }
+
+      const seekTime = (progressBar.value / 100) * video.duration;
+      timeCurrent.textContent = formatTime(seekTime);
+      progressFill.style.width = `${progressBar.value}%`;
     });
 
     progressBar.addEventListener('change', () => {
-        const v = videos[index];
-        if (!v) return;
-        
-        const seekTime = (progressBar.value / 100) * v.duration;
-        v.currentTime = seekTime;
-        
-        if (wasPlayingBeforeDrag) {
-            v.play();
-            playStatusIcon.classList.remove('visible');
-        }
-        isDragging = false;
-    });
-    
-    // Initial State
-    document.body.classList.add('controls-active'); // Start with controls visible
+      const item = currentItem();
+      if (!item || item.type !== 'video') return;
+      const video = item.el;
 
-    await loadVideos();
-    showVideo(0);
+      const seekTime = (progressBar.value / 100) * video.duration;
+      video.currentTime = seekTime;
+      if (wasPlayingBeforeDrag) {
+        video.play();
+        playStatusIcon.classList.remove('visible');
+      }
+      isDragging = false;
+    });
+
+    captionBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const item = currentItem();
+      if (!item || item.type !== 'image') return;
+      generateCaption(item.name);
+    });
+
+    magnifierToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMagnifier(!isMagnifying);
+    });
+
+    document.querySelectorAll('.zoom-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const level = Number.parseFloat(btn.getAttribute('data-level') || '2.5');
+        applyZoom(level);
+      });
+    });
+
+    const magHammer = new Hammer(magnifier);
+    magHammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 0 });
+    let startX = 0;
+    let startY = 0;
+
+    magHammer.on('panstart', () => {
+      startX = magX;
+      startY = magY;
+      magnifier.style.transition = 'none';
+    });
+
+    magHammer.on('panmove', (e) => {
+      magX = startX + e.deltaX;
+      magY = startY + e.deltaY;
+      updateMagnifierPosition();
+      updateMagnifierContent();
+    });
+
+    magHammer.on('panend', () => {
+      magnifier.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    });
+
+    window.addEventListener('resize', () => {
+      if (isMagnifying) updateMagnifierContent();
+    });
+
+    applyZoom(2.5);
+
+    await loadFeed();
+    if (feedItems.length > 0) {
+      await showItem(0);
+    }
   })();
 </script>
 {% endblock %}

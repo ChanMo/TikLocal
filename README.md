@@ -8,7 +8,7 @@
 
 TikLocal's main features include:
 
-* **A TikTok-like swipe-up browsing experience** that allows you to easily and quickly browse local video files.
+* **A TikTok-like swipe-up browsing experience** with a mixed feed of local videos and images.
 * **A file manager-like directory browsing** feature that allows you to easily find and manage local video files.
 * **A Pinterest-like grid layout** feature that allows you to enjoy local images.
 * **Support for light and dark modes** to suit your personal preferences.
@@ -19,7 +19,7 @@ TikLocal is suitable for the following use cases:
 
 * You don't trust TikTok's teen mode and want to provide your child with completely controllable video content.
 * You want to browse and manage your local videos and images locally, but don't want to use third-party cloud services.
-* You want to use a TikTok-style video browsing experience on your phone or tablet.
+* You want to use a TikTok-style mixed media browsing experience on your phone or tablet.
 * You want to use a Pinterest-style image browsing experience on your phone or tablet.
 
 ## How to use
@@ -105,12 +105,26 @@ brew install yt-dlp gallery-dl ffmpeg
 sudo apt install yt-dlp gallery-dl ffmpeg
 ```
 
+### Home Mixed Feed
+
+The home page (`/`) now uses a mixed immersive feed:
+
+- Videos and images are mixed in one swipe flow (video-first density, randomized order)
+- Image cards support in-feed AI caption/tags panel
+- Image cards support circular magnifier (2.5x / 5x)
+- Image cards do **not** auto-advance; swipe manually to move next/previous
+
 ### Configuration
 
 TikLocal provides some configuration options that you can adjust to your needs.
 
 * **Light and dark modes:** You can choose to use light or dark mode.
 * **Video playback speed:** You can adjust the video playback speed.
+
+## Documentation
+
+- Docs index: `docs/README.md`
+- Release notes: `docs/release_notes.md`
 
 
 ## TODO
