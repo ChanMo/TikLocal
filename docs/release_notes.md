@@ -1,6 +1,16 @@
 # Release Notes
 
 ## Unreleased
+- 待补充
+
+## v0.8.9 (2026-02-22)
+- 信息架构升级：底部导航调整为 `Flow / Library / Favorites / Download / Settings`，其中 `Library` 成为视频+图片统一入口，`Favorites` 独立为一级入口。
+- Library 交互重构为极简 Masonry：移除顶部传统筛选表单与卡片冗余文本，仅保留媒体本身的沉浸式浏览。
+- 新增 `/api/library/items` 与前端无限加载：支持按 `scope=all/favorite` 分页拉取，满足大规模素材连续浏览。
+- 新增 Library Quick Viewer Flow：列表内就地预览视频/图片，支持上下滑切换并保留“进入独立详情页”入口，降低跳转割裂感。
+- 交互统一收敛：首页与 Library/Favorites 改为同一沉浸状态模型（视频/图片一致），放大镜作为图片工具态独立控制。
+- 新增共享交互内核：`flow_state_controller.js`（状态）与 `flow_ui_shared.js`（时间/放大镜几何），降低多入口行为分叉风险。
+- 兼容迁移：`/browse`、`/gallery` 改为重定向到 `/library`，详情页与删除后的回跳统一指向新 Library 入口。
 
 ## v0.8.8 (2026-02-22)
 - 首页沉浸流升级为混合媒体 Feed：在同一滑动流中混排视频与图片，替代原纯视频首页链路。

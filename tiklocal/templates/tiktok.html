@@ -391,7 +391,7 @@ body.immersive-mode #quick-theme-toggle {
 .caption-panel.is-hidden {
   display: none;
 }
-#container.image-focus-mode .caption-panel:not(.is-hidden) {
+body.immersive-mode .caption-panel:not(.is-hidden) {
   opacity: 0;
   pointer-events: none;
   transform: translateY(12px);
@@ -493,6 +493,8 @@ body.immersive-mode #quick-theme-toggle {
 {% endblock %}
 
 {% block extra_body %}
+<script src="{{url_for('static', filename='flow_ui_shared.js')}}"></script>
+<script src="{{url_for('static', filename='flow_state_controller.js')}}"></script>
 <script src="{{url_for('static', filename='hammer.min.js')}}"></script>
 <script>
   (async () => {
@@ -520,6 +522,7 @@ body.immersive-mode #quick-theme-toggle {
     const captionPanel = document.getElementById('caption-panel');
     const captionTitle = document.getElementById('caption-title');
     const captionTags = document.getElementById('caption-tags');
+    const uiShared = window.FlowUIShared || {};
 
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
@@ -542,16 +545,12 @@ body.immersive-mode #quick-theme-toggle {
     let magY = 0;
     let zoomLevel = 2.5;
 
-    let isImageFocus = false;
     let captionRequestId = 0;
     let currentCaptionUri = '';
     const captionCache = new Map();
 
     function formatTime(seconds) {
-      if (!seconds || isNaN(seconds) || seconds === Infinity || seconds < 0) return '00:00';
-      const m = Math.floor(seconds / 60);
-      const s = Math.floor(seconds % 60);
-      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      return uiShared.formatTime(seconds);
     }
 
     function currentItem() {
@@ -559,19 +558,23 @@ body.immersive-mode #quick-theme-toggle {
       return feedItems[index];
     }
 
+    const flowState = window.createFlowStateController({
+      getMediaType: () => currentItem()?.type || '',
+      onImmersiveChange: (enabled) => {
+        isImmersive = !!enabled;
+        document.body.classList.toggle('immersive-mode', isImmersive);
+      },
+      onMagnifyingChange: (enabled) => {
+        isMagnifying = !!enabled;
+      },
+    });
+
     function setImmersive(enabled) {
-      isImmersive = !!enabled;
-      document.body.classList.toggle('immersive-mode', isImmersive);
+      flowState.setImmersive(enabled);
     }
 
     function toggleUI() {
-      setImmersive(!isImmersive);
-    }
-
-    function setImageFocus(enabled) {
-      isImageFocus = !!enabled;
-      const container = document.getElementById('container');
-      container.classList.toggle('image-focus-mode', isImageFocus);
+      flowState.toggleImmersive();
     }
 
     function clearCaption(resetUri = true) {
@@ -776,71 +779,27 @@ body.immersive-mode #quick-theme-toggle {
     }
 
     function getImageContainRect(imgEl) {
-      if (!imgEl) return null;
-      const rect = imgEl.getBoundingClientRect();
-      if (!rect.width || !rect.height) return null;
-
-      const naturalW = imgEl.naturalWidth || 0;
-      const naturalH = imgEl.naturalHeight || 0;
-      if (!naturalW || !naturalH) {
-        return {
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height,
-        };
-      }
-
-      const containerRatio = rect.width / rect.height;
-      const imageRatio = naturalW / naturalH;
-      let drawWidth = rect.width;
-      let drawHeight = rect.height;
-
-      if (imageRatio > containerRatio) {
-        drawHeight = rect.width / imageRatio;
-      } else {
-        drawWidth = rect.height * imageRatio;
-      }
-
-      const offsetX = (rect.width - drawWidth) / 2;
-      const offsetY = (rect.height - drawHeight) / 2;
-      return {
-        left: rect.left + offsetX,
-        top: rect.top + offsetY,
-        width: drawWidth,
-        height: drawHeight,
-      };
+      return uiShared.getImageContainRect(imgEl);
     }
 
     function updateMagnifierPosition() {
-      magnifier.style.left = `${magX}px`;
-      magnifier.style.top = `${magY}px`;
+      uiShared.setMagnifierPosition(magnifier, magX, magY);
     }
 
     function updateMagnifierContent() {
       const imgEl = currentImageEl();
       if (!imgEl) return;
-      const rect = getImageContainRect(imgEl);
-      if (!rect || !rect.width || !rect.height) return;
-
-      const relX = Math.max(0, Math.min(1, (magX - rect.left) / rect.width));
-      const relY = Math.max(0, Math.min(1, (magY - rect.top) / rect.height));
-      magnifier.style.backgroundImage = `url('${imgEl.src}')`;
-      magnifier.style.backgroundSize = `${rect.width * zoomLevel}px ${rect.height * zoomLevel}px`;
-
-      const magWidth = magnifier.offsetWidth;
-      const magHeight = magnifier.offsetHeight;
-      const bgX = -(relX * rect.width * zoomLevel - magWidth / 2);
-      const bgY = -(relY * rect.height * zoomLevel - magHeight / 2);
-      magnifier.style.backgroundPosition = `${bgX}px ${bgY}px`;
+      uiShared.updateMagnifierContent({
+        imageEl: imgEl,
+        lensEl: magnifier,
+        centerX: magX,
+        centerY: magY,
+        zoomLevel,
+      });
     }
 
     function toggleMagnifier(active) {
-      const item = currentItem();
-      if (!item || item.type !== 'image') {
-        active = false;
-      }
-      isMagnifying = !!active;
+      isMagnifying = flowState.setMagnifying(active);
       if (isMagnifying) {
         magnifierToggle.classList.add('active');
         zoomOptions.classList.add('show');
@@ -864,7 +823,6 @@ body.immersive-mode #quick-theme-toggle {
 
     function clearPreviousState(prevItem) {
       toggleMagnifier(false);
-      setImageFocus(false);
 
       if (!prevItem) return;
       prevItem.el.classList.remove('active');
@@ -884,6 +842,7 @@ body.immersive-mode #quick-theme-toggle {
       index = safeIndex;
       const item = currentItem();
       if (!item) return;
+      flowState.onMediaChanged();
 
       item.el.style.display = 'block';
       requestAnimationFrame(() => item.el.classList.add('active'));
@@ -908,7 +867,6 @@ body.immersive-mode #quick-theme-toggle {
         }
         preloadNextVideo();
       } else {
-        setImmersive(false);
         playStatusIcon.classList.remove('visible');
         await loadCaption(item.name);
       }
@@ -1037,12 +995,7 @@ body.immersive-mode #quick-theme-toggle {
       } else {
         if (clickTimer) clearTimeout(clickTimer);
         clickTimer = setTimeout(() => {
-          const item = currentItem();
-          if (item?.type === 'image') {
-            setImageFocus(!isImageFocus);
-          } else {
-            toggleUI();
-          }
+          toggleUI();
           clickTimer = null;
         }, 250);
       }

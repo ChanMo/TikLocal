@@ -196,6 +196,138 @@ def create_app(test_config=None):
             num_bytes /= 1024.0
         return f"{num_bytes:.1f} PB"
 
+    def _read_int_arg(name: str, default: int, minimum: int | None = None, maximum: int | None = None) -> int:
+        raw = request.args.get(name, default)
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            value = default
+
+        if minimum is not None:
+            value = max(minimum, value)
+        if maximum is not None:
+            value = min(maximum, value)
+        return value
+
+    def _read_choice_arg(name: str, default: str, allowed: set[str]) -> str:
+        value = str(request.args.get(name, default)).strip()
+        return value if value in allowed else default
+
+    def _collect_library_records(*, favorites_only: bool = False) -> list[dict]:
+        favorite_set = favorite_service.load()
+        all_paths = library_service.scan_videos() + library_service.scan_images()
+
+        # Deduplicate by both relative path and filesystem identity.
+        # This avoids repeated items when media_root contains symlink/hardlink aliases.
+        seen_rel: set[str] = set()
+        records_by_identity: dict[tuple, dict] = {}
+
+        for path in all_paths:
+            try:
+                rel = library_service.get_relative_path(path)
+                if rel in seen_rel:
+                    continue
+                seen_rel.add(rel)
+
+                stat = path.stat()
+                identity = (int(getattr(stat, 'st_dev', 0)), int(getattr(stat, 'st_ino', 0)))
+                if identity == (0, 0):
+                    identity = ('resolved', str(path.resolve()))
+
+                media_type = 'image' if path.suffix.lower() in IMAGE_EXTENSIONS else 'video'
+                candidate = {
+                    'name': rel,
+                    'media_type': media_type,
+                    'mtime_ts': float(stat.st_mtime),
+                    'size_bytes': int(stat.st_size),
+                    'is_favorite': rel in favorite_set,
+                }
+
+                existing = records_by_identity.get(identity)
+                if existing is None:
+                    records_by_identity[identity] = candidate
+                    continue
+
+                # Prefer a favorited alias when deduping the same file identity.
+                if candidate['is_favorite'] and not existing['is_favorite']:
+                    records_by_identity[identity] = candidate
+                    continue
+
+                # Keep deterministic winner for equal identities.
+                if (
+                    candidate['mtime_ts'] > existing['mtime_ts']
+                    or (
+                        candidate['mtime_ts'] == existing['mtime_ts']
+                        and candidate['name'] < existing['name']
+                    )
+                ):
+                    records_by_identity[identity] = candidate
+            except Exception:
+                continue
+
+        records = list(records_by_identity.values())
+        if favorites_only:
+            records = [item for item in records if item.get('is_favorite')]
+
+        records.sort(key=lambda item: (item['mtime_ts'], item['name']), reverse=True)
+        return records
+
+    def _serialize_library_item(record: dict) -> dict:
+        name = str(record.get('name') or '')
+        media_type = str(record.get('media_type') or 'video')
+        encoded = quote(name)
+        media_url = f"/media?uri={encoded}"
+        return {
+            'name': name,
+            'type': media_type,
+            'media_url': media_url,
+            'detail_url': f"/image?uri={encoded}" if media_type == 'image' else f"/detail/{encoded}",
+            'thumb_url': media_url if media_type == 'image' else f"/thumb?uri={encoded}",
+            'mtime_ts': float(record.get('mtime_ts') or 0),
+            'size_bytes': int(record.get('size_bytes') or 0),
+        }
+
+    def _apply_library_mode(records: list[dict], *, mode: str, min_mb: int, seed: str) -> list[dict]:
+        if mode == 'image_random':
+            image_records = [item for item in records if item.get('media_type') == 'image']
+            rng = random.Random(seed)
+            rng.shuffle(image_records)
+            return image_records
+        if mode == 'video_latest':
+            return [item for item in records if item.get('media_type') == 'video']
+        if mode == 'big_files':
+            min_bytes = max(1, int(min_mb)) * 1024 * 1024
+            video_records = [item for item in records if item.get('media_type') == 'video' and int(item.get('size_bytes') or 0) >= min_bytes]
+            video_records.sort(key=lambda item: (item['size_bytes'], item['mtime_ts'], item['name']), reverse=True)
+            return video_records
+        return records
+
+    def _build_library_page(
+        *,
+        favorites_only: bool = False,
+        mode: str = 'all',
+        offset: int = 0,
+        limit: int = 48,
+        min_mb: int = 50,
+        seed: str = '',
+    ) -> dict:
+        records = _collect_library_records(favorites_only=favorites_only)
+        records = _apply_library_mode(records, mode=mode, min_mb=min_mb, seed=seed)
+        total = len(records)
+        start = max(0, int(offset))
+        safe_limit = max(12, min(int(limit), 96))
+        end = start + safe_limit
+        items = [_serialize_library_item(record) for record in records[start:end]]
+        return {
+            'items': items,
+            'total': total,
+            'offset': start,
+            'limit': safe_limit,
+            'next_offset': end,
+            'has_more': end < total,
+            'seed': seed,
+        }
+
 
     # --- Web Routes ---
     @app.route('/')
@@ -205,8 +337,8 @@ def create_app(test_config=None):
 
     @app.route('/gallery')
     def gallery():
-        """Immersive Image Discovery"""
-        return render_template('gallery.html', menu='gallery')
+        """Legacy route: image discovery now maps to Library image mode."""
+        return redirect('/library?mode=image_random')
 
     @app.route('/download')
     def download_view():
@@ -215,43 +347,14 @@ def create_app(test_config=None):
 
     @app.route('/browse')
     def browse():
-        """Video Library List"""
-        # Using scan_videos instead of recursive get_files
-        videos = library_service.scan_videos()
-
-        # Filter Logic
-        filter_mode = request.args.get('filter', 'all')
-        min_mb = int(request.args.get('min_mb', 50))
-
+        """Legacy route: video list now maps to Library video mode."""
+        filter_mode = str(request.args.get('filter', 'all')).strip()
+        if filter_mode == 'favorite':
+            return redirect('/favorite')
         if filter_mode == 'big':
-            threshold = min_mb * 1024 * 1024
-            videos = [v for v in videos if v.stat().st_size >= threshold]
-        elif filter_mode == 'favorite':
-            favorites = favorite_service.load()
-            videos = [v for v in videos if library_service.get_relative_path(v) in favorites]
-
-        # Pagination
-        count = len(videos)
-        page = int(request.args.get('page', 1))
-        length = 20
-        offset = length * (page - 1)
-
-        # Convert to relative strings for template
-        sliced_videos = [library_service.get_relative_path(v) for v in videos[offset:offset+length]]
-
-        return render_template(
-            'browse.html',
-            page=page,
-            count=count,
-            length=length,
-            files=sliced_videos,
-            menu='browse',
-            filter=filter_mode,
-            min_mb=min_mb,
-            has_min_mb=request.args.get('min_mb') is not None,
-            has_previous=page > 1,
-            has_next=len(videos) > offset + length
-        )
+            min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
+            return redirect(f'/library?mode=big_files&min_mb={min_mb}')
+        return redirect('/library?mode=video_latest')
 
     @app.route('/settings/')
     def settings_view():
@@ -280,8 +383,37 @@ def create_app(test_config=None):
         )
 
     @app.route('/library')
-    def library_redirect():
-        return redirect('/browse')
+    def library_view():
+        allowed_modes = {'all', 'image_random', 'video_latest', 'big_files'}
+        mode = _read_choice_arg('mode', 'all', allowed_modes)
+        min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
+        limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+        seed = str(request.args.get('seed', '')).strip()
+        if mode == 'image_random' and not seed:
+            seed = str(random.randint(1, 999999))
+
+        initial_page = _build_library_page(
+            favorites_only=False,
+            mode=mode,
+            offset=0,
+            limit=limit,
+            min_mb=min_mb,
+            seed=seed,
+        )
+        return render_template(
+            'library.html',
+            menu='library',
+            scope='all',
+            active_mode=mode,
+            mode_seed=initial_page['seed'],
+            min_mb=min_mb,
+            empty_message='暂无可展示媒体。',
+            initial_items=initial_page['items'],
+            initial_has_more=initial_page['has_more'],
+            initial_offset=initial_page['offset'],
+            initial_next_offset=initial_page['next_offset'],
+            page_size=initial_page['limit'],
+        )
 
 
     # --- Detail & Action Routes ---
@@ -340,7 +472,7 @@ def create_app(test_config=None):
                     # Thumbnails are handled by OS or periodic cleanup, but ideally Service should handle it
                 except Exception as e:
                     return f"Error deleting file: {e}", 500
-            return redirect('/browse')
+            return redirect('/library')
 
         return render_template('delete_confirm.html', file=name)
         
@@ -348,12 +480,34 @@ def create_app(test_config=None):
     def delete_confirm_legacy():
         # Legacy support for query param style
         uri = request.args.get('uri')
-        if not uri: return redirect('/browse')
+        if not uri: return redirect('/library')
         return redirect(f"/delete/{quote(uri)}")
 
     @app.route('/favorite')
     def favorite_view():
-        return render_template('favorite.html', files=list(favorite_service.load()))
+        limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+        initial_page = _build_library_page(
+            favorites_only=True,
+            mode='all',
+            offset=0,
+            limit=limit,
+            min_mb=50,
+            seed='',
+        )
+        return render_template(
+            'library.html',
+            menu='favorite',
+            scope='favorite',
+            active_mode='all',
+            mode_seed='',
+            min_mb=50,
+            empty_message='你还没有收藏媒体。',
+            initial_items=initial_page['items'],
+            initial_has_more=initial_page['has_more'],
+            initial_offset=initial_page['offset'],
+            initial_next_offset=initial_page['next_offset'],
+            page_size=initial_page['limit'],
+        )
 
 
     # --- Media Serving Routes ---
@@ -385,19 +539,6 @@ def create_app(test_config=None):
 
 
     # --- API Routes ---
-    def _read_int_arg(name: str, default: int, minimum: int | None = None, maximum: int | None = None) -> int:
-        raw = request.args.get(name, default)
-        try:
-            value = int(raw)
-        except (TypeError, ValueError):
-            value = default
-
-        if minimum is not None:
-            value = max(minimum, value)
-        if maximum is not None:
-            value = min(maximum, value)
-        return value
-
     @app.route('/api/videos')
     def api_videos():
         # Clean JSON API
@@ -830,6 +971,32 @@ def create_app(test_config=None):
             'favorites': len(favorites),
             'cache_count': len(thumb_files),
             'cache_mb': round(thumb_size / (1024 * 1024), 2)
+        }
+
+    @app.route('/api/library/items')
+    def api_library_items():
+        scope = str(request.args.get('scope', 'all')).strip()
+        favorites_only = scope == 'favorite'
+        allowed_modes = {'all', 'image_random', 'video_latest', 'big_files'}
+        mode = _read_choice_arg('mode', 'all', allowed_modes)
+        offset = _read_int_arg('offset', 0, minimum=0)
+        limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+        min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
+        seed = str(request.args.get('seed', '')).strip()
+        if mode == 'image_random' and not seed:
+            seed = str(random.randint(1, 999999))
+
+        payload = _build_library_page(
+            favorites_only=favorites_only,
+            mode=mode,
+            offset=offset,
+            limit=limit,
+            min_mb=min_mb,
+            seed=seed,
+        )
+        return {
+            'success': True,
+            'data': payload,
         }
 
     return app

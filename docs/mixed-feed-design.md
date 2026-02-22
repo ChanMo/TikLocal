@@ -12,14 +12,15 @@
 
 - 后端新增 `GET /api/feed/mix`，统一返回 typed items（`video` / `image`）。
 - 前端首页改为单一 Feed 状态机，按条目类型切换播放与交互能力。
-- 图片条目复用 Gallery 的关键体验：AI 标题/标签、圆形放大镜、单击专注模式（仅隐藏左下信息层）。
+- 图片条目复用 Gallery 的关键体验：AI 标题/标签、圆形放大镜。
+- 后续收敛：沉浸行为已统一为“视频/图片同一沉浸模型”，不再维护单独图片专注模式分支。
 
 ## 关键决策与理由
 
 - 混排策略使用“目标比例 + 轻随机 + 连续段约束”，而不是固定 `4V+1I`：降低用户可预测性，保持内容新鲜感。
 - 图片不自动切换：避免打断阅读图片细节，改为手动滑动控制节奏。
 - 视频与图片工具分离：视频不显示 AI 按钮，图片不显示倍速按钮，减少认知噪音。
-- 专注模式只隐藏左下 AI 信息层：保留右侧操作按钮，避免关键操作入口丢失。
+- 沉浸模式统一跨媒体保持，放大镜作为图片工具态独立控制：降低状态切换歧义并减少交互冲突。
 
 ## 实施要点
 
@@ -36,7 +37,7 @@
 
 - 首页沉浸流入口：`/`。
 - API：`/api/feed/mix`。
-- 交互行为：单击、双击、滑动、图片专注、图片放大与 AI 信息层展示。
+- 交互行为：单击沉浸切换、双击播放控制、上下滑切换、图片放大镜与 AI 信息层展示。
 
 ## 风险与权衡
 
@@ -54,5 +55,8 @@
 
 - `tiklocal/app.py`
 - `tiklocal/templates/tiktok.html`
+- `tiklocal/static/flow_state_controller.js`
+- `tiklocal/static/flow_ui_shared.js`
+- `docs/flow-interaction-unification.md`
 - `tests/test_feed_mix.py`
 - `docs/release_notes.md`

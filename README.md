@@ -124,6 +124,7 @@ TikLocal provides some configuration options that you can adjust to your needs.
 ## Documentation
 
 - Docs index: `docs/README.md`
+- Flow interaction unification: `docs/flow-interaction-unification.md`
 - Release notes: `docs/release_notes.md`
 
 
