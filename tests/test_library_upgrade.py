@@ -47,6 +47,8 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert "id=\"quick-play-status\"" in body
     assert "#quick-view.immersive .quick-caption-panel" in body
     assert "image-focus" not in body
+    assert "waterfall-col" in body
+    assert "scheduleWaterfallRelayout" in body
     assert "flow_ui_shared.js" in body
     assert "flow_state_controller.js" in body
     assert "createFlowStateController(" in body
@@ -73,6 +75,7 @@ def test_api_library_items_supports_modes_and_seed(client):
     all_data = all_res.get_json()
     assert all_data["success"] is True
     all_items = all_data["data"]["items"]
+    assert all("width" in item and "height" in item for item in all_items)
     assert any(item["type"] == "video" for item in all_items)
     assert any(item["type"] == "image" for item in all_items)
 

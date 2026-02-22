@@ -42,29 +42,27 @@
   }
 
   .masonry-grid {
-    column-count: 2;
-    column-gap: 8px;
+    --wf-gap: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wf-gap);
   }
   @media (min-width: 768px) {
-    .masonry-grid { column-count: 3; column-gap: 10px; }
+    .masonry-grid { --wf-gap: 10px; }
   }
-  @media (min-width: 1100px) {
-    .masonry-grid { column-count: 4; }
-  }
-  @media (min-width: 1536px) {
-    .masonry-grid { column-count: 5; }
+  .waterfall-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--wf-gap);
   }
   .media-tile {
-    break-inside: avoid;
-    margin-bottom: 8px;
     border-radius: 12px;
     overflow: hidden;
     position: relative;
     background: #0b0f15;
     cursor: pointer;
-  }
-  @media (min-width: 768px) {
-    .media-tile { margin-bottom: 10px; }
   }
   .media-tile img {
     width: 100%;
@@ -609,6 +607,7 @@
     let isDragging = false;
     let wasPlayingBeforeDrag = false;
     let bodyOverflowBackup = '';
+    let bodyScrollLocked = false;
 
     let isMagnifying = false;
     let magX = 0;
@@ -664,16 +663,112 @@
       });
     }
 
+    function getTileAspectRatio(item) {
+      const width = Number(item?.width || 0);
+      const height = Number(item?.height || 0);
+      if (width > 0 && height > 0) {
+        return `${width} / ${height}`;
+      }
+      return item?.type === 'video' ? '16 / 9' : '4 / 5';
+    }
+
+    function getTileHeightRatio(item) {
+      const width = Number(item?.width || 0);
+      const height = Number(item?.height || 0);
+      if (width > 0 && height > 0) {
+        return height / width;
+      }
+      return item?.type === 'video' ? (9 / 16) : (5 / 4);
+    }
+
+    const waterfall = {
+      count: 0,
+      gap: 8,
+      columnWidth: 0,
+      columns: [],
+      heights: [],
+    };
+    let relayoutTimer = null;
+
+    function getWaterfallColumnCount() {
+      const width = window.innerWidth;
+      if (width >= 1536) return 5;
+      if (width >= 1100) return 4;
+      if (width >= 768) return 3;
+      return 2;
+    }
+
+    function getWaterfallGap() {
+      return window.innerWidth >= 768 ? 10 : 8;
+    }
+
+    function updateWaterfallMetrics() {
+      const count = Math.max(1, waterfall.count || getWaterfallColumnCount());
+      const gap = getWaterfallGap();
+      const gridWidth = Math.max(1, grid.clientWidth || window.innerWidth);
+      waterfall.gap = gap;
+      waterfall.columnWidth = Math.max(1, (gridWidth - gap * (count - 1)) / count);
+      grid.style.setProperty('--wf-gap', `${gap}px`);
+    }
+
+    function resetWaterfallLayout() {
+      waterfall.count = 0;
+      waterfall.columnWidth = 0;
+      waterfall.columns = [];
+      waterfall.heights = [];
+      grid.innerHTML = '';
+    }
+
+    function ensureWaterfallLayout(force = false) {
+      const nextCount = getWaterfallColumnCount();
+      if (!force && waterfall.count === nextCount && waterfall.columns.length) {
+        updateWaterfallMetrics();
+        return;
+      }
+
+      waterfall.count = nextCount;
+      grid.innerHTML = '';
+      waterfall.columns = [];
+      waterfall.heights = new Array(nextCount).fill(0);
+      updateWaterfallMetrics();
+
+      for (let i = 0; i < nextCount; i += 1) {
+        const col = document.createElement('div');
+        col.className = 'waterfall-col';
+        grid.appendChild(col);
+        waterfall.columns.push(col);
+      }
+    }
+
+    function pickShortestColumnIndex() {
+      if (!waterfall.heights.length) return 0;
+      let target = 0;
+      let minHeight = waterfall.heights[0];
+      for (let i = 1; i < waterfall.heights.length; i += 1) {
+        if (waterfall.heights[i] < minHeight) {
+          minHeight = waterfall.heights[i];
+          target = i;
+        }
+      }
+      return target;
+    }
+
+    function estimateTileHeight(item) {
+      return waterfall.columnWidth * getTileHeightRatio(item);
+    }
+
     function createTile(item, index) {
       const tile = document.createElement('article');
       tile.className = 'media-tile';
       tile.dataset.index = String(index);
+      const ratio = getTileAspectRatio(item);
 
       if (item.type === 'video') {
         const img = document.createElement('img');
         img.src = item.thumb_url;
         img.alt = '';
         img.loading = 'lazy';
+        img.style.aspectRatio = ratio;
         tile.appendChild(img);
 
         const badge = document.createElement('span');
@@ -685,6 +780,7 @@
         img.src = item.media_url;
         img.alt = '';
         img.loading = 'lazy';
+        img.style.aspectRatio = ratio;
         tile.appendChild(img);
       }
 
@@ -692,18 +788,56 @@
       return tile;
     }
 
+    function appendIndexToWaterfall(index) {
+      const item = items[index];
+      if (!item) return;
+      const colIndex = pickShortestColumnIndex();
+      const col = waterfall.columns[colIndex];
+      if (!col) return;
+      col.appendChild(createTile(item, index));
+      waterfall.heights[colIndex] += estimateTileHeight(item) + waterfall.gap;
+    }
+
+    function relayoutWaterfall() {
+      if (!items.length) {
+        resetWaterfallLayout();
+        ensureWaterfallLayout(true);
+        return;
+      }
+      ensureWaterfallLayout(true);
+      updateWaterfallMetrics();
+      for (let i = 0; i < items.length; i += 1) {
+        appendIndexToWaterfall(i);
+      }
+      feather.replace();
+    }
+
+    function scheduleWaterfallRelayout() {
+      if (relayoutTimer) clearTimeout(relayoutTimer);
+      relayoutTimer = setTimeout(() => {
+        relayoutTimer = null;
+        relayoutWaterfall();
+      }, 180);
+    }
+
     function appendItems(batch) {
       if (!Array.isArray(batch) || !batch.length) return 0;
+      const appendedIndexes = [];
       let appended = 0;
       batch.forEach((item) => {
         const name = String(item?.name || '');
         if (!name || renderedNames.has(name)) return;
         renderedNames.add(name);
         items.push(item);
-        grid.appendChild(createTile(item, items.length - 1));
+        appendedIndexes.push(items.length - 1);
         appended += 1;
       });
-      if (appended > 0) feather.replace();
+      if (appendedIndexes.length) {
+        ensureWaterfallLayout(!waterfall.columns.length);
+        updateWaterfallMetrics();
+        appendedIndexes.forEach((index) => appendIndexToWaterfall(index));
+        feather.replace();
+      }
       if (quickView.classList.contains('active') && currentIndex >= 0) {
         quickCounter.textContent = `${currentIndex + 1} / ${items.length}`;
       }
@@ -771,7 +905,7 @@
       nextOffset = 0;
       items.length = 0;
       renderedNames.clear();
-      grid.innerHTML = '';
+      resetWaterfallLayout();
       activeTab();
       setLoadingText('正在加载...');
       await loadNextPage();
@@ -1032,9 +1166,10 @@
       clearCaption();
       toggleMagnifier(false);
       currentIndex = -1;
-      if (bodyOverflowBackup !== '') {
+      if (bodyScrollLocked) {
         document.body.style.overflow = bodyOverflowBackup;
         bodyOverflowBackup = '';
+        bodyScrollLocked = false;
       }
     }
 
@@ -1088,6 +1223,7 @@
       if (!quickView.classList.contains('active')) {
         bodyOverflowBackup = document.body.style.overflow || '';
         document.body.style.overflow = 'hidden';
+        bodyScrollLocked = true;
       }
       quickView.classList.add('active');
       quickView.setAttribute('aria-hidden', 'false');
@@ -1300,6 +1436,7 @@
 
     window.addEventListener('resize', () => {
       if (isMagnifying) updateMagnifierContent();
+      scheduleWaterfallRelayout();
     });
 
     quickVideo.addEventListener('timeupdate', updateVideoProgress);
@@ -1331,6 +1468,7 @@
 
     quickSpeed.textContent = `${speedOptions[currentSpeedIndex]}x`;
     applyZoom(2.5);
+    ensureWaterfallLayout(true);
     appendItems(initialItems);
     if (!items.length && !hasMore) {
       setLoadingText(emptyMessage);

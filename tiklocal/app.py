@@ -3,11 +3,13 @@ import io
 import json
 import random
 import datetime
+import subprocess as sp
 from urllib.parse import quote, unquote
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 
 from flask import Flask, render_template, send_from_directory, request, redirect, send_file
+from PIL import Image
 
 # Service Imports
 from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS
@@ -272,9 +274,88 @@ def create_app(test_config=None):
         records.sort(key=lambda item: (item['mtime_ts'], item['name']), reverse=True)
         return records
 
+    def _read_media_dims_from_metadata(name: str) -> tuple[int | None, int | None]:
+        payload = metadata_store.get(name)
+        if not isinstance(payload, dict):
+            return None, None
+        media_meta = payload.get('media_meta')
+        if not isinstance(media_meta, dict):
+            return None, None
+        try:
+            width = int(media_meta.get('width') or 0)
+            height = int(media_meta.get('height') or 0)
+        except (TypeError, ValueError):
+            return None, None
+        if width <= 0 or height <= 0:
+            return None, None
+        return width, height
+
+    def _save_media_dims_to_metadata(name: str, media_type: str, width: int, height: int) -> None:
+        if width <= 0 or height <= 0:
+            return
+        current = metadata_store.get(name)
+        payload = dict(current) if isinstance(current, dict) else {}
+        payload['media_meta'] = {
+            'type': media_type,
+            'width': int(width),
+            'height': int(height),
+            'updated_at': datetime.datetime.utcnow().isoformat() + 'Z',
+        }
+        metadata_store.set(name, payload, overwrite=True)
+
+    def _probe_media_dims(name: str, media_type: str) -> tuple[int | None, int | None]:
+        target = library_service.resolve_path(name)
+        if not target or not target.exists():
+            return None, None
+
+        if media_type == 'image':
+            try:
+                with Image.open(target) as img:
+                    width, height = img.size
+                if int(width) > 0 and int(height) > 0:
+                    return int(width), int(height)
+            except Exception:
+                return None, None
+            return None, None
+
+        try:
+            cmd = [
+                'ffprobe',
+                '-v', 'error',
+                '-select_streams', 'v:0',
+                '-show_entries', 'stream=width,height',
+                '-of', 'json',
+                str(target),
+            ]
+            proc = sp.run(cmd, capture_output=True, text=True, timeout=8)
+            if proc.returncode != 0:
+                return None, None
+            payload = json.loads(proc.stdout or '{}')
+            streams = payload.get('streams') or []
+            if not streams:
+                return None, None
+            stream = streams[0] if isinstance(streams[0], dict) else {}
+            width = int(stream.get('width') or 0)
+            height = int(stream.get('height') or 0)
+            if width > 0 and height > 0:
+                return width, height
+        except Exception:
+            return None, None
+        return None, None
+
+    def _get_or_probe_media_dims(name: str, media_type: str) -> tuple[int | None, int | None]:
+        width, height = _read_media_dims_from_metadata(name)
+        if width and height:
+            return width, height
+        width, height = _probe_media_dims(name, media_type)
+        if width and height:
+            _save_media_dims_to_metadata(name, media_type, width, height)
+        return width, height
+
     def _serialize_library_item(record: dict) -> dict:
         name = str(record.get('name') or '')
         media_type = str(record.get('media_type') or 'video')
+        width, height = _get_or_probe_media_dims(name, media_type)
         encoded = quote(name)
         media_url = f"/media?uri={encoded}"
         return {
@@ -285,6 +366,8 @@ def create_app(test_config=None):
             'thumb_url': media_url if media_type == 'image' else f"/thumb?uri={encoded}",
             'mtime_ts': float(record.get('mtime_ts') or 0),
             'size_bytes': int(record.get('size_bytes') or 0),
+            'width': int(width) if width else None,
+            'height': int(height) if height else None,
         }
 
     def _apply_library_mode(records: list[dict], *, mode: str, min_mb: int, seed: str) -> list[dict]:
@@ -895,8 +978,10 @@ def create_app(test_config=None):
             result['prompt_source'] = prompt_source
             result['llm_source'] = llm_source
             result.setdefault('prompt_hash', compute_prompt_hash(effective_prompt))
-            metadata_store.set(uri, result, overwrite=True)
-            return {'success': True, 'data': result}
+            merged = dict(existing) if isinstance(existing, dict) else {}
+            merged.update(result)
+            metadata_store.set(uri, merged, overwrite=True)
+            return {'success': True, 'data': merged}
         except Exception as e:
             return {'success': False, 'error': str(e)}, 500
 

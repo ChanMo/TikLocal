@@ -3,6 +3,15 @@
 ## Unreleased
 - 待补充
 
+## v0.8.10 (2026-02-22)
+- 修复 Library/Favorites 的 Quick Viewer 关闭后页面滚动锁死问题：补齐 body 滚动状态恢复逻辑，确保关闭弹层后列表可继续滚动。
+- Library API 增强媒体尺寸返回：`/api/library/items` 新增 `width` / `height` 字段，并在 `~/.tiklocal/metadata.json` 统一缓存图片与视频尺寸信息。
+- 尺寸探测策略优化：图片使用 Pillow 读取，视频使用 ffprobe 读取；缓存命中后直接复用，减少重复探测开销。
+- 修复图片 AI 元数据写入覆盖风险：生成标题/标签时改为 merge 写回，保留 `media_meta` 等已有字段。
+- Library/Favorites 瀑布流渲染升级为固定列最短列分发引擎，替代 CSS 多列自动流，降低滚动加载时右侧列反复跳动与回流重排。
+- 新增瀑布流响应式重排策略：仅在窗口变化时防抖重排，保持无限加载与 Quick Viewer 索引一致性。
+- 更新 `tests/test_library_upgrade.py`，补充瀑布流脚本标记与 `width`/`height` 字段断言，覆盖关键回归点。
+
 ## v0.8.9 (2026-02-22)
 - 信息架构升级：底部导航调整为 `Flow / Library / Favorites / Download / Settings`，其中 `Library` 成为视频+图片统一入口，`Favorites` 独立为一级入口。
 - Library 交互重构为极简 Masonry：移除顶部传统筛选表单与卡片冗余文本，仅保留媒体本身的沉浸式浏览。
