@@ -47,3 +47,7 @@ def get_download_jobs_path() -> Path:
 
 def get_download_sources_path() -> Path:
     return get_data_dir() / 'download_sources.json'
+
+
+def get_collections_path() -> Path:
+    return get_data_dir() / 'collections.json'

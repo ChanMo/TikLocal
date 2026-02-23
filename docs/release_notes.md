@@ -1,8 +1,18 @@
 # Release Notes
 
 ## Unreleased
+- 暂无。
+
+## v0.8.12 (2026-02-23)
 - 架构收敛：新增 `flow_session.js`、`flow_actions_shared.js`、`flow_media_actions_controller.js`，统一 Home / Library / Favorites 的会话状态与媒体动作编排。
 - 清理废弃能力：移除 `/browse`、`/gallery` 旧路由与 `/api/videos`、`/api/random-images` 旧接口，删除未使用模板 `browse.html`、`favorite.html`、`gallery.html`、`index.html`。
+- 新增自定义集合基础能力：增加 `~/.tiklocal/collections.json`、`CollectionStore` 与 `/api/collections*` 接口，支持集合创建、增删媒体、按媒体反查所属集合。
+- 新增集合页面与详情入口：增加 `/collections` 与 `/collection/<id>`，并在 Favorites/Collection 视图提供集合导航。
+- Library/Favorites/Collection Quick Viewer 新增“加入集合”弹层，支持就地新建集合并即时勾选生效（无保存步骤），并显示“已加入数量”状态反馈。
+- Collections 交互增强：集合页卡片改为极简信息展示（仅名称+数量），重命名/删除收敛到 `...` 菜单；重命名从系统 `prompt` 升级为页面内轻量弹层。
+- 集合详情页顶部导航升级为“返回我的集合 + 当前集合名”的极简头部，替代原有可读性较弱的胶囊式导航。
+- 修复 Quick Viewer 集合弹层点击竞态：避免触发打开后被同一次点击瞬间关闭（已加入打开后短时点击保护）。
+- 首页 Flow 增加“加入集合”按钮与集合选择弹层，补齐与 Library/Favorites 的能力一致性。
 
 ## v0.8.10 (2026-02-22)
 - 修复 Library/Favorites 的 Quick Viewer 关闭后页面滚动锁死问题：补齐 body 滚动状态恢复逻辑，确保关闭弹层后列表可继续滚动。

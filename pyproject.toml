@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "TikLocal"
-version = "0.8.10"
+version = "0.8.12"
 description = "A local media server that combines the features of TikTok and Pinterest"
 authors = ["ChanMo <chan.mo@outlook.com>"]
 readme = "README.md"
@@ -19,6 +19,7 @@ waitress = "^3.0.2"
 pyyaml = "^6.0"
 requests = "^2.32.0"
 pillow = "^11.0.0"
+pytest = "^9.0.2"
 
 [[tool.poetry.source]]
 name = "aliyun"

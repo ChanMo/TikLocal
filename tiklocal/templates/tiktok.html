@@ -229,6 +229,7 @@ body.immersive-mode #quick-theme-toggle {
   text-decoration: none;
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
   cursor: pointer;
+  position: relative;
 }
 .action-btn:active {
   transform: scale(0.9);
@@ -260,6 +261,31 @@ body.immersive-mode #quick-theme-toggle {
 }
 .heart-filled {
   display: none;
+}
+.action-btn .collection-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(15, 23, 42, 0.9);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+.action-btn.has-collection {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.72);
+}
+.action-btn.has-collection .collection-count {
+  display: inline-flex;
 }
 
 /* Image overlay controls */
@@ -429,6 +455,179 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     left: 12px;
   }
 }
+
+.collection-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  background: rgba(15, 23, 42, 0.56);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.collection-modal.active {
+  display: flex;
+}
+.collection-modal-card {
+  width: min(440px, 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.98);
+  color: #0f172a;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.3);
+  padding: 12px;
+}
+[data-theme="dark"] .collection-modal-card {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #f8fafc;
+}
+.collection-modal-header {
+  margin-bottom: 10px;
+}
+.collection-modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.collection-modal-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+}
+.collection-modal-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #64748b;
+}
+[data-theme="dark"] .collection-modal-meta {
+  color: #94a3b8;
+}
+.collection-modal-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.collection-modal-close svg {
+  width: 15px;
+  height: 15px;
+}
+.collection-modal-create {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.collection-modal-create input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: rgba(248, 250, 252, 0.86);
+  color: #0f172a;
+  font-size: 13px;
+  padding: 8px 10px;
+}
+[data-theme="dark"] .collection-modal-create input {
+  background: rgba(15, 23, 42, 0.82);
+  color: #f1f5f9;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+.collection-modal-create button,
+.collection-modal-actions button {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.9);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+[data-theme="dark"] .collection-modal-create button,
+[data-theme="dark"] .collection-modal-actions button {
+  background: rgba(226, 232, 240, 0.94);
+  color: #0f172a;
+}
+.collection-modal-actions button.ghost {
+  background: rgba(255, 255, 255, 0.85);
+  color: #334155;
+}
+[data-theme="dark"] .collection-modal-actions button.ghost {
+  background: rgba(15, 23, 42, 0.86);
+  color: #cbd5e1;
+}
+.collection-modal-list {
+  max-height: min(44vh, 320px);
+  overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(248, 250, 252, 0.78);
+}
+[data-theme="dark"] .collection-modal-list {
+  background: rgba(15, 23, 42, 0.76);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+.collection-modal-item {
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.collection-modal-item:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+.collection-modal-item.is-pending {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.collection-modal-item input {
+  width: 15px;
+  height: 15px;
+}
+.collection-modal-item span {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.collection-modal-item em {
+  font-style: normal;
+  font-size: 11px;
+  color: #64748b;
+}
+[data-theme="dark"] .collection-modal-item em {
+  color: #94a3b8;
+}
+.collection-modal-empty {
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+  padding: 14px 8px;
+}
+[data-theme="dark"] .collection-modal-empty {
+  color: #94a3b8;
+}
+.collection-modal-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 </style>
 {% endblock %}
 
@@ -476,6 +675,11 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       <svg class="heart-filled" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
     </a>
 
+    <button type="button" class="action-btn" id="collection-btn" title="加入集合">
+      <i data-feather="bookmark"></i>
+      <span class="collection-count" id="collection-count">0</span>
+    </button>
+
     <a href="#" class="action-btn" id="info-btn">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
     </a>
@@ -488,6 +692,28 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
 
   <div class="magnifier" id="magnifier">
     <div class="mag-badge" id="mag-badge">2.5x</div>
+  </div>
+</div>
+
+<div id="collection-modal" class="collection-modal" aria-hidden="true">
+  <div class="collection-modal-card">
+    <div class="collection-modal-header">
+      <div class="collection-modal-title-row">
+        <h3>加入集合</h3>
+        <button id="collection-modal-close" type="button" class="collection-modal-close">
+          <i data-feather="x"></i>
+        </button>
+      </div>
+      <div id="collection-modal-meta" class="collection-modal-meta">当前未加入任何集合</div>
+    </div>
+    <div class="collection-modal-create">
+      <input id="collection-name-input" type="text" maxlength="80" placeholder="新建集合名称" />
+      <button id="collection-create-btn" type="button">新建</button>
+    </div>
+    <div id="collection-list" class="collection-modal-list"></div>
+    <div class="collection-modal-actions">
+      <button id="collection-cancel-btn" type="button" class="ghost">关闭</button>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -512,7 +738,16 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     const zoomOptions = document.getElementById('zoom-options');
     const magBadge = document.getElementById('mag-badge');
     const favoriteBtn = document.getElementById('favorite-btn');
+    const collectionBtn = document.getElementById('collection-btn');
+    const collectionCount = document.getElementById('collection-count');
     const infoBtn = document.getElementById('info-btn');
+    const collectionModal = document.getElementById('collection-modal');
+    const collectionModalClose = document.getElementById('collection-modal-close');
+    const collectionModalMeta = document.getElementById('collection-modal-meta');
+    const collectionCancelBtn = document.getElementById('collection-cancel-btn');
+    const collectionCreateBtn = document.getElementById('collection-create-btn');
+    const collectionNameInput = document.getElementById('collection-name-input');
+    const collectionList = document.getElementById('collection-list');
 
     const playStatusIcon = document.getElementById('play-status-icon');
     const customControls = document.getElementById('custom-controls');
@@ -550,6 +785,12 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     let magX = 0;
     let magY = 0;
     let zoomLevel = 2.5;
+    const collectionStateCache = new Map();
+    let collectionCatalog = [];
+    let collectionSelectedIds = new Set();
+    let collectionSelectedNames = [];
+    let collectionModalOpenedAt = 0;
+    const collectionModalGuardMs = 520;
 
     function formatTime(seconds) {
       return uiShared.formatTime(seconds);
@@ -656,6 +897,211 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       await mediaActions.generateCaption(uri, { confirmExisting: !force });
     }
 
+    async function collectionsRequest(url, options = {}) {
+      const response = await fetch(url, options);
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (error) {
+        payload = null;
+      }
+      if (!response.ok || !(payload && payload.success)) {
+        throw new Error((payload && payload.error) || '请求失败');
+      }
+      return payload.data || {};
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function setCollectionMeta(names) {
+      if (!collectionModalMeta) return;
+      const items = Array.isArray(names) ? names.filter(Boolean) : [];
+      if (!items.length) {
+        collectionModalMeta.textContent = '当前未加入任何集合';
+        return;
+      }
+      const preview = items.slice(0, 2).join('、');
+      const rest = items.length - 2;
+      collectionModalMeta.textContent = rest > 0 ? `已加入：${preview} +${rest}` : `已加入：${preview}`;
+    }
+
+    function setCollectionButtonState(names) {
+      const items = Array.isArray(names) ? names.filter(Boolean) : [];
+      const count = items.length;
+      collectionBtn.classList.toggle('has-collection', count > 0);
+      collectionCount.textContent = count > 99 ? '99+' : String(count);
+      const preview = items.slice(0, 2).join('、');
+      const suffix = items.length > 2 ? ` +${items.length - 2}` : '';
+      collectionBtn.title = count > 0 ? `已加入：${preview}${suffix}` : '加入集合';
+    }
+
+    async function fetchCollectionMembership(uri, force = false) {
+      const key = String(uri || '').trim();
+      if (!key) return { ids: new Set(), names: [] };
+      if (!force && collectionStateCache.has(key)) {
+        const cached = collectionStateCache.get(key) || {};
+        return {
+          ids: new Set(Array.isArray(cached.ids) ? cached.ids : []),
+          names: Array.isArray(cached.names) ? cached.names.slice() : [],
+        };
+      }
+      const encoded = encodeURIComponent(key);
+      const selectedData = await collectionsRequest(`/api/collections/by-media?uri=${encoded}`);
+      const selectedItems = Array.isArray(selectedData.items) ? selectedData.items : [];
+      const ids = [];
+      const names = [];
+      selectedItems.forEach((entry) => {
+        const id = String(entry?.id || '').trim();
+        const name = String(entry?.name || '').trim();
+        if (id) ids.push(id);
+        if (name) names.push(name);
+      });
+      collectionStateCache.set(key, { ids, names });
+      return { ids: new Set(ids), names };
+    }
+
+    async function syncCollectionState(item, force = false) {
+      const expectedName = String(item?.name || '');
+      if (!expectedName) {
+        collectionSelectedIds = new Set();
+        collectionSelectedNames = [];
+        setCollectionButtonState([]);
+        setCollectionMeta([]);
+        return;
+      }
+      try {
+        const state = await fetchCollectionMembership(expectedName, force);
+        if (String(currentItem()?.name || '') !== expectedName) return;
+        collectionSelectedIds = new Set(state.ids);
+        collectionSelectedNames = state.names.slice();
+        setCollectionButtonState(collectionSelectedNames);
+        setCollectionMeta(collectionSelectedNames);
+      } catch (error) {
+        if (String(currentItem()?.name || '') !== expectedName) return;
+        collectionSelectedIds = new Set();
+        collectionSelectedNames = [];
+        setCollectionButtonState([]);
+        setCollectionMeta([]);
+      }
+    }
+
+    function closeCollectionModal() {
+      collectionModal.classList.remove('active');
+      collectionModal.setAttribute('aria-hidden', 'true');
+      collectionCreateBtn.disabled = false;
+      collectionModalOpenedAt = 0;
+    }
+
+    function renderCollectionList(items, selectedIds) {
+      if (!Array.isArray(items) || !items.length) {
+        collectionList.innerHTML = '<div class="collection-modal-empty">暂无集合，先新建一个。</div>';
+        return;
+      }
+      collectionList.innerHTML = items.map((item) => {
+        const id = String(item.id || '');
+        const safeName = escapeHtml(String(item.name || '未命名集合'));
+        const count = Number(item.item_count || 0);
+        const checked = selectedIds.has(id) ? 'checked' : '';
+        return `
+          <label class="collection-modal-item" data-id="${id}">
+            <input type="checkbox" ${checked} />
+            <span>${safeName}</span>
+            <em>${count}</em>
+          </label>
+        `;
+      }).join('');
+    }
+
+    async function openCollectionModal() {
+      const item = currentItem();
+      if (!item || !item.name) return;
+      collectionModalOpenedAt = Date.now();
+      collectionModal.classList.add('active');
+      collectionModal.setAttribute('aria-hidden', 'false');
+      collectionList.innerHTML = '<div class="collection-modal-empty">加载中...</div>';
+      try {
+        const [allData, selectedState] = await Promise.all([
+          collectionsRequest('/api/collections'),
+          fetchCollectionMembership(item.name, true),
+        ]);
+        const allItems = Array.isArray(allData.items) ? allData.items : [];
+        collectionCatalog = allItems;
+        collectionSelectedIds = new Set(selectedState.ids);
+        collectionSelectedNames = selectedState.names.slice();
+        setCollectionButtonState(collectionSelectedNames);
+        setCollectionMeta(collectionSelectedNames);
+        renderCollectionList(allItems, collectionSelectedIds);
+      } catch (error) {
+        collectionList.innerHTML = '<div class="collection-modal-empty">加载失败，请重试。</div>';
+      }
+      feather.replace();
+    }
+
+    async function createCollectionInModal() {
+      const name = String(collectionNameInput.value || '').trim();
+      if (!name) return;
+      collectionCreateBtn.disabled = true;
+      try {
+        const created = await collectionsRequest('/api/collections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const createdId = String(created?.item?.id || '').trim();
+        const item = currentItem();
+        if (createdId && item?.name) {
+          await collectionsRequest(`/api/collections/${encodeURIComponent(createdId)}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uris: [item.name] }),
+          });
+          collectionStateCache.delete(item.name);
+        }
+        collectionNameInput.value = '';
+        await openCollectionModal();
+      } catch (error) {
+        collectionCreateBtn.disabled = false;
+        return;
+      }
+      collectionCreateBtn.disabled = false;
+    }
+
+    async function toggleCollectionMembership(collectionId, checked, rowEl, inputEl) {
+      const item = currentItem();
+      if (!item || !item.name) return;
+      if (!collectionId) return;
+      rowEl?.classList.add('is-pending');
+      if (inputEl) inputEl.disabled = true;
+      try {
+        await collectionsRequest(`/api/collections/${encodeURIComponent(collectionId)}/items`, {
+          method: checked ? 'POST' : 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uris: [item.name] }),
+        });
+        await syncCollectionState(item, true);
+        collectionCatalog = collectionCatalog.map((entry) => {
+          if (String(entry?.id || '') !== collectionId) return entry;
+          const baseCount = Number(entry?.item_count || 0);
+          const nextCount = checked ? (baseCount + 1) : Math.max(0, baseCount - 1);
+          return { ...entry, item_count: nextCount };
+        });
+        renderCollectionList(collectionCatalog, collectionSelectedIds);
+      } catch (error) {
+        if (inputEl) inputEl.checked = !checked;
+        return;
+      } finally {
+        rowEl?.classList.remove('is-pending');
+        if (inputEl) inputEl.disabled = false;
+      }
+    }
+
     async function goNext() {
       if (getCurrentIndex() >= feedItems.length - 1 && flowSession.hasMore()) {
         await loadFeed();
@@ -680,6 +1126,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       infoBtn.href = item.detail_url;
       favoriteBtn.dataset.value = item.name;
       updateFavoriteState(item.name);
+      syncCollectionState(item);
 
       const isVideo = item.type === 'video';
       speedBtn.hidden = !isVideo;
@@ -1007,6 +1454,55 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
         await mediaActions.toggleFavorite(name);
       } catch (error) {
         updateFavoriteState(name);
+      }
+    });
+
+    collectionBtn.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await openCollectionModal();
+    });
+    collectionBtn.addEventListener('keydown', async (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      await openCollectionModal();
+    });
+
+    collectionModalClose.addEventListener('click', (event) => {
+      event.preventDefault();
+      closeCollectionModal();
+    });
+    collectionCancelBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      closeCollectionModal();
+    });
+    collectionModal.addEventListener('click', (event) => {
+      if (collectionModalOpenedAt && (Date.now() - collectionModalOpenedAt) < collectionModalGuardMs) {
+        return;
+      }
+      if (event.target === collectionModal) closeCollectionModal();
+    });
+    collectionCreateBtn.addEventListener('click', async (event) => {
+      event.preventDefault();
+      await createCollectionInModal();
+    });
+    collectionNameInput.addEventListener('keydown', async (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      await createCollectionInModal();
+    });
+    collectionList.addEventListener('change', async (event) => {
+      const inputEl = event.target.closest('input[type="checkbox"]');
+      if (!inputEl) return;
+      const rowEl = inputEl.closest('[data-id]');
+      const collectionId = String(rowEl?.getAttribute('data-id') || '').trim();
+      if (!collectionId) return;
+      await toggleCollectionMembership(collectionId, !!inputEl.checked, rowEl, inputEl);
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && collectionModal.classList.contains('active')) {
+        closeCollectionModal();
       }
     });
 

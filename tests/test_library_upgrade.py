@@ -59,6 +59,8 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert "createFlowSession(" in body
     assert "createFlowMediaActionsController(" in body
     assert "uiShared.updateMagnifierContent({" in body
+    assert "collectionModalOpenedAt" in body
+    assert "quickCollectionList.addEventListener('change'" in body
 
 
 def test_home_feed_uses_unified_immersive_model(client):
@@ -77,6 +79,11 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert "flowState.toggleImmersive()" in body
     assert "flowState.setMagnifying(active)" in body
     assert "uiShared.updateMagnifierContent({" in body
+    assert 'id="collection-btn"' in body
+    assert 'id="collection-count"' in body
+    assert 'id="collection-modal"' in body
+    assert "toggleCollectionMembership(" in body
+    assert "collectionList.addEventListener('change'" in body
     assert "image-focus-mode" not in body
 
 

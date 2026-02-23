@@ -36,6 +36,7 @@ from tiklocal.services.downloader import (
     validate_download_config,
     validate_download_url,
 )
+from tiklocal.services.collections import CollectionStore
 from tiklocal.paths import (
     get_metadata_path,
     get_prompt_config_path,
@@ -43,6 +44,7 @@ from tiklocal.paths import (
     get_download_config_path,
     get_download_jobs_path,
     get_download_sources_path,
+    get_collections_path,
 )
 
 
@@ -103,6 +105,7 @@ def create_app(test_config=None):
     download_config_store = DownloadConfigStore(get_download_config_path())
     download_history_store = DownloadHistoryStore(get_download_jobs_path())
     download_source_store = DownloadSourceStore(get_download_sources_path())
+    collection_store = CollectionStore(get_collections_path())
     download_manager = DownloadManager(
         Path(media_root_str),
         download_config_store,
@@ -370,6 +373,71 @@ def create_app(test_config=None):
             'height': int(height) if height else None,
         }
 
+    def _collect_collection_records(collection_id: str) -> tuple[dict | None, list[dict]]:
+        collection = collection_store.get(collection_id)
+        if not collection:
+            return None, []
+
+        favorites = favorite_service.load()
+        uris = collection_store.list_item_uris(collection_id, newest_first=True)
+        records: list[dict] = []
+        seen: set[str] = set()
+        for uri in uris:
+            if uri in seen:
+                continue
+            seen.add(uri)
+            target = library_service.resolve_path(uri)
+            if not target or not target.exists():
+                continue
+            try:
+                stat = target.stat()
+            except OSError:
+                continue
+            media_type = 'image' if target.suffix.lower() in IMAGE_EXTENSIONS else 'video'
+            records.append({
+                'name': uri,
+                'media_type': media_type,
+                'mtime_ts': float(stat.st_mtime),
+                'size_bytes': int(stat.st_size),
+                'is_favorite': uri in favorites,
+            })
+        return collection, records
+
+    def _collection_cover_payload(collection: dict) -> tuple[str, str]:
+        cover_uri = str(collection.get('cover_uri') or '').strip()
+        if cover_uri:
+            target = library_service.resolve_path(cover_uri)
+            if target and target.exists():
+                media_type = 'image' if target.suffix.lower() in IMAGE_EXTENSIONS else 'video'
+                return cover_uri, media_type
+
+        uris = collection_store.list_item_uris(str(collection.get('id') or ''), newest_first=True)
+        for uri in uris:
+            target = library_service.resolve_path(uri)
+            if not target or not target.exists():
+                continue
+            media_type = 'image' if target.suffix.lower() in IMAGE_EXTENSIONS else 'video'
+            return uri, media_type
+        return '', ''
+
+    def _serialize_collection_summary(collection: dict) -> dict:
+        collection_id = str(collection.get('id') or '')
+        cover_uri, cover_type = _collection_cover_payload(collection)
+        cover_encoded = quote(cover_uri, safe='') if cover_uri else ''
+        cover_media_url = f"/media?uri={cover_encoded}" if cover_uri else ''
+        return {
+            'id': collection_id,
+            'name': str(collection.get('name') or ''),
+            'description': str(collection.get('description') or ''),
+            'item_count': int(collection.get('item_count') or 0),
+            'cover_uri': cover_uri,
+            'cover_type': cover_type,
+            'cover_media_url': cover_media_url,
+            'detail_url': f"/collection/{quote(collection_id, safe='')}" if collection_id else '#',
+            'created_at': str(collection.get('created_at') or ''),
+            'updated_at': str(collection.get('updated_at') or ''),
+        }
+
     def _apply_library_mode(records: list[dict], *, mode: str, min_mb: int, seed: str) -> list[dict]:
         if mode == 'image_random':
             image_records = [item for item in records if item.get('media_type') == 'image']
@@ -393,9 +461,14 @@ def create_app(test_config=None):
         limit: int = 48,
         min_mb: int = 50,
         seed: str = '',
+        collection_id: str = '',
     ) -> dict:
-        records = _collect_library_records(favorites_only=favorites_only)
-        records = _apply_library_mode(records, mode=mode, min_mb=min_mb, seed=seed)
+        records: list[dict] = []
+        if collection_id:
+            _, records = _collect_collection_records(collection_id)
+        else:
+            records = _collect_library_records(favorites_only=favorites_only)
+            records = _apply_library_mode(records, mode=mode, min_mb=min_mb, seed=seed)
         total = len(records)
         start = max(0, int(offset))
         safe_limit = max(12, min(int(limit), 96))
@@ -471,6 +544,8 @@ def create_app(test_config=None):
             'library.html',
             menu='library',
             scope='all',
+            collection_id='',
+            collection_name='',
             active_mode=mode,
             mode_seed=initial_page['seed'],
             min_mb=min_mb,
@@ -581,10 +656,48 @@ def create_app(test_config=None):
             'library.html',
             menu='favorite',
             scope='favorite',
+            collection_id='',
+            collection_name='',
             active_mode='all',
             mode_seed='',
             min_mb=50,
             empty_message='你还没有收藏媒体。',
+            initial_items=initial_page['items'],
+            initial_has_more=initial_page['has_more'],
+            initial_offset=initial_page['offset'],
+            initial_next_offset=initial_page['next_offset'],
+            page_size=initial_page['limit'],
+        )
+
+    @app.route('/collections')
+    def collections_view():
+        return render_template('collections.html', menu='favorite')
+
+    @app.route('/collection/<collection_id>')
+    def collection_detail_view(collection_id):
+        collection = collection_store.get(collection_id)
+        if not collection:
+            return "Collection not found", 404
+        limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+        initial_page = _build_library_page(
+            favorites_only=False,
+            mode='all',
+            offset=0,
+            limit=limit,
+            min_mb=50,
+            seed='',
+            collection_id=collection_id,
+        )
+        return render_template(
+            'library.html',
+            menu='favorite',
+            scope='collection',
+            collection_id=collection_id,
+            collection_name=str(collection.get('name') or '集合'),
+            active_mode='all',
+            mode_seed='',
+            min_mb=50,
+            empty_message='该集合暂无可展示媒体。',
             initial_items=initial_page['items'],
             initial_has_more=initial_page['has_more'],
             initial_offset=initial_page['offset'],
@@ -865,6 +978,113 @@ def create_app(test_config=None):
         items = download_manager.resolve_sources_for_files(normalized)
         return {'success': True, 'data': {'items': items}}
 
+    def _normalize_collection_mutation_uris(raw: object) -> list[str]:
+        if not isinstance(raw, list):
+            return []
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in raw:
+            value = str(item or '').strip().replace('\\', '/')
+            while value.startswith('./'):
+                value = value[2:]
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            normalized.append(value)
+            if len(normalized) >= 200:
+                break
+        return normalized
+
+    @app.route('/api/collections', methods=['GET', 'POST'])
+    def api_collections():
+        if request.method == 'GET':
+            collections = collection_store.list()
+            items = [_serialize_collection_summary(item) for item in collections]
+            return {'success': True, 'data': {'items': items}}
+
+        payload = request.get_json(silent=True) or {}
+        name = str(payload.get('name', '')).strip()
+        description = str(payload.get('description', '')).strip()
+        if not name:
+            return {'success': False, 'error': 'name 不能为空。'}, 400
+        try:
+            created = collection_store.create(name=name, description=description)
+        except ValueError as exc:
+            return {'success': False, 'error': str(exc)}, 400
+        return {'success': True, 'data': {'item': _serialize_collection_summary(created)}}
+
+    @app.route('/api/collections/<collection_id>', methods=['GET', 'PATCH', 'DELETE'])
+    def api_collection_detail(collection_id):
+        if request.method == 'GET':
+            found = collection_store.get(collection_id)
+            if not found:
+                return {'success': False, 'error': 'Collection not found'}, 404
+            return {'success': True, 'data': {'item': _serialize_collection_summary(found)}}
+
+        if request.method == 'DELETE':
+            deleted = collection_store.delete(collection_id)
+            if not deleted:
+                return {'success': False, 'error': 'Collection not found'}, 404
+            return {'success': True, 'data': {'deleted': True}}
+
+        payload = request.get_json(silent=True) or {}
+        name = payload['name'] if 'name' in payload else None
+        description = payload['description'] if 'description' in payload else None
+        cover_uri = payload['cover_uri'] if 'cover_uri' in payload else None
+        try:
+            updated = collection_store.update(
+                collection_id,
+                name=name,
+                description=description,
+                cover_uri=cover_uri,
+            )
+        except ValueError as exc:
+            return {'success': False, 'error': str(exc)}, 400
+        if not updated:
+            return {'success': False, 'error': 'Collection not found'}, 404
+        return {'success': True, 'data': {'item': _serialize_collection_summary(updated)}}
+
+    @app.route('/api/collections/<collection_id>/items', methods=['GET', 'POST', 'DELETE'])
+    def api_collection_items(collection_id):
+        if request.method == 'GET':
+            found = collection_store.get(collection_id)
+            if not found:
+                return {'success': False, 'error': 'Collection not found'}, 404
+            offset = _read_int_arg('offset', 0, minimum=0)
+            limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+            page = _build_library_page(
+                favorites_only=False,
+                mode='all',
+                offset=offset,
+                limit=limit,
+                min_mb=50,
+                seed='',
+                collection_id=collection_id,
+            )
+            return {'success': True, 'data': page}
+
+        payload = request.get_json(silent=True) or {}
+        uris = _normalize_collection_mutation_uris(payload.get('uris'))
+        if not uris:
+            return {'success': False, 'error': 'uris 不能为空。'}, 400
+
+        if request.method == 'POST':
+            updated = collection_store.add_items(collection_id, uris)
+        else:
+            updated = collection_store.remove_items(collection_id, uris)
+        if not updated:
+            return {'success': False, 'error': 'Collection not found'}, 404
+        return {'success': True, 'data': {'item': _serialize_collection_summary(updated)}}
+
+    @app.route('/api/collections/by-media')
+    def api_collections_by_media():
+        uri = str(request.args.get('uri', '')).strip()
+        if not uri:
+            return {'success': False, 'error': 'uri 不能为空。'}, 400
+        items = collection_store.list_for_media(uri)
+        payload = [_serialize_collection_summary(item) for item in items]
+        return {'success': True, 'data': {'items': payload}}
+
     @app.route('/api/ai/prompt-config', methods=['GET', 'POST'])
     def api_prompt_config():
         if request.method == 'GET':
@@ -1032,8 +1252,15 @@ def create_app(test_config=None):
     def api_library_items():
         scope = str(request.args.get('scope', 'all')).strip()
         favorites_only = scope == 'favorite'
+        collection_id = ''
+        if scope == 'collection':
+            collection_id = str(request.args.get('collection_id', '')).strip()
+            if not collection_id:
+                return {'success': False, 'error': 'collection_id 不能为空。'}, 400
         allowed_modes = {'all', 'image_random', 'video_latest', 'big_files'}
         mode = _read_choice_arg('mode', 'all', allowed_modes)
+        if scope != 'all':
+            mode = 'all'
         offset = _read_int_arg('offset', 0, minimum=0)
         limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
         min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
@@ -1048,6 +1275,7 @@ def create_app(test_config=None):
             limit=limit,
             min_mb=min_mb,
             seed=seed,
+            collection_id=collection_id,
         )
         return {
             'success': True,

@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  body {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom)) !important;
+  }
+  .collections-shell {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 16px 12px 6px;
+  }
+  .collections-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .collections-topbar h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #0f172a;
+  }
+  [data-theme="dark"] .collections-topbar h1 {
+    color: #f8fafc;
+  }
+  .ghost-chip {
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    background: rgba(255, 255, 255, 0.86);
+    color: #334155;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+  [data-theme="dark"] .ghost-chip {
+    background: rgba(30, 41, 59, 0.8);
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+  .collection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(164px, 1fr));
+    gap: 10px;
+  }
+  @media (min-width: 768px) {
+    .collection-grid {
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 12px;
+    }
+  }
+  .collection-item {
+    position: relative;
+  }
+  .collection-card {
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+  }
+  [data-theme="dark"] .collection-card {
+    background: rgba(15, 23, 42, 0.78);
+    border-color: rgba(148, 163, 184, 0.18);
+  }
+  .collection-cover {
+    aspect-ratio: 1 / 1;
+    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+    position: relative;
+    overflow: hidden;
+  }
+  [data-theme="dark"] .collection-cover {
+    background: linear-gradient(135deg, #1e293b, #334155);
+  }
+  .collection-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .collection-cover-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .collection-meta {
+    padding: 10px 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .collection-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  [data-theme="dark"] .collection-name {
+    color: #f8fafc;
+  }
+  .collection-sub {
+    font-size: 12px;
+    color: #64748b;
+  }
+  [data-theme="dark"] .collection-sub {
+    color: #94a3b8;
+  }
+  .collection-menu {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+  }
+  .collection-menu-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    background: rgba(15, 23, 42, 0.56);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .collection-menu-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+  .collection-menu-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 116px;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.22);
+    display: none;
+    overflow: hidden;
+  }
+  .collection-menu.open .collection-menu-panel {
+    display: block;
+  }
+  .collection-menu-item {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    background: transparent;
+    color: #334155;
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .collection-menu-item:last-child {
+    border-bottom: 0;
+  }
+  .collection-menu-item:hover {
+    background: rgba(148, 163, 184, 0.12);
+  }
+  .collection-menu-item.danger {
+    color: #dc2626;
+  }
+  [data-theme="dark"] .collection-menu-panel {
+    background: rgba(15, 23, 42, 0.98);
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+  [data-theme="dark"] .collection-menu-item {
+    color: #cbd5e1;
+    border-bottom-color: rgba(148, 163, 184, 0.16);
+  }
+  [data-theme="dark"] .collection-menu-item:hover {
+    background: rgba(148, 163, 184, 0.14);
+  }
+  [data-theme="dark"] .collection-menu-item.danger {
+    color: #f87171;
+  }
+  .collections-empty {
+    margin-top: 30px;
+    text-align: center;
+    font-size: 13px;
+    color: #64748b;
+  }
+  .modal-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 260;
+    background: rgba(15, 23, 42, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-mask.active {
+    display: flex;
+  }
+  .modal-card {
+    width: min(460px, 100%);
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: #fff;
+    padding: 14px;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.25);
+  }
+  [data-theme="dark"] .modal-card {
+    background: #0f172a;
+    border-color: rgba(148, 163, 184, 0.18);
+  }
+  .field {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(248, 250, 252, 0.75);
+    color: #0f172a;
+    padding: 9px 11px;
+    font-size: 13px;
+  }
+  [data-theme="dark"] .field {
+    border-color: rgba(148, 163, 184, 0.2);
+    background: rgba(15, 23, 42, 0.8);
+    color: #e2e8f0;
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="collections-shell">
+  <div class="collections-topbar">
+    <h1>我的集合</h1>
+    <button id="open-create-collection" class="ghost-chip" type="button">新建集合</button>
+  </div>
+  <section id="collections-grid" class="collection-grid"></section>
+  <p id="collections-empty" class="collections-empty" hidden>还没有集合，先建一个开始整理。</p>
+</main>
+
+<div id="create-modal" class="modal-mask" aria-hidden="true">
+  <div class="modal-card">
+    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">新建集合</h3>
+    <input id="create-name" class="field mb-2" type="text" maxlength="80" placeholder="例如：灵感片段" />
+    <textarea id="create-description" class="field" rows="3" maxlength="280" placeholder="可选描述"></textarea>
+    <div class="modal-actions">
+      <button id="cancel-create" class="ghost-chip" type="button">取消</button>
+      <button id="submit-create" class="ghost-chip" type="button">创建</button>
+    </div>
+  </div>
+</div>
+
+<div id="rename-modal" class="modal-mask" aria-hidden="true">
+  <div class="modal-card">
+    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">重命名集合</h3>
+    <input id="rename-name" class="field" type="text" maxlength="80" placeholder="输入新名称" />
+    <div class="modal-actions">
+      <button id="cancel-rename" class="ghost-chip" type="button">取消</button>
+      <button id="submit-rename" class="ghost-chip" type="button">保存</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+  (() => {
+    const grid = document.getElementById('collections-grid');
+    const emptyEl = document.getElementById('collections-empty');
+    const openBtn = document.getElementById('open-create-collection');
+    const modal = document.getElementById('create-modal');
+    const cancelBtn = document.getElementById('cancel-create');
+    const submitBtn = document.getElementById('submit-create');
+    const nameInput = document.getElementById('create-name');
+    const descInput = document.getElementById('create-description');
+    const renameModal = document.getElementById('rename-modal');
+    const renameCancelBtn = document.getElementById('cancel-rename');
+    const renameSubmitBtn = document.getElementById('submit-rename');
+    const renameInput = document.getElementById('rename-name');
+    const collectionsById = new Map();
+    let renamingCollectionId = '';
+
+    async function api(url, options = {}) {
+      const response = await fetch(url, options);
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (error) {
+        payload = {};
+      }
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || '请求失败');
+      }
+      return payload.data || {};
+    }
+
+    function openCreateModal() {
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+      nameInput.focus();
+    }
+
+    function closeCreateModal() {
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+      nameInput.value = '';
+      descInput.value = '';
+    }
+
+    function openRenameModal(collectionId) {
+      const id = String(collectionId || '').trim();
+      const item = collectionsById.get(id);
+      if (!id || !item) return;
+      renamingCollectionId = id;
+      renameInput.value = String(item.name || '').trim();
+      renameModal.classList.add('active');
+      renameModal.setAttribute('aria-hidden', 'false');
+      requestAnimationFrame(() => {
+        renameInput.focus();
+        renameInput.select();
+      });
+    }
+
+    function closeRenameModal() {
+      renameModal.classList.remove('active');
+      renameModal.setAttribute('aria-hidden', 'true');
+      renameInput.value = '';
+      renamingCollectionId = '';
+    }
+
+    function renderCards(items) {
+      if (!Array.isArray(items) || !items.length) {
+        grid.innerHTML = '';
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+      collectionsById.clear();
+      grid.innerHTML = items.map((item) => {
+        const id = String(item.id || '');
+        collectionsById.set(id, item);
+        const cover = String(item.cover_media_url || '').trim();
+        const count = Number(item.item_count || 0);
+        const detail = String(item.detail_url || '#');
+        const name = escapeHtml(item.name || '未命名集合');
+        const coverHtml = cover
+          ? `<img src="${cover}" alt="" loading="lazy" />`
+          : `<div class="collection-cover-empty"><i data-feather="folder"></i></div>`;
+        return `
+          <article class="collection-item" data-collection-id="${id}">
+            <a class="collection-card" href="${detail}">
+              <div class="collection-cover">${coverHtml}</div>
+              <div class="collection-meta">
+                <div class="collection-name">${name}</div>
+                <div class="collection-sub">${count} 个媒体</div>
+              </div>
+            </a>
+            <div class="collection-menu" data-menu-id="${id}">
+              <button class="collection-menu-btn" type="button" data-menu-toggle="1" data-id="${id}" aria-label="更多操作">
+                <i data-feather="more-horizontal"></i>
+              </button>
+              <div class="collection-menu-panel">
+                <button class="collection-menu-item" type="button" data-action="rename" data-id="${id}">重命名</button>
+                <button class="collection-menu-item danger" type="button" data-action="delete" data-id="${id}">删除</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+      feather.replace();
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function loadCollections() {
+      const data = await api('/api/collections');
+      renderCards(data.items || []);
+    }
+
+    function closeMenus(exceptId = '') {
+      grid.querySelectorAll('.collection-menu.open').forEach((node) => {
+        if (exceptId && node.getAttribute('data-menu-id') === exceptId) return;
+        node.classList.remove('open');
+      });
+    }
+
+    function toggleMenu(collectionId) {
+      const id = String(collectionId || '').trim();
+      if (!id) return;
+      const target = grid.querySelector(`.collection-menu[data-menu-id="${id}"]`);
+      if (!target) return;
+      const shouldOpen = !target.classList.contains('open');
+      closeMenus(id);
+      target.classList.toggle('open', shouldOpen);
+    }
+
+    async function createCollection() {
+      const name = String(nameInput.value || '').trim();
+      const description = String(descInput.value || '').trim();
+      if (!name) return;
+      submitBtn.disabled = true;
+      try {
+        await api('/api/collections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description }),
+        });
+        closeCreateModal();
+        await loadCollections();
+      } catch (error) {
+        alert(error.message || '创建失败');
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    async function submitRenameCollection() {
+      const collectionId = String(renamingCollectionId || '').trim();
+      const name = String(renameInput.value || '').trim();
+      if (!collectionId || !name) return;
+      renameSubmitBtn.disabled = true;
+      try {
+        await api(`/api/collections/${encodeURIComponent(collectionId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        closeRenameModal();
+        await loadCollections();
+      } catch (error) {
+        alert(error.message || '重命名失败');
+      } finally {
+        renameSubmitBtn.disabled = false;
+      }
+    }
+
+    async function deleteCollection(collectionId) {
+      const item = collectionsById.get(collectionId);
+      if (!item) return;
+      const ok = window.confirm(`确认删除集合“${String(item.name || '未命名集合')}”？`);
+      if (!ok) return;
+      try {
+        await api(`/api/collections/${encodeURIComponent(collectionId)}`, { method: 'DELETE' });
+        await loadCollections();
+      } catch (error) {
+        alert(error.message || '删除失败');
+      }
+    }
+
+    openBtn.addEventListener('click', openCreateModal);
+    cancelBtn.addEventListener('click', closeCreateModal);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeCreateModal();
+    });
+    submitBtn.addEventListener('click', createCollection);
+    nameInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        createCollection();
+      }
+    });
+    grid.addEventListener('click', async (event) => {
+      const menuToggle = event.target.closest('[data-menu-toggle][data-id]');
+      if (menuToggle) {
+        event.preventDefault();
+        event.stopPropagation();
+        const collectionId = String(menuToggle.getAttribute('data-id') || '').trim();
+        toggleMenu(collectionId);
+        return;
+      }
+
+      const button = event.target.closest('[data-action][data-id]');
+      if (!button) return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenus();
+      const action = String(button.getAttribute('data-action') || '').trim();
+      const collectionId = String(button.getAttribute('data-id') || '').trim();
+      if (!action || !collectionId) return;
+      if (action === 'rename') {
+        openRenameModal(collectionId);
+        return;
+      }
+      if (action === 'delete') {
+        await deleteCollection(collectionId);
+      }
+    });
+
+    document.addEventListener('click', (event) => {
+      if (event.target.closest('.collection-menu')) return;
+      closeMenus();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (renameModal.classList.contains('active')) {
+        closeRenameModal();
+        return;
+      }
+      if (modal.classList.contains('active')) {
+        closeCreateModal();
+        return;
+      }
+      closeMenus();
+    });
+    renameCancelBtn.addEventListener('click', closeRenameModal);
+    renameModal.addEventListener('click', (event) => {
+      if (event.target === renameModal) closeRenameModal();
+    });
+    renameSubmitBtn.addEventListener('click', submitRenameCollection);
+    renameInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      submitRenameCollection();
+    });
+
+    loadCollections().catch(() => {
+      renderCards([]);
+    });
+  })();
+</script>
+{% endblock %}

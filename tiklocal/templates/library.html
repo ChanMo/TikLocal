@@ -40,6 +40,48 @@
     color: #0f172a;
     border-color: rgba(248, 250, 252, 0.95);
   }
+  .collection-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 2px 2px 4px;
+  }
+  .collection-nav-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #475569;
+    text-decoration: none;
+    padding: 6px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(255, 255, 255, 0.82);
+  }
+  .collection-nav-back svg {
+    width: 14px;
+    height: 14px;
+  }
+  .collection-nav-title {
+    flex: 1;
+    min-width: 0;
+    text-align: right;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  [data-theme="dark"] .collection-nav-back {
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.2);
+    background: rgba(30, 41, 59, 0.8);
+  }
+  [data-theme="dark"] .collection-nav-title {
+    color: #f8fafc;
+  }
 
   .masonry-grid {
     --wf-gap: 8px;
@@ -258,6 +300,7 @@
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    position: relative;
   }
   .quick-btn:active {
     transform: scale(0.92);
@@ -276,6 +319,31 @@
   }
   .quick-btn.is-hidden {
     display: none;
+  }
+  .quick-btn .collection-count {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+  }
+  .quick-btn.has-collection {
+    background: rgba(255, 255, 255, 0.24);
+    border-color: rgba(255, 255, 255, 0.78);
+  }
+  .quick-btn.has-collection .collection-count {
+    display: inline-flex;
   }
   #quick-speed {
     font-size: 14px;
@@ -454,6 +522,179 @@
     pointer-events: none;
     transform: translateY(10px);
   }
+
+  .quick-collection-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 280;
+    background: rgba(15, 23, 42, 0.56);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .quick-collection-modal.active {
+    display: flex;
+  }
+  .quick-collection-card {
+    width: min(440px, 100%);
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(255, 255, 255, 0.98);
+    color: #0f172a;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.3);
+    padding: 12px;
+  }
+  [data-theme="dark"] .quick-collection-card {
+    background: rgba(15, 23, 42, 0.98);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #f8fafc;
+  }
+  .quick-collection-header {
+    margin-bottom: 10px;
+  }
+  .quick-collection-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .quick-collection-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .quick-collection-meta {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #64748b;
+  }
+  [data-theme="dark"] .quick-collection-meta {
+    color: #94a3b8;
+  }
+  .quick-collection-close {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .quick-collection-close svg {
+    width: 15px;
+    height: 15px;
+  }
+  .quick-collection-create {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .quick-collection-create input {
+    flex: 1;
+    min-width: 0;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    background: rgba(248, 250, 252, 0.86);
+    color: #0f172a;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  [data-theme="dark"] .quick-collection-create input {
+    background: rgba(15, 23, 42, 0.82);
+    color: #f1f5f9;
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+  .quick-collection-create button,
+  .quick-collection-actions button {
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 12px;
+  }
+  [data-theme="dark"] .quick-collection-create button,
+  [data-theme="dark"] .quick-collection-actions button {
+    background: rgba(226, 232, 240, 0.94);
+    color: #0f172a;
+  }
+  .quick-collection-actions button.ghost {
+    background: rgba(255, 255, 255, 0.85);
+    color: #334155;
+  }
+  [data-theme="dark"] .quick-collection-actions button.ghost {
+    background: rgba(15, 23, 42, 0.86);
+    color: #cbd5e1;
+  }
+  .quick-collection-list {
+    max-height: min(44vh, 320px);
+    overflow: auto;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 10px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: rgba(248, 250, 252, 0.78);
+  }
+  [data-theme="dark"] .quick-collection-list {
+    background: rgba(15, 23, 42, 0.76);
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+  .quick-collection-item {
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .quick-collection-item:hover {
+    background: rgba(148, 163, 184, 0.12);
+  }
+  .quick-collection-item.is-pending {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .quick-collection-item input {
+    width: 15px;
+    height: 15px;
+  }
+  .quick-collection-item span {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .quick-collection-item em {
+    font-style: normal;
+    font-size: 11px;
+    color: #64748b;
+  }
+  [data-theme="dark"] .quick-collection-item em {
+    color: #94a3b8;
+  }
+  .quick-collection-empty {
+    text-align: center;
+    font-size: 12px;
+    color: #64748b;
+    padding: 14px 8px;
+  }
+  [data-theme="dark"] .quick-collection-empty {
+    color: #94a3b8;
+  }
+  .quick-collection-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
 </style>
 {% endblock %}
 
@@ -466,6 +707,23 @@
       <button type="button" class="mode-tab" data-mode="image_random">图片随机</button>
       <button type="button" class="mode-tab" data-mode="video_latest">视频最新</button>
       <button type="button" class="mode-tab" data-mode="big_files">大文件</button>
+    </div>
+  </section>
+  {% elif scope == 'favorite' %}
+  <section class="mb-2">
+    <div class="mode-tabs">
+      <a class="mode-tab is-active" href="/favorite">收藏媒体</a>
+      <a class="mode-tab" href="/collections">我的集合</a>
+    </div>
+  </section>
+  {% elif scope == 'collection' %}
+  <section class="mb-2">
+    <div class="collection-nav">
+      <a class="collection-nav-back" href="/collections">
+        <i data-feather="arrow-left"></i>
+        <span>我的集合</span>
+      </a>
+      <div class="collection-nav-title">{{ collection_name }}</div>
     </div>
   </section>
   {% endif %}
@@ -519,6 +777,13 @@
     <button id="quick-favorite" class="quick-btn" type="button" title="收藏">
       <i data-feather="heart"></i>
     </button>
+    <button id="quick-collection" class="quick-btn" type="button" title="加入集合">
+      <i data-feather="bookmark"></i>
+      <span class="collection-count" id="quick-collection-count">0</span>
+    </button>
+    <button id="quick-set-cover" class="quick-btn is-hidden" type="button" title="设为集合封面">
+      <i data-feather="image"></i>
+    </button>
     <a id="quick-source" class="quick-btn is-hidden" href="#" target="_blank" rel="noopener noreferrer" title="查看来源">
       <i data-feather="external-link"></i>
     </a>
@@ -536,6 +801,28 @@
     <div class="quick-mag-badge" id="quick-mag-badge">2.5x</div>
   </div>
 </div>
+
+<div id="quick-collection-modal" class="quick-collection-modal" aria-hidden="true">
+  <div class="quick-collection-card">
+    <div class="quick-collection-header">
+      <div class="quick-collection-title-row">
+        <h3>加入集合</h3>
+        <button id="quick-collection-close" type="button" class="quick-collection-close">
+          <i data-feather="x"></i>
+        </button>
+      </div>
+      <div id="quick-collection-meta" class="quick-collection-meta">当前未加入任何集合</div>
+    </div>
+    <div class="quick-collection-create">
+      <input id="quick-collection-name" type="text" maxlength="80" placeholder="新建集合名称" />
+      <button id="quick-collection-create-btn" type="button">新建</button>
+    </div>
+    <div id="quick-collection-list" class="quick-collection-list"></div>
+    <div class="quick-collection-actions">
+      <button id="quick-collection-cancel" type="button" class="ghost">关闭</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_body %}
@@ -548,6 +835,7 @@
 <script>
   (() => {
     const scope = {{ scope | tojson }};
+    const collectionId = {{ collection_id | tojson }};
     const pageSize = {{ page_size }};
     const initialItems = {{ initial_items | tojson }};
     const initialHasMore = {{ 'true' if initial_has_more else 'false' }};
@@ -589,11 +877,27 @@
     const actionsShared = window.FlowActionsShared || {};
 
     const quickFavorite = document.getElementById('quick-favorite');
+    const quickCollection = document.getElementById('quick-collection');
+    const quickCollectionCount = document.getElementById('quick-collection-count');
+    const quickSetCover = document.getElementById('quick-set-cover');
     const quickSource = document.getElementById('quick-source');
     const quickDetail = document.getElementById('quick-detail');
+    const quickCollectionModal = document.getElementById('quick-collection-modal');
+    const quickCollectionClose = document.getElementById('quick-collection-close');
+    const quickCollectionMeta = document.getElementById('quick-collection-meta');
+    const quickCollectionCancel = document.getElementById('quick-collection-cancel');
+    const quickCollectionCreateBtn = document.getElementById('quick-collection-create-btn');
+    const quickCollectionNameInput = document.getElementById('quick-collection-name');
+    const quickCollectionList = document.getElementById('quick-collection-list');
 
-    let mode = scope === 'favorite' ? 'all' : initialMode;
+    let mode = scope === 'all' ? initialMode : 'all';
     let seed = initialSeed || '';
+    const collectionStateCache = new Map();
+    let collectionCatalog = [];
+    let collectionSelectedIds = new Set();
+    let collectionSelectedNames = [];
+    let collectionModalOpenedAt = 0;
+    const collectionModalGuardMs = 520;
     const flowSession = window.createFlowSession({
       initialItems,
       initialHasMore: !!initialHasMore,
@@ -837,6 +1141,9 @@
         offset: String(offset),
         limit: String(pageSize),
       });
+      if (scope === 'collection' && collectionId) {
+        params.set('collection_id', String(collectionId));
+      }
       if (mode === 'big_files') {
         params.set('min_mb', String(minMb));
       }
@@ -903,6 +1210,224 @@
       activeTab();
       setLoadingText('正在加载...');
       await loadNextPage();
+    }
+
+    async function collectionsRequest(url, options = {}) {
+      const response = await fetch(url, options);
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (error) {
+        payload = null;
+      }
+      if (!response.ok || !(payload && payload.success)) {
+        throw new Error((payload && payload.error) || '请求失败');
+      }
+      return payload.data || {};
+    }
+
+    function flashActionButton(buttonEl) {
+      if (!buttonEl) return;
+      buttonEl.classList.add('is-active');
+      setTimeout(() => buttonEl.classList.remove('is-active'), 220);
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function setCollectionMeta(names) {
+      if (!quickCollectionMeta) return;
+      const items = Array.isArray(names) ? names.filter(Boolean) : [];
+      if (!items.length) {
+        quickCollectionMeta.textContent = '当前未加入任何集合';
+        return;
+      }
+      const preview = items.slice(0, 2).join('、');
+      const rest = items.length - 2;
+      quickCollectionMeta.textContent = rest > 0 ? `已加入：${preview} +${rest}` : `已加入：${preview}`;
+    }
+
+    function setCollectionButtonState(names) {
+      const items = Array.isArray(names) ? names.filter(Boolean) : [];
+      const count = items.length;
+      quickCollection.classList.toggle('has-collection', count > 0);
+      quickCollectionCount.textContent = count > 99 ? '99+' : String(count);
+      const preview = items.slice(0, 2).join('、');
+      const suffix = items.length > 2 ? ` +${items.length - 2}` : '';
+      quickCollection.title = count > 0 ? `已加入：${preview}${suffix}` : '加入集合';
+    }
+
+    async function fetchCollectionMembership(uri, force = false) {
+      const key = String(uri || '').trim();
+      if (!key) return { ids: new Set(), names: [] };
+      if (!force && collectionStateCache.has(key)) {
+        const cached = collectionStateCache.get(key) || {};
+        return {
+          ids: new Set(Array.isArray(cached.ids) ? cached.ids : []),
+          names: Array.isArray(cached.names) ? cached.names.slice() : [],
+        };
+      }
+      const encoded = encodeURIComponent(key);
+      const selectedData = await collectionsRequest(`/api/collections/by-media?uri=${encoded}`);
+      const selectedItems = Array.isArray(selectedData.items) ? selectedData.items : [];
+      const ids = [];
+      const names = [];
+      selectedItems.forEach((entry) => {
+        const id = String(entry?.id || '').trim();
+        const name = String(entry?.name || '').trim();
+        if (id) ids.push(id);
+        if (name) names.push(name);
+      });
+      collectionStateCache.set(key, { ids, names });
+      return { ids: new Set(ids), names };
+    }
+
+    async function syncCollectionState(item, force = false) {
+      const expectedName = String(item?.name || '');
+      if (!expectedName) {
+        collectionSelectedIds = new Set();
+        collectionSelectedNames = [];
+        setCollectionButtonState([]);
+        setCollectionMeta([]);
+        return;
+      }
+      try {
+        const state = await fetchCollectionMembership(expectedName, force);
+        if (String(currentItem()?.name || '') !== expectedName) return;
+        collectionSelectedIds = new Set(state.ids);
+        collectionSelectedNames = state.names.slice();
+        setCollectionButtonState(collectionSelectedNames);
+        setCollectionMeta(collectionSelectedNames);
+      } catch (error) {
+        if (String(currentItem()?.name || '') !== expectedName) return;
+        collectionSelectedIds = new Set();
+        collectionSelectedNames = [];
+        setCollectionButtonState([]);
+        setCollectionMeta([]);
+      }
+    }
+
+    function updateCollectionCoverButton(item) {
+      const shouldShow = scope === 'collection' && !!collectionId && !!item?.name;
+      quickSetCover.classList.toggle('is-hidden', !shouldShow);
+    }
+
+    function closeCollectionModal() {
+      if (!quickCollectionModal) return;
+      quickCollectionModal.classList.remove('active');
+      quickCollectionModal.setAttribute('aria-hidden', 'true');
+      quickCollectionCreateBtn.disabled = false;
+      collectionModalOpenedAt = 0;
+    }
+
+    function renderCollectionList(items, selectedIds) {
+      if (!quickCollectionList) return;
+      if (!Array.isArray(items) || !items.length) {
+        quickCollectionList.innerHTML = '<div class="quick-collection-empty">暂无集合，先新建一个。</div>';
+        return;
+      }
+      quickCollectionList.innerHTML = items.map((item) => {
+        const id = String(item.id || '');
+        const safeName = escapeHtml(String(item.name || '未命名集合'));
+        const count = Number(item.item_count || 0);
+        const checked = selectedIds.has(id) ? 'checked' : '';
+        return `
+          <label class="quick-collection-item" data-id="${id}">
+            <input type="checkbox" ${checked} />
+            <span>${safeName}</span>
+            <em>${count}</em>
+          </label>
+        `;
+      }).join('');
+    }
+
+    async function openCollectionModal() {
+      const item = currentItem();
+      if (!item || !item.name || !quickCollectionModal) return;
+      collectionModalOpenedAt = Date.now();
+      quickCollectionModal.classList.add('active');
+      quickCollectionModal.setAttribute('aria-hidden', 'false');
+      quickCollectionList.innerHTML = '<div class="quick-collection-empty">加载中...</div>';
+      try {
+        const [allData, selectedState] = await Promise.all([
+          collectionsRequest('/api/collections'),
+          fetchCollectionMembership(item.name, true),
+        ]);
+        const allItems = Array.isArray(allData.items) ? allData.items : [];
+        collectionCatalog = allItems;
+        collectionSelectedIds = new Set(selectedState.ids);
+        collectionSelectedNames = selectedState.names.slice();
+        setCollectionButtonState(collectionSelectedNames);
+        setCollectionMeta(collectionSelectedNames);
+        renderCollectionList(allItems, collectionSelectedIds);
+      } catch (error) {
+        quickCollectionList.innerHTML = '<div class="quick-collection-empty">加载失败，请重试。</div>';
+      }
+      feather.replace();
+    }
+
+    async function createCollectionInModal() {
+      const name = String(quickCollectionNameInput?.value || '').trim();
+      if (!name) return;
+      quickCollectionCreateBtn.disabled = true;
+      try {
+        const createdData = await collectionsRequest('/api/collections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const createdId = String(createdData?.item?.id || '').trim();
+        const item = currentItem();
+        if (createdId && item?.name) {
+          await collectionsRequest(`/api/collections/${encodeURIComponent(createdId)}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uris: [item.name] }),
+          });
+          collectionStateCache.delete(item.name);
+        }
+        if (quickCollectionNameInput) quickCollectionNameInput.value = '';
+        await openCollectionModal();
+      } catch (error) {
+        quickCollectionCreateBtn.disabled = false;
+        return;
+      }
+      quickCollectionCreateBtn.disabled = false;
+    }
+
+    async function toggleCollectionMembership(collectionId, checked, rowEl, inputEl) {
+      const item = currentItem();
+      if (!item || !item.name) return;
+      if (!collectionId) return;
+      rowEl?.classList.add('is-pending');
+      if (inputEl) inputEl.disabled = true;
+      try {
+        await collectionsRequest(`/api/collections/${encodeURIComponent(collectionId)}/items`, {
+          method: checked ? 'POST' : 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uris: [item.name] }),
+        });
+        await syncCollectionState(item, true);
+        collectionCatalog = collectionCatalog.map((entry) => {
+          if (String(entry?.id || '') !== collectionId) return entry;
+          const baseCount = Number(entry?.item_count || 0);
+          const nextCount = checked ? (baseCount + 1) : Math.max(0, baseCount - 1);
+          return { ...entry, item_count: nextCount };
+        });
+        renderCollectionList(collectionCatalog, collectionSelectedIds);
+      } catch (error) {
+        if (inputEl) inputEl.checked = !checked;
+        return;
+      } finally {
+        rowEl?.classList.remove('is-pending');
+        if (inputEl) inputEl.disabled = false;
+      }
     }
 
     async function syncFavoriteState(item) {
@@ -1108,6 +1633,7 @@
 
     function closeViewer() {
       flowState.reset();
+      closeCollectionModal();
       quickView.classList.remove('active');
       quickView.setAttribute('aria-hidden', 'true');
       quickVideo.pause();
@@ -1125,6 +1651,9 @@
       updateSourceButton(null);
       clearCaption();
       toggleMagnifier(false);
+      updateCollectionCoverButton(null);
+      setCollectionButtonState([]);
+      setCollectionMeta([]);
       setCurrentIndex(-1);
       if (bodyScrollLocked) {
         document.body.style.overflow = bodyOverflowBackup;
@@ -1142,6 +1671,7 @@
       toggleMagnifier(false);
       flowState.onMediaChanged();
       updateControls(item);
+      updateCollectionCoverButton(item);
 
       if (item.type === 'video') {
         clearCaption();
@@ -1174,6 +1704,7 @@
       }
 
       syncFavoriteState(item);
+      syncCollectionState(item);
       syncSourceState(item);
       if (index >= items.length - 8 && flowSession.hasMore()) loadNextPage();
     }
@@ -1225,6 +1756,74 @@
       }
     });
 
+    async function setCurrentAsCollectionCover() {
+      const item = currentItem();
+      if (!item || !item.name || scope !== 'collection' || !collectionId) return;
+      quickSetCover.disabled = true;
+      try {
+        await collectionsRequest(`/api/collections/${encodeURIComponent(collectionId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cover_uri: item.name }),
+        });
+        flashActionButton(quickSetCover);
+      } catch (error) {
+        quickSetCover.disabled = false;
+        return;
+      }
+      quickSetCover.disabled = false;
+    }
+
+    quickCollection.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await openCollectionModal();
+    });
+    quickCollection.addEventListener('keydown', async (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      await openCollectionModal();
+    });
+
+    quickSetCover.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await setCurrentAsCollectionCover();
+    });
+
+    quickCollectionClose.addEventListener('click', (event) => {
+      event.preventDefault();
+      closeCollectionModal();
+    });
+    quickCollectionCancel.addEventListener('click', (event) => {
+      event.preventDefault();
+      closeCollectionModal();
+    });
+    quickCollectionModal.addEventListener('click', (event) => {
+      if (collectionModalOpenedAt && (Date.now() - collectionModalOpenedAt) < collectionModalGuardMs) {
+        return;
+      }
+      if (event.target === quickCollectionModal) closeCollectionModal();
+    });
+    quickCollectionCreateBtn.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await createCollectionInModal();
+    });
+    quickCollectionNameInput.addEventListener('keydown', async (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      await createCollectionInModal();
+    });
+    quickCollectionList.addEventListener('change', async (event) => {
+      const inputEl = event.target.closest('input[type="checkbox"]');
+      if (!inputEl) return;
+      const rowEl = inputEl.closest('[data-id]');
+      const collectionId = String(rowEl?.getAttribute('data-id') || '').trim();
+      if (!collectionId) return;
+      await toggleCollectionMembership(collectionId, !!inputEl.checked, rowEl, inputEl);
+    });
+
     quickCloseTop.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -1232,6 +1831,10 @@
     });
 
     document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && quickCollectionModal.classList.contains('active')) {
+        closeCollectionModal();
+        return;
+      }
       if (!quickView.classList.contains('active')) return;
       if (event.key === 'Escape') closeViewer();
       if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextItem();
