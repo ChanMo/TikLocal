@@ -1,7 +1,8 @@
 # Release Notes
 
 ## Unreleased
-- 待补充
+- 架构收敛：新增 `flow_session.js`、`flow_actions_shared.js`、`flow_media_actions_controller.js`，统一 Home / Library / Favorites 的会话状态与媒体动作编排。
+- 清理废弃能力：移除 `/browse`、`/gallery` 旧路由与 `/api/videos`、`/api/random-images` 旧接口，删除未使用模板 `browse.html`、`favorite.html`、`gallery.html`、`index.html`。
 
 ## v0.8.10 (2026-02-22)
 - 修复 Library/Favorites 的 Quick Viewer 关闭后页面滚动锁死问题：补齐 body 滚动状态恢复逻辑，确保关闭弹层后列表可继续滚动。

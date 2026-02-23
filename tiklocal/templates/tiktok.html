@@ -495,6 +495,9 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
 {% block extra_body %}
 <script src="{{url_for('static', filename='flow_ui_shared.js')}}"></script>
 <script src="{{url_for('static', filename='flow_state_controller.js')}}"></script>
+<script src="{{url_for('static', filename='flow_session.js')}}"></script>
+<script src="{{url_for('static', filename='flow_actions_shared.js')}}"></script>
+<script src="{{url_for('static', filename='flow_media_actions_controller.js')}}"></script>
 <script src="{{url_for('static', filename='hammer.min.js')}}"></script>
 <script>
   (async () => {
@@ -523,15 +526,18 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     const captionTitle = document.getElementById('caption-title');
     const captionTags = document.getElementById('caption-tags');
     const uiShared = window.FlowUIShared || {};
+    const actionsShared = window.FlowActionsShared || {};
 
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
-    let feedItems = [];
-    let index = -1;
-    let page = 1;
+    const flowSession = window.createFlowSession({
+      initialItems: [],
+      initialHasMore: true,
+      initialCursor: { page: 1 },
+      keyOf: (item) => String(item?.name || ''),
+    });
+    const feedItems = flowSession.items;
     let seed = '';
-    let hasMore = true;
-    let loadingFeed = false;
 
     let currentSpeedIndex = 1;
     let isImmersive = false;
@@ -545,17 +551,20 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     let magY = 0;
     let zoomLevel = 2.5;
 
-    let captionRequestId = 0;
-    let currentCaptionUri = '';
-    const captionCache = new Map();
-
     function formatTime(seconds) {
       return uiShared.formatTime(seconds);
     }
 
     function currentItem() {
-      if (index < 0 || index >= feedItems.length) return null;
-      return feedItems[index];
+      return flowSession.currentItem();
+    }
+
+    function getCurrentIndex() {
+      return flowSession.getIndex();
+    }
+
+    function setCurrentIndex(next) {
+      return flowSession.setIndex(next);
     }
 
     const flowState = window.createFlowStateController({
@@ -577,8 +586,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       flowState.toggleImmersive();
     }
 
-    function clearCaption(resetUri = true) {
-      if (resetUri) currentCaptionUri = '';
+    function clearCaption() {
       captionTitle.textContent = '';
       captionTitle.classList.add('hidden');
       captionTags.innerHTML = '';
@@ -613,86 +621,58 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       captionBtn.classList.toggle('is-loading', !!loading);
     }
 
-    async function loadCaption(uri) {
-      if (captionCache.has(uri)) {
-        currentCaptionUri = uri;
-        renderCaption(captionCache.get(uri));
-        return;
-      }
+    function flashCaptionError() {
+      captionBtn.classList.add('is-error');
+      setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
+    }
 
-      clearCaption();
-      currentCaptionUri = uri;
-      const reqId = ++captionRequestId;
-      try {
-        const res = await fetch(`/api/image/metadata?uri=${encodeURIComponent(uri)}`);
-        const data = await res.json();
-        if (reqId !== captionRequestId || currentCaptionUri !== uri) return;
-        if (data.success) {
-          captionCache.set(uri, data.data || null);
-          renderCaption(data.data || null);
-        } else {
-          captionBtn.classList.add('is-error');
-          setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
+    const mediaActions = window.createFlowMediaActionsController({
+      actions: actionsShared,
+      onFavoriteChange: (value) => {
+        favoriteBtn.classList.toggle('is-active', !!value);
+      },
+      onCaptionClear: () => {
+        clearCaption();
+      },
+      onCaptionRender: (payload) => {
+        renderCaption(payload);
+      },
+      onCaptionLoading: (loading) => {
+        setCaptionLoading(loading);
+      },
+      onError: (kind) => {
+        if (kind === 'caption_load' || kind === 'caption_generate') {
+          flashCaptionError();
         }
-      } catch (error) {
-        if (reqId !== captionRequestId || currentCaptionUri !== uri) return;
-        captionBtn.classList.add('is-error');
-        setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
-      }
+      },
+      confirmCaptionReplace: async () => window.confirm('已存在标题，是否覆盖生成？'),
+    });
+
+    async function loadCaption(uri) {
+      await mediaActions.loadCaption(uri);
     }
 
     async function generateCaption(uri, force = false) {
-      const cached = captionCache.get(uri);
-      const hasExisting = cached && ((cached.title && String(cached.title).trim()) || (Array.isArray(cached.tags) && cached.tags.length));
-      if (hasExisting && !force) {
-        const ok = window.confirm('已存在标题，是否覆盖生成？');
-        if (!ok) return;
-      }
-
-      setCaptionLoading(true);
-      try {
-        const res = await fetch('/api/image/metadata', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uri, force: true }),
-        });
-        const data = await res.json();
-        if (!data.success) {
-          captionBtn.classList.add('is-error');
-          setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
-          return;
-        }
-        captionCache.set(uri, data.data || null);
-        if (currentCaptionUri === uri) {
-          renderCaption(data.data || null);
-        }
-      } catch (error) {
-        captionBtn.classList.add('is-error');
-        setTimeout(() => captionBtn.classList.remove('is-error'), 1400);
-      } finally {
-        setCaptionLoading(false);
-      }
+      await mediaActions.generateCaption(uri, { confirmExisting: !force });
     }
 
     async function goNext() {
-      if (index >= feedItems.length - 1 && hasMore) {
+      if (getCurrentIndex() >= feedItems.length - 1 && flowSession.hasMore()) {
         await loadFeed();
       }
-      if (index < feedItems.length - 1) {
-        await showItem(index + 1);
+      if (getCurrentIndex() < feedItems.length - 1) {
+        await showItem(getCurrentIndex() + 1);
       }
     }
 
     async function goPrev() {
-      if (index > 0) {
-        await showItem(index - 1);
+      if (getCurrentIndex() > 0) {
+        await showItem(getCurrentIndex() - 1);
       }
     }
 
     function updateFavoriteState(name) {
-      fetch(`/api/favorite/${encodeURIComponent(name)}`)
-        .then((r) => r.json())
-        .then((d) => favoriteBtn.classList.toggle('is-active', !!d.favorite))
+      mediaActions.syncFavorite(name)
         .catch(() => favoriteBtn.classList.remove('is-active'));
     }
 
@@ -730,7 +710,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     }
 
     function preloadNextVideo() {
-      for (let i = index + 1; i < feedItems.length; i++) {
+      for (let i = getCurrentIndex() + 1; i < feedItems.length; i++) {
         const item = feedItems[i];
         if (item.type !== 'video') continue;
         const v = item.el;
@@ -839,7 +819,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       const prevItem = currentItem();
       clearPreviousState(prevItem);
 
-      index = safeIndex;
+      setCurrentIndex(safeIndex);
       const item = currentItem();
       if (!item) return;
       flowState.onMediaChanged();
@@ -871,7 +851,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
         await loadCaption(item.name);
       }
 
-      if (index >= feedItems.length - 4 && hasMore) {
+      if (getCurrentIndex() >= feedItems.length - 4 && flowSession.hasMore()) {
         loadFeed();
       }
     }
@@ -912,48 +892,55 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     }
 
     async function loadFeed() {
-      if (loadingFeed || !hasMore) return;
-      loadingFeed = true;
+      if (flowSession.isLoading() || !flowSession.hasMore()) return;
       try {
-        const query = new URLSearchParams({
-          page: String(page),
-          size: '24',
-        });
-        if (seed) query.set('seed', seed);
-
-        const res = await fetch(`/api/feed/mix?${query.toString()}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        if (!seed && data.seed) seed = String(data.seed);
-        hasMore = data.has_more !== false;
-
-        const incoming = Array.isArray(data.items) ? data.items : [];
-        incoming.forEach((item) => {
-          if (!item || !item.type || !item.name || !item.media_url) return;
-          const mediaEl = buildMediaElement(item);
-          feedContainer.appendChild(mediaEl);
-          feedItems.push({
-            type: item.type,
-            name: item.name,
-            media_url: item.media_url,
-            detail_url: item.detail_url || '#',
-            thumb_url: item.thumb_url || '',
-            el: mediaEl,
+        const result = await flowSession.loadMore(async (cursor) => {
+          const page = Number(cursor?.page || 1);
+          const query = new URLSearchParams({
+            page: String(page),
+            size: '24',
           });
+          if (seed) query.set('seed', seed);
+
+          const res = await fetch(`/api/feed/mix?${query.toString()}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          if (!seed && data.seed) seed = String(data.seed);
+          const incoming = Array.isArray(data.items) ? data.items : [];
+          const normalized = incoming.map((item) => {
+            if (!item || !item.type || !item.name || !item.media_url) return null;
+            const mediaEl = buildMediaElement(item);
+            return {
+              type: item.type,
+              name: item.name,
+              media_url: item.media_url,
+              detail_url: item.detail_url || '#',
+              thumb_url: item.thumb_url || '',
+              el: mediaEl,
+            };
+          }).filter(Boolean);
+
+          return {
+            items: normalized,
+            hasMore: data.has_more !== false,
+            cursor: { page: page + 1 },
+          };
         });
-        page += 1;
+
+        (result.appendedIndices || []).forEach((itemIndex) => {
+          const entry = feedItems[itemIndex];
+          if (entry?.el) feedContainer.appendChild(entry.el);
+        });
 
         if (feedItems.length > 100) {
           const removeCount = 30;
-          const removed = feedItems.splice(0, removeCount);
+          const removed = flowSession.dropHead(removeCount);
           removed.forEach((entry) => entry.el.remove());
-          index = Math.max(0, index - removeCount);
+          setCurrentIndex(Math.max(0, getCurrentIndex() - removeCount));
         }
       } catch (error) {
-        hasMore = false;
-      } finally {
-        loadingFeed = false;
+        flowSession.setHasMore(false);
       }
     }
 
@@ -1016,11 +1003,10 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       e.preventDefault();
       const name = favoriteBtn.dataset.value || '';
       if (!name) return;
-      favoriteBtn.classList.toggle('is-active');
       try {
-        await fetch(`/api/favorite/${encodeURIComponent(name)}`, { method: 'POST' });
+        await mediaActions.toggleFavorite(name);
       } catch (error) {
-        favoriteBtn.classList.toggle('is-active');
+        updateFavoriteState(name);
       }
     });
 

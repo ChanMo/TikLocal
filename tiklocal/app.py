@@ -418,26 +418,10 @@ def create_app(test_config=None):
         """Immersive Mixed Media Feed"""
         return render_template('tiktok.html', menu='index')
 
-    @app.route('/gallery')
-    def gallery():
-        """Legacy route: image discovery now maps to Library image mode."""
-        return redirect('/library?mode=image_random')
-
     @app.route('/download')
     def download_view():
         """URL Download Center"""
         return render_template('download.html', menu='download')
-
-    @app.route('/browse')
-    def browse():
-        """Legacy route: video list now maps to Library video mode."""
-        filter_mode = str(request.args.get('filter', 'all')).strip()
-        if filter_mode == 'favorite':
-            return redirect('/favorite')
-        if filter_mode == 'big':
-            min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
-            return redirect(f'/library?mode=big_files&min_mb={min_mb}')
-        return redirect('/library?mode=video_latest')
 
     @app.route('/settings/')
     def settings_view():
@@ -510,6 +494,8 @@ def create_app(test_config=None):
         if target.suffix.lower() in IMAGE_EXTENSIONS:
             return redirect(f"/image?uri={quote(name)}")
         source_meta = download_manager.resolve_source_for_file(name)
+        file_path_encoded = quote(name, safe='/')
+        file_query_encoded = quote(name, safe='')
         
         # Context navigation (prev/next)
         # Note: Re-scanning every request is inefficient for large libraries, 
@@ -523,14 +509,20 @@ def create_app(test_config=None):
             next_item = video_names[index+1] if index < len(video_names)-1 else None
         except ValueError:
             prev_item = next_item = None
+        prev_item_path_encoded = quote(prev_item, safe='/') if prev_item else None
+        next_item_path_encoded = quote(next_item, safe='/') if next_item else None
 
         return render_template(
             'detail.html',
             file=name,
+            file_path_encoded=file_path_encoded,
+            file_query_encoded=file_query_encoded,
             mtime=datetime.datetime.fromtimestamp(target.stat().st_mtime).strftime('%Y-%m-%d %H:%M'),
             size=target.stat().st_size,
             previous_item=prev_item,
             next_item=next_item,
+            previous_item_path_encoded=prev_item_path_encoded,
+            next_item_path_encoded=next_item_path_encoded,
             source_meta=source_meta,
         )
     
@@ -542,7 +534,15 @@ def create_app(test_config=None):
         target = library_service.resolve_path(uri)
         if not target or not target.exists(): return "File not found", 404
         source_meta = download_manager.resolve_source_for_file(uri)
-        return render_template('image_detail.html', image=target, uri=uri, stat=target.stat(), source_meta=source_meta)
+        uri_query_encoded = quote(uri, safe='')
+        return render_template(
+            'image_detail.html',
+            image=target,
+            uri=uri,
+            uri_query_encoded=uri_query_encoded,
+            stat=target.stat(),
+            source_meta=source_meta,
+        )
 
     @app.route("/delete/<path:name>", methods=['POST', 'GET'])
     def delete_view(name):
@@ -608,7 +608,7 @@ def create_app(test_config=None):
         # Legacy support for /media?uri=...
         uri = request.args.get('uri')
         if not uri: return "Missing uri", 400
-        return redirect(f"/media/{uri}")
+        return redirect(f"/media/{quote(uri, safe='/')}")
 
     @app.route('/thumb')
     def thumb_view():
@@ -622,36 +622,6 @@ def create_app(test_config=None):
 
 
     # --- API Routes ---
-    @app.route('/api/videos')
-    def api_videos():
-        # Clean JSON API
-        selected = recommend_service.get_weighted_selection(file_type='video', limit=20)
-        return json.dumps(selected)
-
-    @app.route('/api/random-images')
-    def api_random_images():
-        page = _read_int_arg('page', 1, minimum=1)
-        size = _read_int_arg('size', 30, minimum=1, maximum=100)
-        seed = request.args.get('seed') or str(random.randint(1, 999999))
-        
-        # Get recommended images (all of them, weighted)
-        # Note: RecommendService currently returns a list. For true scale, we'd paginate inside Service.
-        # For now, consistent with previous behavior, we get all and slice.
-        all_images = recommend_service.get_weighted_selection(file_type='image', limit=99999, seed=seed)
-        
-        total = len(all_images)
-        start = (page - 1) * size
-        end = start + size
-        page_images = all_images[start:end]
-        
-        return {
-            'images': page_images,
-            'page': page,
-            'total': total,
-            'has_more': end < total,
-            'seed': seed
-        }
-
     @app.route('/api/feed/mix')
     def api_feed_mix():
         page = _read_int_arg('page', 1, minimum=1)

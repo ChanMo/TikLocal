@@ -541,6 +541,9 @@
 {% block extra_body %}
 <script src="{{ url_for('static', filename='flow_ui_shared.js') }}"></script>
 <script src="{{ url_for('static', filename='flow_state_controller.js') }}"></script>
+<script src="{{ url_for('static', filename='flow_session.js') }}"></script>
+<script src="{{ url_for('static', filename='flow_actions_shared.js') }}"></script>
+<script src="{{ url_for('static', filename='flow_media_actions_controller.js') }}"></script>
 <script src="{{ url_for('static', filename='hammer.min.js') }}"></script>
 <script>
   (() => {
@@ -583,6 +586,7 @@
     const quickCaptionTitle = document.getElementById('quick-caption-title');
     const quickCaptionTags = document.getElementById('quick-caption-tags');
     const uiShared = window.FlowUIShared || {};
+    const actionsShared = window.FlowActionsShared || {};
 
     const quickFavorite = document.getElementById('quick-favorite');
     const quickSource = document.getElementById('quick-source');
@@ -590,16 +594,13 @@
 
     let mode = scope === 'favorite' ? 'all' : initialMode;
     let seed = initialSeed || '';
-    let hasMore = !!initialHasMore;
-    let nextOffset = Number(initialNextOffset || 0);
-    let loading = false;
-
-    const items = [];
-    const renderedNames = new Set();
-    const favoriteState = new Map();
-    const sourceState = new Map();
-    const captionCache = new Map();
-    let currentIndex = -1;
+    const flowSession = window.createFlowSession({
+      initialItems,
+      initialHasMore: !!initialHasMore,
+      initialCursor: { offset: Number(initialNextOffset || 0) },
+      keyOf: (item) => String(item?.name || ''),
+    });
+    const items = flowSession.items;
     let currentSpeedIndex = 1;
     let clickTimer = null;
     let lastClickTime = 0;
@@ -613,8 +614,6 @@
     let magX = 0;
     let magY = 0;
     let zoomLevel = 2.5;
-    let captionRequestId = 0;
-    let currentCaptionUri = '';
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
     function formatTime(seconds) {
@@ -626,8 +625,15 @@
     }
 
     function currentItem() {
-      if (currentIndex < 0 || currentIndex >= items.length) return null;
-      return items[currentIndex];
+      return flowSession.currentItem();
+    }
+
+    function getCurrentIndex() {
+      return flowSession.getIndex();
+    }
+
+    function setCurrentIndex(next) {
+      return flowSession.setIndex(next);
     }
 
     const flowState = window.createFlowStateController({
@@ -820,30 +826,6 @@
       }, 180);
     }
 
-    function appendItems(batch) {
-      if (!Array.isArray(batch) || !batch.length) return 0;
-      const appendedIndexes = [];
-      let appended = 0;
-      batch.forEach((item) => {
-        const name = String(item?.name || '');
-        if (!name || renderedNames.has(name)) return;
-        renderedNames.add(name);
-        items.push(item);
-        appendedIndexes.push(items.length - 1);
-        appended += 1;
-      });
-      if (appendedIndexes.length) {
-        ensureWaterfallLayout(!waterfall.columns.length);
-        updateWaterfallMetrics();
-        appendedIndexes.forEach((index) => appendIndexToWaterfall(index));
-        feather.replace();
-      }
-      if (quickView.classList.contains('active') && currentIndex >= 0) {
-        quickCounter.textContent = `${currentIndex + 1} / ${items.length}`;
-      }
-      return appended;
-    }
-
     function setLoadingText(text) {
       loadingEl.textContent = text;
     }
@@ -866,32 +848,44 @@
     }
 
     async function loadNextPage() {
-      if (loading || !hasMore) return;
-      loading = true;
+      if (flowSession.isLoading() || !flowSession.hasMore()) return;
       setLoadingText('正在加载...');
       try {
-        const res = await fetch(`/api/library/items?${apiParams(nextOffset).toString()}`);
-        const data = await res.json();
-        if (!data?.success) throw new Error('request failed');
+        await flowSession.loadMore(async (cursor) => {
+          const offset = Number(cursor?.offset || 0);
+          const res = await fetch(`/api/library/items?${apiParams(offset).toString()}`);
+          const data = await res.json();
+          if (!data?.success) throw new Error('request failed');
 
-        const payload = data.data || {};
-        const incoming = Array.isArray(payload.items) ? payload.items : [];
-        if (payload.seed && mode === 'image_random') seed = String(payload.seed);
-        appendItems(incoming);
-        hasMore = payload.has_more === true;
-        nextOffset = Number(payload.next_offset || (nextOffset + pageSize));
+          const payload = data.data || {};
+          if (payload.seed && mode === 'image_random') seed = String(payload.seed);
+          return {
+            items: Array.isArray(payload.items) ? payload.items : [],
+            hasMore: payload.has_more === true,
+            cursor: { offset: Number(payload.next_offset || (offset + pageSize)) },
+          };
+        }).then((result) => {
+          const appendedIndexes = result.appendedIndices || [];
+          if (appendedIndexes.length) {
+            ensureWaterfallLayout(!waterfall.columns.length);
+            updateWaterfallMetrics();
+            appendedIndexes.forEach((idx) => appendIndexToWaterfall(idx));
+            feather.replace();
+            if (quickView.classList.contains('active') && getCurrentIndex() >= 0) {
+              quickCounter.textContent = `${getCurrentIndex() + 1} / ${items.length}`;
+            }
+          }
+        });
 
         if (!items.length) {
           setLoadingText(emptyMessage);
-        } else if (!hasMore) {
+        } else if (!flowSession.hasMore()) {
           setLoadingText('到底了');
         } else {
           setLoadingText('继续下滑加载更多');
         }
       } catch (error) {
         setLoadingText('加载失败，下滑重试');
-      } finally {
-        loading = false;
       }
     }
 
@@ -901,10 +895,10 @@
       if (mode === 'image_random') seed = makeRandomSeed();
       else seed = '';
 
-      hasMore = true;
-      nextOffset = 0;
-      items.length = 0;
-      renderedNames.clear();
+      flowSession.reset({
+        hasMore: true,
+        cursor: { offset: 0 },
+      });
       resetWaterfallLayout();
       activeTab();
       setLoadingText('正在加载...');
@@ -913,18 +907,8 @@
 
     async function syncFavoriteState(item) {
       if (!item?.name) return;
-      if (favoriteState.has(item.name)) {
-        updateFavoriteButton(favoriteState.get(item.name));
-        return;
-      }
       try {
-        const res = await fetch(`/api/favorite/${encodeURIComponent(item.name)}`);
-        const data = await res.json();
-        const value = !!data.favorite;
-        favoriteState.set(item.name, value);
-        if (currentIndex >= 0 && items[currentIndex]?.name === item.name) {
-          updateFavoriteButton(value);
-        }
+        await mediaActions.syncFavorite(item.name);
       } catch (error) {
         updateFavoriteButton(false);
       }
@@ -948,8 +932,7 @@
         quickSource.classList.remove('is-hidden');
     }
 
-    function clearCaption(resetUri = true) {
-      if (resetUri) currentCaptionUri = '';
+    function clearCaption() {
       quickCaptionTitle.textContent = '';
       quickCaptionTags.innerHTML = '';
       quickCaptionPanel.classList.add('is-hidden');
@@ -978,64 +961,41 @@
       quickCaption.classList.toggle('is-loading', !!loadingState);
     }
 
-    async function loadCaption(uri) {
-      if (!uri) {
-        clearCaption();
-        return;
-      }
-      if (captionCache.has(uri)) {
-        currentCaptionUri = uri;
-        renderCaption(captionCache.get(uri));
-        return;
-      }
+    function flashCaptionError() {
+      quickCaption.classList.add('is-error');
+      setTimeout(() => quickCaption.classList.remove('is-error'), 1400);
+    }
 
-      clearCaption();
-      currentCaptionUri = uri;
-      const reqId = ++captionRequestId;
-      try {
-        const res = await fetch(`/api/image/metadata?uri=${encodeURIComponent(uri)}`);
-        const data = await res.json();
-        if (reqId !== captionRequestId || currentCaptionUri !== uri) return;
-        if (!data?.success) {
-          quickCaption.classList.add('is-error');
-          setTimeout(() => quickCaption.classList.remove('is-error'), 1400);
-          return;
-        }
-        const payload = data.data || null;
-        captionCache.set(uri, payload);
+    const mediaActions = window.createFlowMediaActionsController({
+      actions: actionsShared,
+      onFavoriteChange: (value) => {
+        updateFavoriteButton(value);
+      },
+      onSourceChange: (sourceMeta) => {
+        updateSourceButton(sourceMeta);
+      },
+      onCaptionClear: () => {
+        clearCaption();
+      },
+      onCaptionRender: (payload) => {
         renderCaption(payload);
-      } catch (error) {
-        if (reqId !== captionRequestId || currentCaptionUri !== uri) return;
-        quickCaption.classList.add('is-error');
-        setTimeout(() => quickCaption.classList.remove('is-error'), 1400);
-      }
+      },
+      onCaptionLoading: (loading) => {
+        setCaptionLoading(loading);
+      },
+      onError: (kind) => {
+        if (kind === 'caption_load' || kind === 'caption_generate') {
+          flashCaptionError();
+        }
+      },
+    });
+
+    async function loadCaption(uri) {
+      await mediaActions.loadCaption(uri);
     }
 
     async function generateCaption(uri) {
-      if (!uri) return;
-      setCaptionLoading(true);
-      try {
-        const res = await fetch('/api/image/metadata', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uri, force: true }),
-        });
-        const data = await res.json();
-        if (!data?.success) {
-          quickCaption.classList.add('is-error');
-          setTimeout(() => quickCaption.classList.remove('is-error'), 1400);
-          return;
-        }
-        captionCache.set(uri, data.data || null);
-        if (currentCaptionUri === uri) {
-          renderCaption(data.data || null);
-        }
-      } catch (error) {
-        quickCaption.classList.add('is-error');
-        setTimeout(() => quickCaption.classList.remove('is-error'), 1400);
-      } finally {
-        setCaptionLoading(false);
-      }
+      await mediaActions.generateCaption(uri);
     }
 
     function currentImageEl() {
@@ -1165,7 +1125,7 @@
       updateSourceButton(null);
       clearCaption();
       toggleMagnifier(false);
-      currentIndex = -1;
+      setCurrentIndex(-1);
       if (bodyScrollLocked) {
         document.body.style.overflow = bodyOverflowBackup;
         bodyOverflowBackup = '';
@@ -1175,7 +1135,7 @@
 
     async function showItem(index) {
       if (index < 0 || index >= items.length) return;
-      currentIndex = index;
+      setCurrentIndex(index);
       const item = items[index];
       quickCounter.textContent = `${index + 1} / ${items.length}`;
       quickDetail.href = item.detail_url || '#';
@@ -1215,7 +1175,7 @@
 
       syncFavoriteState(item);
       syncSourceState(item);
-      if (index >= items.length - 8 && hasMore) loadNextPage();
+      if (index >= items.length - 8 && flowSession.hasMore()) loadNextPage();
     }
 
     function openViewer(index) {
@@ -1231,12 +1191,12 @@
     }
 
     async function nextItem() {
-      if (currentIndex >= items.length - 1 && hasMore) await loadNextPage();
-      if (currentIndex < items.length - 1) await showItem(currentIndex + 1);
+      if (getCurrentIndex() >= items.length - 1 && flowSession.hasMore()) await loadNextPage();
+      if (getCurrentIndex() < items.length - 1) await showItem(getCurrentIndex() + 1);
     }
 
     async function prevItem() {
-      if (currentIndex > 0) await showItem(currentIndex - 1);
+      if (getCurrentIndex() > 0) await showItem(getCurrentIndex() - 1);
     }
 
     async function syncSourceState(item) {
@@ -1244,43 +1204,24 @@
         updateSourceButton(null);
         return;
       }
-      if (sourceState.has(item.name)) {
-        updateSourceButton(sourceState.get(item.name));
-        return;
-      }
-      updateSourceButton(null);
       try {
-        const res = await fetch(`/api/source?file=${encodeURIComponent(item.name)}`);
-        const data = await res.json();
-        const source = data?.success ? (data?.data?.source || null) : null;
-        sourceState.set(item.name, source);
-        if (currentIndex >= 0 && items[currentIndex]?.name === item.name) {
-          updateSourceButton(source);
-        }
+        await mediaActions.syncSource(item.name);
       } catch (error) {
-        sourceState.set(item.name, null);
-        if (currentIndex >= 0 && items[currentIndex]?.name === item.name) {
-          updateSourceButton(null);
-        }
+        updateSourceButton(null);
       }
     }
 
     quickFavorite.addEventListener('click', async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (currentIndex < 0 || currentIndex >= items.length) return;
-      const item = items[currentIndex];
+      const idx = getCurrentIndex();
+      if (idx < 0 || idx >= items.length) return;
+      const item = items[idx];
       if (!item?.name) return;
-
-      const before = !!favoriteState.get(item.name);
-      const next = !before;
-      favoriteState.set(item.name, next);
-      updateFavoriteButton(next);
       try {
-        await fetch(`/api/favorite/${encodeURIComponent(item.name)}`, { method: 'POST' });
+        await mediaActions.toggleFavorite(item.name);
       } catch (error) {
-        favoriteState.set(item.name, before);
-        updateFavoriteButton(before);
+        await syncFavoriteState(item);
       }
     });
 
@@ -1468,11 +1409,10 @@
 
     quickSpeed.textContent = `${speedOptions[currentSpeedIndex]}x`;
     applyZoom(2.5);
-    ensureWaterfallLayout(true);
-    appendItems(initialItems);
-    if (!items.length && !hasMore) {
+    relayoutWaterfall();
+    if (!items.length && !flowSession.hasMore()) {
       setLoadingText(emptyMessage);
-    } else if (!hasMore) {
+    } else if (!flowSession.hasMore()) {
       setLoadingText('到底了');
     } else {
       setLoadingText('继续下滑加载更多');

@@ -64,8 +64,8 @@
               preload="metadata"
               class="video-player w-full max-h-[70vh] object-contain"
               id="main-video"
-              src="/media/{{file}}"
-              poster="/thumb?uri={{file}}"
+              src="/media/{{ file_path_encoded }}"
+              poster="/thumb?uri={{ file_query_encoded }}"
             >
               您的浏览器不支持视频播放。
             </video>
@@ -203,7 +203,7 @@
             </button>
             
             <a 
-              href="/media/{{file}}" 
+              href="/media/{{ file_path_encoded }}" 
               target="_blank"
               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 font-medium"
             >
@@ -256,7 +256,7 @@
           <div class="space-y-2">
             {% if previous_item %}
             <a 
-              href="/detail/{{previous_item}}" 
+              href="/detail/{{ previous_item_path_encoded }}" 
               class="nav-button prev w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
             >
               <i data-feather="chevron-left" class="w-4 h-4"></i>
@@ -266,7 +266,7 @@
             
             {% if next_item %}
             <a 
-              href="/detail/{{next_item}}" 
+              href="/detail/{{ next_item_path_encoded }}" 
               class="nav-button w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
             >
               下一个视频
@@ -330,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const videoControls = document.getElementById('video-controls');
   const setThumbBtn = document.getElementById('set-thumb-btn');
   
-  const fileName = "{{file}}";
+  const fileName = {{ file|tojson }};
   let isFavorited = false;
 
   // 初始化收藏状态
@@ -534,7 +534,7 @@ function confirmDelete() {
     '确定要删除这个视频吗？', 
     '此操作不可撤销，视频将被永久删除。', 
     () => {
-      window.location.href = '/delete/{{file}}';
+      window.location.href = '/delete/{{ file_path_encoded }}';
     }
   );
 }
