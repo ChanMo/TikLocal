@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.8.13 (2026-02-24)
+- Release v0.8.13: fix 'function' object is not subscriptable on Python 3.12
+- fix: add __future__ annotations to resolve 'function' object is not subscriptable
+
+
 ## Unreleased
 - 暂无。
 
