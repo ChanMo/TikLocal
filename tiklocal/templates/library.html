@@ -945,6 +945,7 @@
     let magX = 0;
     let magY = 0;
     let zoomLevel = 2.5;
+    let magnifierFrameRequest = null;
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
     function formatTime(seconds) {
@@ -969,11 +970,18 @@
 
     const flowState = window.createFlowStateController({
       getMediaType: () => currentItem()?.type || '',
+      canMagnifyMedia: (mediaType) => mediaType === 'image' || mediaType === 'video',
       onImmersiveChange: (enabled) => {
         quickView.classList.toggle('immersive', !!enabled);
       },
       onMagnifyingChange: (enabled) => {
         isMagnifying = !!enabled;
+        if (!isMagnifying) {
+          cancelMagnifierFrameRequest();
+          quickMagnifierToggle.classList.remove('is-active');
+          quickZoomOptions.classList.remove('show');
+          quickMagnifier.classList.remove('active');
+        }
       },
     });
 
@@ -1563,15 +1571,91 @@
       return quickImage;
     }
 
+    function currentVideoEl() {
+      const item = currentItem();
+      if (!item || item.type !== 'video') return null;
+      return quickVideo;
+    }
+
     function getImageContainRect(imgEl) {
       return uiShared.getImageContainRect(imgEl);
+    }
+
+    function getVideoContainRect(videoEl) {
+      return uiShared.getVideoContainRect(videoEl);
     }
 
     function updateMagnifierPosition() {
       uiShared.setMagnifierPosition(quickMagnifier, magX, magY);
     }
 
+    function cancelMagnifierFrameRequest() {
+      if (!magnifierFrameRequest) return;
+      if (magnifierFrameRequest.kind === 'rvfc') {
+        const videoEl = magnifierFrameRequest.videoEl;
+        if (videoEl && typeof videoEl.cancelVideoFrameCallback === 'function') {
+          try {
+            videoEl.cancelVideoFrameCallback(magnifierFrameRequest.id);
+          } catch (error) {
+            // Ignore cancellation failures when media element lifecycle changes.
+          }
+        }
+      } else if (magnifierFrameRequest.kind === 'raf') {
+        cancelAnimationFrame(magnifierFrameRequest.id);
+      } else if (magnifierFrameRequest.kind === 'timeout') {
+        clearTimeout(magnifierFrameRequest.id);
+      }
+      magnifierFrameRequest = null;
+    }
+
+    function scheduleMagnifierFrameLoop(videoEl) {
+      cancelMagnifierFrameRequest();
+      if (!videoEl) return;
+
+      const tick = () => {
+        magnifierFrameRequest = null;
+        if (!isMagnifying) return;
+        const activeVideo = currentVideoEl();
+        if (!activeVideo || activeVideo !== videoEl) return;
+        updateMagnifierContent();
+
+        if (videoEl.paused || videoEl.ended) {
+          const timeoutId = setTimeout(() => {
+            scheduleMagnifierFrameLoop(videoEl);
+          }, 120);
+          magnifierFrameRequest = { kind: 'timeout', id: timeoutId, videoEl };
+          return;
+        }
+        scheduleMagnifierFrameLoop(videoEl);
+      };
+
+      if (typeof videoEl.requestVideoFrameCallback === 'function') {
+        const id = videoEl.requestVideoFrameCallback(() => tick());
+        magnifierFrameRequest = { kind: 'rvfc', id, videoEl };
+      } else {
+        const id = requestAnimationFrame(tick);
+        magnifierFrameRequest = { kind: 'raf', id, videoEl };
+      }
+    }
+
     function updateMagnifierContent() {
+      const item = currentItem();
+      if (!item) return;
+
+      if (item.type === 'video') {
+        const videoEl = currentVideoEl();
+        if (!videoEl) return;
+        uiShared.updateVideoMagnifierContent({
+          videoEl,
+          lensEl: quickMagnifier,
+          centerX: magX,
+          centerY: magY,
+          zoomLevel,
+          maxPixelRatio: 2,
+        });
+        return;
+      }
+
       const imgEl = currentImageEl();
       if (!imgEl) return;
       uiShared.updateMagnifierContent({
@@ -1603,7 +1687,10 @@
         quickMagnifierToggle.classList.add('is-active');
         quickZoomOptions.classList.add('show');
         quickMagnifier.classList.add('active');
-        const rect = getImageContainRect(currentImageEl());
+        const item = currentItem();
+        const rect = item?.type === 'video'
+          ? getVideoContainRect(currentVideoEl())
+          : getImageContainRect(currentImageEl());
         if (rect) {
           magX = rect.left + rect.width / 2;
           magY = rect.top + rect.height / 2;
@@ -1613,7 +1700,13 @@
         }
         updateMagnifierPosition();
         updateMagnifierContent();
+        if (item?.type === 'video') {
+          scheduleMagnifierFrameLoop(currentVideoEl());
+        } else {
+          cancelMagnifierFrameRequest();
+        }
       } else {
+        cancelMagnifierFrameRequest();
         quickMagnifierToggle.classList.remove('is-active');
         quickZoomOptions.classList.remove('show');
         quickMagnifier.classList.remove('active');
@@ -1625,7 +1718,7 @@
       quickControls.classList.toggle('is-hidden', !isVideo);
       quickSpeed.hidden = !isVideo;
       quickCaption.hidden = isVideo;
-      quickMagnifierToolWrap.hidden = isVideo;
+      quickMagnifierToolWrap.hidden = false;
 
       if (!isVideo) {
         quickProgress.disabled = true;
@@ -2017,7 +2110,17 @@
     quickVideo.addEventListener('timeupdate', updateVideoProgress);
     quickVideo.addEventListener('loadedmetadata', updateVideoProgress);
     quickVideo.addEventListener('durationchange', updateVideoProgress);
-    quickVideo.addEventListener('play', () => quickPlayStatus.classList.remove('visible'));
+    quickVideo.addEventListener('play', () => {
+      quickPlayStatus.classList.remove('visible');
+      if (isMagnifying && currentVideoEl() === quickVideo) {
+        scheduleMagnifierFrameLoop(quickVideo);
+      }
+    });
+    quickVideo.addEventListener('seeked', () => {
+      if (isMagnifying && currentVideoEl() === quickVideo) {
+        updateMagnifierContent();
+      }
+    });
     quickVideo.addEventListener('pause', () => {
       const item = currentItem();
       if (item?.type === 'video') showPlayStatus(true);

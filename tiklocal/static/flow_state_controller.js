@@ -6,6 +6,9 @@
   function createFlowStateController(options) {
     var opts = options || {};
     var getMediaType = typeof opts.getMediaType === 'function' ? opts.getMediaType : function () { return ''; };
+    var canMagnifyMedia = typeof opts.canMagnifyMedia === 'function'
+      ? opts.canMagnifyMedia
+      : function (mediaType) { return mediaType === 'image'; };
     var onImmersiveChange = typeof opts.onImmersiveChange === 'function' ? opts.onImmersiveChange : noop;
     var onMagnifyingChange = typeof opts.onMagnifyingChange === 'function' ? opts.onMagnifyingChange : noop;
 
@@ -13,7 +16,11 @@
     var magnifying = false;
 
     function canMagnify() {
-      return getMediaType() === 'image';
+      try {
+        return !!canMagnifyMedia(getMediaType());
+      } catch (error) {
+        return false;
+      }
     }
 
     function setImmersive(enabled) {
