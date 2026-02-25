@@ -528,13 +528,17 @@
     inset: 0;
     z-index: 280;
     background: rgba(15, 23, 42, 0.56);
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     padding: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s;
   }
   .quick-collection-modal.active {
-    display: flex;
+    opacity: 1;
+    pointer-events: auto;
   }
   .quick-collection-card {
     width: min(440px, 100%);
@@ -544,6 +548,11 @@
     color: #0f172a;
     box-shadow: 0 24px 80px rgba(15, 23, 42, 0.3);
     padding: 12px;
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .quick-collection-modal.active .quick-collection-card {
+    transform: translateY(0);
   }
   [data-theme="dark"] .quick-collection-card {
     background: rgba(15, 23, 42, 0.98);
@@ -587,7 +596,7 @@
   .quick-collection-create {
     display: flex;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-top: 10px;
   }
   .quick-collection-create input {
     flex: 1;
@@ -604,8 +613,7 @@
     color: #f1f5f9;
     border-color: rgba(148, 163, 184, 0.2);
   }
-  .quick-collection-create button,
-  .quick-collection-actions button {
+  .quick-collection-create button {
     border-radius: 10px;
     border: 1px solid rgba(148, 163, 184, 0.3);
     background: rgba(15, 23, 42, 0.9);
@@ -614,18 +622,9 @@
     font-weight: 600;
     padding: 8px 12px;
   }
-  [data-theme="dark"] .quick-collection-create button,
-  [data-theme="dark"] .quick-collection-actions button {
+  [data-theme="dark"] .quick-collection-create button {
     background: rgba(226, 232, 240, 0.94);
     color: #0f172a;
-  }
-  .quick-collection-actions button.ghost {
-    background: rgba(255, 255, 255, 0.85);
-    color: #334155;
-  }
-  [data-theme="dark"] .quick-collection-actions button.ghost {
-    background: rgba(15, 23, 42, 0.86);
-    color: #cbd5e1;
   }
   .quick-collection-list {
     max-height: min(44vh, 320px);
@@ -647,7 +646,6 @@
     padding: 8px 10px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
     cursor: pointer;
     border: 1px solid transparent;
@@ -659,27 +657,41 @@
     opacity: 0.6;
     pointer-events: none;
   }
-  .quick-collection-item input {
-    width: 15px;
-    height: 15px;
+  .quick-collection-item.is-selected {
+    background: rgba(99, 102, 241, 0.07);
   }
-  .quick-collection-item span {
+  .quick-collection-item input[type="checkbox"] {
+    position: absolute; opacity: 0; width: 0; height: 0;
+  }
+  .quick-collection-item span.coll-name {
     flex: 1;
     min-width: 0;
-    font-size: 12px;
-    color: inherit;
+    font-size: 13px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .quick-collection-item em {
-    font-style: normal;
-    font-size: 11px;
-    color: #64748b;
+  .quick-collection-item .coll-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: rgba(148, 163, 184, 0.12);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; color: #64748b;
   }
-  [data-theme="dark"] .quick-collection-item em {
-    color: #94a3b8;
+  .quick-collection-item .coll-check {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(148, 163, 184, 0.45);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s;
   }
+  .quick-collection-item .coll-check svg { display: none; color: white; }
+  .quick-collection-item.is-selected .coll-check {
+    background: #6366f1;
+    border-color: #6366f1;
+  }
+  .quick-collection-item.is-selected .coll-check svg { display: block; }
   .quick-collection-empty {
     text-align: center;
     font-size: 12px;
@@ -689,11 +701,28 @@
   [data-theme="dark"] .quick-collection-empty {
     color: #94a3b8;
   }
-  .quick-collection-actions {
-    margin-top: 10px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+  .coll-drag-handle {
+    width: 36px; height: 4px;
+    border-radius: 2px;
+    background: rgba(148, 163, 184, 0.35);
+    margin: 12px auto 16px;
+    display: none;
+  }
+  @media (max-width: 540px) {
+    .quick-collection-modal {
+      align-items: flex-end;
+      padding: 0;
+    }
+    .quick-collection-card {
+      width: 100%;
+      border-radius: 20px 20px 0 0;
+      transform: translateY(100%);
+      padding: 0 12px 24px;
+    }
+    .quick-collection-modal.active .quick-collection-card {
+      transform: translateY(0);
+    }
+    .coll-drag-handle { display: block; }
   }
 </style>
 {% endblock %}
@@ -804,6 +833,7 @@
 
 <div id="quick-collection-modal" class="quick-collection-modal" aria-hidden="true">
   <div class="quick-collection-card">
+    <div class="coll-drag-handle"></div>
     <div class="quick-collection-header">
       <div class="quick-collection-title-row">
         <h3>加入集合</h3>
@@ -813,13 +843,10 @@
       </div>
       <div id="quick-collection-meta" class="quick-collection-meta">当前未加入任何集合</div>
     </div>
+    <div id="quick-collection-list" class="quick-collection-list"></div>
     <div class="quick-collection-create">
       <input id="quick-collection-name" type="text" maxlength="80" placeholder="新建集合名称" />
       <button id="quick-collection-create-btn" type="button">新建</button>
-    </div>
-    <div id="quick-collection-list" class="quick-collection-list"></div>
-    <div class="quick-collection-actions">
-      <button id="quick-collection-cancel" type="button" class="ghost">关闭</button>
     </div>
   </div>
 </div>
@@ -885,7 +912,7 @@
     const quickCollectionModal = document.getElementById('quick-collection-modal');
     const quickCollectionClose = document.getElementById('quick-collection-close');
     const quickCollectionMeta = document.getElementById('quick-collection-meta');
-    const quickCollectionCancel = document.getElementById('quick-collection-cancel');
+
     const quickCollectionCreateBtn = document.getElementById('quick-collection-create-btn');
     const quickCollectionNameInput = document.getElementById('quick-collection-name');
     const quickCollectionList = document.getElementById('quick-collection-list');
@@ -1337,11 +1364,18 @@
         const safeName = escapeHtml(String(item.name || '未命名集合'));
         const count = Number(item.item_count || 0);
         const checked = selectedIds.has(id) ? 'checked' : '';
+        const isSelected = selectedIds.has(id) ? 'is-selected' : '';
         return `
-          <label class="quick-collection-item" data-id="${id}">
+          <label class="quick-collection-item ${isSelected}" data-id="${id}">
+            <span class="coll-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            </span>
+            <span class="coll-name">${safeName}</span>
+            <em class="coll-count">${count > 0 ? count : ''}</em>
+            <span class="coll-check">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </span>
             <input type="checkbox" ${checked} />
-            <span>${safeName}</span>
-            <em>${count}</em>
           </label>
         `;
       }).join('');
@@ -1795,10 +1829,7 @@
       event.preventDefault();
       closeCollectionModal();
     });
-    quickCollectionCancel.addEventListener('click', (event) => {
-      event.preventDefault();
-      closeCollectionModal();
-    });
+
     quickCollectionModal.addEventListener('click', (event) => {
       if (collectionModalOpenedAt && (Date.now() - collectionModalOpenedAt) < collectionModalGuardMs) {
         return;

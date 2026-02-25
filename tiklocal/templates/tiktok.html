@@ -461,13 +461,17 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
   inset: 0;
   z-index: 260;
   background: rgba(15, 23, 42, 0.56);
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s;
 }
 .collection-modal.active {
-  display: flex;
+  opacity: 1;
+  pointer-events: auto;
 }
 .collection-modal-card {
   width: min(440px, 100%);
@@ -477,6 +481,11 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
   color: #0f172a;
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.3);
   padding: 12px;
+  transform: translateY(20px);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.collection-modal.active .collection-modal-card {
+  transform: translateY(0);
 }
 [data-theme="dark"] .collection-modal-card {
   background: rgba(15, 23, 42, 0.98);
@@ -520,7 +529,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
 .collection-modal-create {
   display: flex;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-top: 10px;
 }
 .collection-modal-create input {
   flex: 1;
@@ -537,8 +546,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
   color: #f1f5f9;
   border-color: rgba(148, 163, 184, 0.2);
 }
-.collection-modal-create button,
-.collection-modal-actions button {
+.collection-modal-create button {
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.3);
   background: rgba(15, 23, 42, 0.9);
@@ -547,18 +555,9 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
   font-weight: 600;
   padding: 8px 12px;
 }
-[data-theme="dark"] .collection-modal-create button,
-[data-theme="dark"] .collection-modal-actions button {
+[data-theme="dark"] .collection-modal-create button {
   background: rgba(226, 232, 240, 0.94);
   color: #0f172a;
-}
-.collection-modal-actions button.ghost {
-  background: rgba(255, 255, 255, 0.85);
-  color: #334155;
-}
-[data-theme="dark"] .collection-modal-actions button.ghost {
-  background: rgba(15, 23, 42, 0.86);
-  color: #cbd5e1;
 }
 .collection-modal-list {
   max-height: min(44vh, 320px);
@@ -580,7 +579,6 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
   padding: 8px 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   cursor: pointer;
   border: 1px solid transparent;
@@ -592,27 +590,47 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
   opacity: 0.6;
   pointer-events: none;
 }
-.collection-modal-item input {
-  width: 15px;
-  height: 15px;
+.collection-modal-item.is-selected {
+  background: rgba(99, 102, 241, 0.07);
 }
-.collection-modal-item span {
+.collection-modal-item input[type="checkbox"] {
+  position: absolute; opacity: 0; width: 0; height: 0;
+}
+.collection-modal-item span.coll-name {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
-  color: inherit;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.collection-modal-item em {
+em.coll-count {
   font-style: normal;
   font-size: 11px;
-  color: #64748b;
-}
-[data-theme="dark"] .collection-modal-item em {
   color: #94a3b8;
+  flex-shrink: 0;
 }
+.coll-icon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.12);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: #64748b;
+}
+.coll-check {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(148, 163, 184, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.coll-check svg { display: none; color: white; }
+.collection-modal-item.is-selected .coll-check {
+  background: #6366f1;
+  border-color: #6366f1;
+}
+.collection-modal-item.is-selected .coll-check svg { display: block; }
 .collection-modal-empty {
   text-align: center;
   font-size: 12px;
@@ -622,11 +640,28 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
 [data-theme="dark"] .collection-modal-empty {
   color: #94a3b8;
 }
-.collection-modal-actions {
-  margin-top: 10px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+.coll-drag-handle {
+  width: 36px; height: 4px;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.35);
+  margin: 12px auto 16px;
+  display: none;
+}
+@media (max-width: 540px) {
+  .collection-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .collection-modal-card {
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+    padding: 0 12px 24px;
+  }
+  .collection-modal.active .collection-modal-card {
+    transform: translateY(0);
+  }
+  .coll-drag-handle { display: block; }
 }
 </style>
 {% endblock %}
@@ -697,6 +732,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
 
 <div id="collection-modal" class="collection-modal" aria-hidden="true">
   <div class="collection-modal-card">
+    <div class="coll-drag-handle"></div>
     <div class="collection-modal-header">
       <div class="collection-modal-title-row">
         <h3>加入集合</h3>
@@ -706,13 +742,10 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       </div>
       <div id="collection-modal-meta" class="collection-modal-meta">当前未加入任何集合</div>
     </div>
+    <div id="collection-list" class="collection-modal-list"></div>
     <div class="collection-modal-create">
       <input id="collection-name-input" type="text" maxlength="80" placeholder="新建集合名称" />
       <button id="collection-create-btn" type="button">新建</button>
-    </div>
-    <div id="collection-list" class="collection-modal-list"></div>
-    <div class="collection-modal-actions">
-      <button id="collection-cancel-btn" type="button" class="ghost">关闭</button>
     </div>
   </div>
 </div>
@@ -744,7 +777,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     const collectionModal = document.getElementById('collection-modal');
     const collectionModalClose = document.getElementById('collection-modal-close');
     const collectionModalMeta = document.getElementById('collection-modal-meta');
-    const collectionCancelBtn = document.getElementById('collection-cancel-btn');
+
     const collectionCreateBtn = document.getElementById('collection-create-btn');
     const collectionNameInput = document.getElementById('collection-name-input');
     const collectionList = document.getElementById('collection-list');
@@ -1009,11 +1042,18 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
         const safeName = escapeHtml(String(item.name || '未命名集合'));
         const count = Number(item.item_count || 0);
         const checked = selectedIds.has(id) ? 'checked' : '';
+        const isSelected = selectedIds.has(id) ? 'is-selected' : '';
         return `
-          <label class="collection-modal-item" data-id="${id}">
+          <label class="collection-modal-item ${isSelected}" data-id="${id}">
+            <span class="coll-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            </span>
+            <span class="coll-name">${safeName}</span>
+            <em class="coll-count">${count > 0 ? count : ''}</em>
+            <span class="coll-check">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </span>
             <input type="checkbox" ${checked} />
-            <span>${safeName}</span>
-            <em>${count}</em>
           </label>
         `;
       }).join('');
@@ -1472,10 +1512,7 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
       event.preventDefault();
       closeCollectionModal();
     });
-    collectionCancelBtn.addEventListener('click', (event) => {
-      event.preventDefault();
-      closeCollectionModal();
-    });
+
     collectionModal.addEventListener('click', (event) => {
       if (collectionModalOpenedAt && (Date.now() - collectionModalOpenedAt) < collectionModalGuardMs) {
         return;
@@ -1503,6 +1540,19 @@ body.immersive-mode .caption-panel:not(.is-hidden) {
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && collectionModal.classList.contains('active')) {
         closeCollectionModal();
+        return;
+      }
+      const target = event.target;
+      if (target && typeof target.closest === 'function') {
+        if (target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) {
+          return;
+        }
+      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') goNext();
+      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') goPrev();
+      if (event.key === ' ') {
+        event.preventDefault();
+        togglePlay();
       }
     });
 
