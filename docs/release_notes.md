@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.8.14 (2026-02-25)
+- release: v0.8.14 集合弹层交互优化
+- feat: 优化集合弹层为移动端抽屉并增强键盘操作
+
+
 ## v0.8.13 (2026-02-24)
 - Release v0.8.13: fix 'function' object is not subscriptable on Python 3.12
 - fix: add __future__ annotations to resolve 'function' object is not subscriptable
