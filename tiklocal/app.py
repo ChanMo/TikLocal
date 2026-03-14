@@ -218,6 +218,97 @@ def create_app(test_config=None):
         value = str(request.args.get(name, default)).strip()
         return value if value in allowed else default
 
+    def _build_feed_media_item(name: str, media_type: str) -> dict[str, str]:
+        encoded = quote(name)
+        detail_url = f"/detail/{encoded}" if media_type == 'video' else f"/image?uri={encoded}"
+        media_url = f"/media?uri={encoded}"
+        return {
+            'type': media_type,
+            'name': name,
+            'media_url': media_url,
+            'thumb_url': f"/thumb?uri={encoded}" if media_type == 'video' else media_url,
+            'detail_url': detail_url,
+        }
+
+    def _collect_source_media_groups(records: list[dict]) -> list[dict]:
+        records_by_name = {str(item.get('name') or ''): item for item in records if item.get('name')}
+        source_map = download_source_store.get_many(list(records_by_name.keys()))
+        groups_by_source: dict[str, dict] = {}
+        groups_by_job: dict[str, dict] = {}
+
+        for name, source_meta in source_map.items():
+            if not isinstance(source_meta, dict):
+                continue
+            record = records_by_name.get(name)
+            if not record:
+                continue
+
+            normalized_item = {
+                'name': name,
+                'media_type': str(record.get('media_type') or ''),
+                'sort_ts': float(record.get('mtime_ts') or 0),
+            }
+
+            source_url = str(source_meta.get('source_url_display') or source_meta.get('source_url_raw') or '').strip()
+            if source_url:
+                group = groups_by_source.setdefault(source_url, {
+                    'key': source_url,
+                    'source_domain': str(source_meta.get('source_domain') or '').strip(),
+                    'created_at': str(source_meta.get('created_at') or '').strip(),
+                    'items': [],
+                })
+                group['items'].append(normalized_item)
+                if str(source_meta.get('created_at') or '').strip() > str(group.get('created_at') or ''):
+                    group['created_at'] = str(source_meta.get('created_at') or '').strip()
+
+            job_id = str(source_meta.get('job_id') or '').strip()
+            if job_id:
+                group = groups_by_job.setdefault(job_id, {
+                    'key': job_id,
+                    'source_domain': str(source_meta.get('source_domain') or '').strip(),
+                    'created_at': str(source_meta.get('created_at') or '').strip(),
+                    'items': [],
+                })
+                group['items'].append(normalized_item)
+                if str(source_meta.get('created_at') or '').strip() > str(group.get('created_at') or ''):
+                    group['created_at'] = str(source_meta.get('created_at') or '').strip()
+
+        results: list[dict] = []
+        seen_group_signatures: set[tuple[str, ...]] = set()
+        for group in list(groups_by_source.values()) + list(groups_by_job.values()):
+            entries = group.get('items') or []
+            unique_names = sorted({str(item.get('name') or '') for item in entries if item.get('name')})
+            if len(unique_names) < 2:
+                continue
+            signature = tuple(unique_names)
+            if signature in seen_group_signatures:
+                continue
+            seen_group_signatures.add(signature)
+
+            sorted_items = sorted(
+                [item for item in entries if item.get('name') in records_by_name],
+                key=lambda item: (float(item.get('sort_ts') or 0), str(item.get('name') or '')),
+                reverse=True,
+            )
+            domain = str(group.get('source_domain') or '').strip()
+            results.append({
+                'source_domain': domain,
+                'created_at': str(group.get('created_at') or ''),
+                'items': [
+                    _build_feed_media_item(str(item['name']), str(item['media_type']))
+                    for item in sorted_items[:8]
+                ],
+            })
+
+        results.sort(
+            key=lambda item: (
+                str(item.get('created_at') or ''),
+                len(item.get('items') or []),
+            ),
+            reverse=True,
+        )
+        return results
+
     def _collect_library_records(*, favorites_only: bool = False) -> list[dict]:
         favorite_set = favorite_service.load()
         all_paths = library_service.scan_videos() + library_service.scan_images()
@@ -276,6 +367,74 @@ def create_app(test_config=None):
 
         records.sort(key=lambda item: (item['mtime_ts'], item['name']), reverse=True)
         return records
+
+    def _build_theme_strip_candidates(records: list[dict]) -> list[dict]:
+        records_by_name = {str(item.get('name') or ''): item for item in records if item.get('name')}
+        candidates: list[dict] = []
+
+        favorite_records = [
+            item for item in records
+            if item.get('is_favorite') and item.get('media_type') in {'video', 'image'}
+        ]
+        favorite_records.sort(key=lambda item: item.get('mtime_ts') or 0, reverse=True)
+        favorite_items = [
+            _build_feed_media_item(item['name'], item['media_type'])
+            for item in favorite_records[:8]
+        ]
+        if len(favorite_items) >= 3:
+            candidates.append({
+                'type': 'theme_strip',
+                'name': 'theme:favorite-picks',
+                'title': '收藏精选',
+                'subtitle': '快速跳去收藏页继续看。',
+                'target_url': '/favorite',
+                'target_label': '打开收藏',
+                'items': favorite_items,
+            })
+
+        history = download_history_store.get()
+        recent_download_names: list[str] = []
+        seen_names: set[str] = set()
+        sorted_history = sorted(
+            [item for item in history if isinstance(item, dict)],
+            key=lambda item: str(item.get('created_at') or ''),
+            reverse=True,
+        )
+        for job in sorted_history:
+            if str(job.get('status') or '') != 'success':
+                continue
+            raw_files = job.get('output_files_rel')
+            if not isinstance(raw_files, list):
+                continue
+            for value in raw_files:
+                name = str(value or '').strip().replace('\\', '/')
+                while name.startswith('./'):
+                    name = name[2:]
+                if not name or name in seen_names or name not in records_by_name:
+                    continue
+                seen_names.add(name)
+                recent_download_names.append(name)
+                if len(recent_download_names) >= 8:
+                    break
+            if len(recent_download_names) >= 8:
+                break
+
+        download_items = [
+            _build_feed_media_item(name, str(records_by_name[name]['media_type']))
+            for name in recent_download_names
+        ]
+        if len(download_items) >= 3:
+            candidates.append({
+                'type': 'theme_strip',
+                'name': 'theme:recent-downloads',
+                'title': '最近下载',
+                'subtitle': '快速跳去媒体库继续看。',
+                'target_url': '/library',
+                'target_label': '打开媒体库',
+                'items': download_items,
+            })
+
+        return candidates
 
     def _read_media_dims_from_metadata(name: str) -> tuple[int | None, int | None]:
         payload = metadata_store.get(name)
@@ -825,24 +984,103 @@ def create_app(test_config=None):
                 image_streak += 1
                 video_streak = 0
 
-        page_items = mixed[start:end]
+        records = _collect_library_records(favorites_only=False)
+        theme_candidates = _build_theme_strip_candidates(records)
+        source_groups = _collect_source_media_groups(records)
+        image_group_candidate = None
+        image_group_names: set[str] = set()
+        for group in source_groups:
+            group_items = [item for item in (group.get('items') or []) if item.get('type') == 'image']
+            if len(group_items) < 2:
+                continue
+            image_group_candidate = {
+                'type': 'image_group',
+                'name': f"group:{group_items[0]['name']}",
+                'title': '原始图集',
+                'subtitle': '左右切换查看同一帖子里的图片。',
+                'items': group_items,
+            }
+            image_group_names = {str(item.get('name') or '') for item in group_items}
+            break
+
+        mixed_entries: list[dict] = [
+            {'type': media_type, 'name': name}
+            for media_type, name in mixed
+        ]
+        if image_group_candidate and mixed_entries:
+            mixed_entries = [
+                entry for entry in mixed_entries
+                if not (entry.get('type') == 'image' and str(entry.get('name') or '') in image_group_names)
+            ]
+            group_rng = random.Random(f"{seed}:image-group")
+            insert_floor = min(2, len(mixed_entries))
+            insert_ceil = min(max(insert_floor, 6), len(mixed_entries))
+            insert_at = insert_floor if insert_ceil <= insert_floor else group_rng.randint(insert_floor, insert_ceil)
+            mixed_entries.insert(insert_at, image_group_candidate)
+        if page == 1 and theme_candidates and mixed_entries:
+            theme_rng = random.Random(f"{seed}:theme-strip")
+            candidate = theme_rng.choice(theme_candidates)
+            insert_floor = min(6, len(mixed_entries))
+            insert_ceil = min(max(insert_floor, 10), len(mixed_entries))
+            insert_at = insert_floor if insert_ceil <= insert_floor else theme_rng.randint(insert_floor, insert_ceil)
+            mixed_entries.insert(insert_at, candidate)
+
+        page_items = mixed_entries[start:end]
         items = []
-        for media_type, name in page_items:
-            encoded = quote(name)
-            detail_url = f"/detail/{encoded}" if media_type == 'video' else f"/image?uri={encoded}"
-            media_url = f"/media?uri={encoded}"
-            items.append({
-                'type': media_type,
-                'name': name,
-                'media_url': media_url,
-                'thumb_url': f"/thumb?uri={encoded}" if media_type == 'video' else media_url,
-                'detail_url': detail_url,
-            })
+        for entry in page_items:
+            item_type = str(entry.get('type') or '')
+            if item_type == 'theme_strip':
+                target_url = str(entry.get('target_url') or '').strip()
+                items.append({
+                    'type': 'theme_strip',
+                    'name': str(entry.get('name') or 'theme:strip'),
+                    'title': str(entry.get('title') or '').strip(),
+                    'subtitle': str(entry.get('subtitle') or '').strip(),
+                    'target_url': target_url,
+                    'target_label': str(entry.get('target_label') or '').strip(),
+                    'items': [
+                        {
+                            'type': child.get('type'),
+                            'name': child.get('name'),
+                            'media_url': child.get('media_url'),
+                            'thumb_url': child.get('thumb_url'),
+                            'detail_url': child.get('detail_url'),
+                            'focus_url': f"{target_url}?focus={quote(str(child.get('name') or ''), safe='')}" if target_url and child.get('name') else target_url,
+                        }
+                        for child in (entry.get('items') or [])
+                        if isinstance(child, dict) and child.get('name')
+                    ],
+                })
+                continue
+            if item_type == 'image_group':
+                items.append({
+                    'type': 'image_group',
+                    'name': str(entry.get('name') or 'group:image'),
+                    'title': str(entry.get('title') or '').strip(),
+                    'subtitle': str(entry.get('subtitle') or '').strip(),
+                    'items': [
+                        {
+                            'type': child.get('type'),
+                            'name': child.get('name'),
+                            'media_url': child.get('media_url'),
+                            'thumb_url': child.get('thumb_url'),
+                            'detail_url': child.get('detail_url'),
+                        }
+                        for child in (entry.get('items') or [])
+                        if isinstance(child, dict) and child.get('name')
+                    ],
+                })
+                continue
+
+            name = str(entry.get('name') or '')
+            if not name or item_type not in {'video', 'image'}:
+                continue
+            items.append(_build_feed_media_item(name, item_type))
 
         return {
             'items': items,
             'page': page,
-            'has_more': len(mixed) > end,
+            'has_more': len(mixed_entries) > end,
             'seed': seed,
         }
 

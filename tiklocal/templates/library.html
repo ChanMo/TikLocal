@@ -871,6 +871,7 @@
     const initialSeed = {{ mode_seed | tojson }};
     const minMb = {{ min_mb }};
     const emptyMessage = {{ empty_message | tojson }};
+    const focusName = new URLSearchParams(window.location.search).get('focus') || '';
 
     const grid = document.getElementById('library-grid');
     const loadingEl = document.getElementById('library-loading');
@@ -946,6 +947,8 @@
     let magY = 0;
     let zoomLevel = 2.5;
     let magnifierFrameRequest = null;
+    let focusHandled = false;
+    let focusLoading = false;
     const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
     function formatTime(seconds) {
@@ -1169,6 +1172,15 @@
       loadingEl.textContent = text;
     }
 
+    function findItemIndexByName(name) {
+      const expected = String(name || '').trim();
+      if (!expected) return -1;
+      for (let i = 0; i < items.length; i += 1) {
+        if (String(items[i]?.name || '') === expected) return i;
+      }
+      return -1;
+    }
+
     function apiParams(offset) {
       const params = new URLSearchParams({
         scope,
@@ -1228,6 +1240,38 @@
         }
       } catch (error) {
         setLoadingText('加载失败，下滑重试');
+      }
+    }
+
+    async function maybeOpenFocusedItem() {
+      if (!focusName || focusHandled || focusLoading) return;
+      const directIndex = findItemIndexByName(focusName);
+      if (directIndex >= 0) {
+        focusHandled = true;
+        openViewer(directIndex);
+        return;
+      }
+      if (!flowSession.hasMore()) {
+        focusHandled = true;
+        return;
+      }
+
+      focusLoading = true;
+      try {
+        while (!focusHandled && flowSession.hasMore()) {
+          await loadNextPage();
+          const index = findItemIndexByName(focusName);
+          if (index >= 0) {
+            focusHandled = true;
+            openViewer(index);
+            return;
+          }
+        }
+        if (!flowSession.hasMore()) {
+          focusHandled = true;
+        }
+      } finally {
+        focusLoading = false;
       }
     }
 
@@ -2155,6 +2199,7 @@
       setLoadingText('继续下滑加载更多');
     }
     feather.replace();
+    maybeOpenFocusedItem();
   })();
 </script>
 {% endblock %}

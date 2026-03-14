@@ -40,6 +40,341 @@ html, body {
 .feed-media.active {
   display: block;
 }
+.feed-theme-strip {
+  display: none;
+  width: min(100%, 980px);
+  height: auto;
+  max-height: calc(100% - 112px - env(safe-area-inset-bottom));
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.22), transparent 32%),
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.2), transparent 26%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  z-index: 12;
+  pointer-events: auto;
+}
+.feed-theme-strip.active {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.feed-image-group {
+  display: none;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  top: 0;
+  left: 0;
+  transform: none;
+  z-index: 9;
+  pointer-events: none;
+}
+.feed-image-group.active {
+  display: block;
+}
+.image-group-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+.image-group-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.18s ease, transform 0.22s ease;
+}
+.image-group-overlay {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  right: 16px;
+  left: auto;
+  bottom: auto;
+  padding: 0;
+  background: transparent;
+}
+.image-group-counter {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.theme-strip-kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9);
+}
+.theme-strip-header h2 {
+  margin: 6px 0 0;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.02;
+  color: #fff;
+  font-weight: 800;
+}
+.theme-strip-header p {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(226, 232, 240, 0.8);
+  max-width: 560px;
+}
+.theme-strip-preview {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  min-height: min(48vh, 420px);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.theme-strip-preview-media {
+  width: 100%;
+  height: min(48vh, 420px);
+  object-fit: contain;
+  display: block;
+  background: rgba(2, 6, 23, 0.85);
+}
+.theme-strip-preview-overlay {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 6px;
+}
+.theme-strip-preview-text {
+  min-width: 0;
+}
+.theme-strip-preview-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.92);
+}
+.theme-strip-preview-name {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  word-break: break-word;
+}
+.theme-strip-preview-link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+}
+.theme-strip-preview-link.is-secondary {
+  background: rgba(15, 23, 42, 0.54);
+}
+.theme-strip-group-shell {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  background: rgba(2, 6, 23, 0.96);
+}
+.theme-strip-group-shell.is-active {
+  display: flex;
+}
+.theme-strip-group-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.theme-strip-group-media {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: rgba(2, 6, 23, 0.96);
+}
+.theme-strip-group-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 0;
+}
+.theme-strip-group-counter {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.86);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.theme-strip-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.theme-strip-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+}
+.theme-strip-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.theme-strip-group-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 16px 16px;
+}
+.theme-strip-group-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  word-break: break-word;
+}
+.theme-strip-rail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 6px 0 0;
+}
+.theme-strip-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  scroll-snap-align: start;
+}
+.theme-strip-card.is-selected .theme-strip-thumb {
+  border-color: rgba(255, 255, 255, 0.36);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+.theme-strip-thumb {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  aspect-ratio: 4 / 5;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.theme-strip-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.theme-strip-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+.theme-strip-card:hover::after,
+.theme-strip-card:focus-visible::after {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.theme-strip-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(248, 250, 252, 0.9);
+  font-size: 13px;
+  font-weight: 600;
+}
+.theme-strip-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.88);
+}
+.theme-strip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .feed-theme-strip {
+    width: calc(100% - 20px);
+    padding: 18px 12px calc(18px + env(safe-area-inset-bottom));
+    border-radius: 24px;
+    max-height: calc(100% - 84px - env(safe-area-inset-bottom));
+  }
+  .theme-strip-preview {
+    min-height: min(42vh, 320px);
+  }
+  .theme-strip-preview-media {
+    height: min(42vh, 320px);
+  }
+  .theme-strip-preview-overlay {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .theme-strip-group-bar,
+  .theme-strip-group-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .theme-strip-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 960px) {
+  .theme-strip-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 
 #overlay-layer {
   position: absolute;
@@ -813,6 +1148,8 @@ em.coll-count {
     let wasPlayingBeforeDrag = false;
     let clickTimer = null;
     let lastClickTime = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
 
     let isMagnifying = false;
     let magX = 0;
@@ -1165,22 +1502,62 @@ em.coll-count {
       }
     }
 
+    function goGroupNext() {
+      const item = currentItem();
+      if (!item || item.type !== 'image_group' || typeof item.renderChild !== 'function') return false;
+      const entries = Array.isArray(item.items) ? item.items : [];
+      const nextIndex = (Number(item.activeChildIndex) || 0) + 1;
+      if (nextIndex >= entries.length) return false;
+      item.activeChildIndex = item.renderChild(nextIndex);
+      return true;
+    }
+
+    function goGroupPrev() {
+      const item = currentItem();
+      if (!item || item.type !== 'image_group' || typeof item.renderChild !== 'function') return false;
+      const nextIndex = (Number(item.activeChildIndex) || 0) - 1;
+      if (nextIndex < 0) return false;
+      item.activeChildIndex = item.renderChild(nextIndex);
+      return true;
+    }
+
     function updateFavoriteState(name) {
       mediaActions.syncFavorite(name)
         .catch(() => favoriteBtn.classList.remove('is-active'));
     }
 
     function updateControls(item) {
-      infoBtn.href = item.detail_url;
-      favoriteBtn.dataset.value = item.name;
-      updateFavoriteState(item.name);
-      syncCollectionState(item);
-
       const isVideo = item.type === 'video';
+      const isThemeStrip = item.type === 'theme_strip';
+      const isImageGroup = item.type === 'image_group';
+      const displayEntry = currentDisplayEntry();
+      infoBtn.hidden = isThemeStrip;
+      favoriteBtn.hidden = isThemeStrip;
+      collectionBtn.hidden = isThemeStrip;
       speedBtn.hidden = !isVideo;
-      captionBtn.hidden = isVideo;
-      magnifierToolWrap.hidden = false;
+      captionBtn.hidden = isVideo || isThemeStrip || isImageGroup;
+      magnifierToolWrap.hidden = isThemeStrip || isImageGroup;
       customControls.hidden = !isVideo;
+
+      if (isThemeStrip) {
+        favoriteBtn.dataset.value = '';
+        favoriteBtn.classList.remove('is-active');
+        setCollectionButtonState([]);
+        setCollectionMeta([]);
+        infoBtn.removeAttribute('href');
+        playStatusIcon.classList.add('hidden');
+        playStatusIcon.classList.remove('visible');
+        return;
+      }
+
+      const detailUrl = String(displayEntry?.detail_url || item.detail_url || '#');
+      const mediaName = String(displayEntry?.name || item.name || '');
+      infoBtn.href = detailUrl;
+      favoriteBtn.dataset.value = mediaName;
+      if (mediaName) {
+        updateFavoriteState(mediaName);
+        syncCollectionState({ name: mediaName });
+      }
 
       if (isVideo) {
         progressBar.disabled = false;
@@ -1249,7 +1626,11 @@ em.coll-count {
 
     function currentImageEl() {
       const item = currentItem();
-      if (!item || item.type !== 'image') return null;
+      if (!item) return null;
+      if (item.type === 'image_group') {
+        return item.el?.querySelector('.image-group-media') || null;
+      }
+      if (item.type !== 'image') return null;
       return item.el;
     }
 
@@ -1257,6 +1638,17 @@ em.coll-count {
       const item = currentItem();
       if (!item || item.type !== 'video') return null;
       return item.el;
+    }
+
+    function currentDisplayEntry() {
+      const item = currentItem();
+      if (!item) return null;
+      if (item.type === 'image_group') {
+        const entries = Array.isArray(item.items) ? item.items : [];
+        const idx = Math.max(0, Math.min(Number(item.activeChildIndex) || 0, entries.length - 1));
+        return entries[idx] || null;
+      }
+      return item;
     }
 
     function getImageContainRect(imgEl) {
@@ -1390,6 +1782,13 @@ em.coll-count {
       if (prevItem.type === 'video') {
         prevItem.el.pause();
         prevItem.el.muted = true;
+        return;
+      }
+      if (prevItem.type === 'theme_strip') {
+        const previewVideo = prevItem.el.querySelector('.theme-strip-preview-media');
+        if (previewVideo && previewVideo.tagName === 'VIDEO') previewVideo.pause();
+        const groupVideo = prevItem.el.querySelector('.theme-strip-group-media');
+        if (groupVideo && groupVideo.tagName === 'VIDEO') groupVideo.pause();
       }
     }
 
@@ -1404,7 +1803,7 @@ em.coll-count {
       if (!item) return;
       flowState.onMediaChanged();
 
-      item.el.style.display = 'block';
+      item.el.style.display = item.type === 'theme_strip' ? '' : 'block';
       requestAnimationFrame(() => item.el.classList.add('active'));
       updateControls(item);
 
@@ -1426,6 +1825,17 @@ em.coll-count {
             .catch(() => playStatusIcon.classList.add('visible'));
         }
         preloadNextVideo();
+      } else if (item.type === 'image_group') {
+        clearCaption();
+        if (typeof item.renderChild === 'function') {
+          item.activeChildIndex = item.renderChild(Number(item.activeChildIndex) || 0);
+        }
+        playStatusIcon.classList.add('hidden');
+        playStatusIcon.classList.remove('visible');
+      } else if (item.type === 'theme_strip') {
+        clearCaption();
+        playStatusIcon.classList.add('hidden');
+        playStatusIcon.classList.remove('visible');
       } else {
         playStatusIcon.classList.remove('visible');
         await loadCaption(item.name);
@@ -1437,6 +1847,108 @@ em.coll-count {
     }
 
     function buildMediaElement(item) {
+      if (item.type === 'theme_strip') {
+        const panel = document.createElement('section');
+        panel.className = 'feed-media feed-theme-strip';
+        panel.dataset.name = item.name;
+        panel.innerHTML = `
+          <div class="theme-strip-header">
+            <div class="theme-strip-kicker">Theme Break</div>
+            <h2>${escapeHtml(item.title || '主题精选')}</h2>
+            <p>${escapeHtml(item.subtitle || '在随机流中穿插一组有上下文的内容。')}</p>
+          </div>
+          <div class="theme-strip-preview-overlay">
+            <div class="theme-strip-preview-text">
+              <div class="theme-strip-preview-label">Quick Jump</div>
+            </div>
+            <a class="theme-strip-preview-link" href="${escapeHtml(item.target_url || '/library')}" target="_self">${escapeHtml(item.target_label || '打开页面')}</a>
+          </div>
+          <div class="theme-strip-rail"></div>
+        `;
+        const rail = panel.querySelector('.theme-strip-rail');
+        const children = Array.isArray(item.items) ? item.items : [];
+        children.forEach((entry, index) => {
+          if (!rail || !entry || !entry.name || !entry.thumb_url) return;
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'theme-strip-card';
+          card.innerHTML = `
+            <div class="theme-strip-thumb">
+              <img src="${escapeHtml(entry.thumb_url)}" alt="${escapeHtml(entry.name)}" loading="lazy" decoding="async">
+            </div>
+            <div class="theme-strip-meta">
+              <span class="theme-strip-badge">${entry.type === 'video' ? 'Video' : 'Image'}</span>
+              <span class="theme-strip-name">${escapeHtml(entry.name)}</span>
+            </div>
+          `;
+          card.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            window.location.href = entry.focus_url || item.target_url || entry.detail_url || '/library';
+          });
+          rail.appendChild(card);
+        });
+        return panel;
+      }
+
+      if (item.type === 'image_group') {
+        const panel = document.createElement('section');
+        panel.className = 'feed-media feed-image-group';
+        panel.dataset.name = item.name;
+        panel.innerHTML = `
+          <div class="image-group-stage"></div>
+          <div class="image-group-overlay">
+            <div class="image-group-counter"></div>
+          </div>
+        `;
+        const stage = panel.querySelector('.image-group-stage');
+        const counterEl = panel.querySelector('.image-group-counter');
+        const children = Array.isArray(item.items) ? item.items : [];
+
+        function renderImageGroup(index) {
+          if (!stage || !counterEl || !children.length) return;
+          const safeIndex = Math.max(0, Math.min(index, children.length - 1));
+          const entry = children[safeIndex];
+          if (!entry || !entry.media_url) return;
+          const previousIndex = Number(panel._activeChildIndex);
+          const direction = Number.isFinite(previousIndex) && safeIndex < previousIndex ? -1 : 1;
+          const previousMedia = stage.querySelector('.image-group-media');
+          const img = document.createElement('img');
+          img.className = 'image-group-media';
+          img.src = entry.media_url;
+          img.alt = entry.name || '';
+          img.loading = 'eager';
+          img.decoding = 'async';
+          img.style.opacity = '0';
+          img.style.transform = `translateX(${direction * 18}px)`;
+          stage.appendChild(img);
+          requestAnimationFrame(() => {
+            img.style.opacity = '1';
+            img.style.transform = 'translateX(0)';
+            if (previousMedia) {
+              previousMedia.style.opacity = '0';
+              previousMedia.style.transform = `translateX(${direction * -12}px)`;
+            }
+          });
+          if (previousMedia) {
+            window.setTimeout(() => {
+              if (previousMedia.parentNode === stage) previousMedia.remove();
+            }, 220);
+          }
+          panel._activeChildIndex = safeIndex;
+          counterEl.textContent = `${safeIndex + 1} / ${children.length}`;
+          if (currentItem()?.el === panel) {
+            currentItem().activeChildIndex = safeIndex;
+            updateControls(currentItem());
+          }
+        }
+
+        panel._renderImageGroup = renderImageGroup;
+        panel._activeChildIndex = 0;
+        renderImageGroup(0);
+        return panel;
+      }
+
       if (item.type === 'video') {
         const video = document.createElement('video');
         video.className = 'feed-media feed-video';
@@ -1499,14 +2011,25 @@ em.coll-count {
           if (!seed && data.seed) seed = String(data.seed);
           const incoming = Array.isArray(data.items) ? data.items : [];
           const normalized = incoming.map((item) => {
-            if (!item || !item.type || !item.name || !item.media_url) return null;
+            if (!item || !item.type || !item.name) return null;
             const mediaEl = buildMediaElement(item);
+            if (!mediaEl) return null;
             return {
               type: item.type,
               name: item.name,
-              media_url: item.media_url,
+              media_url: item.media_url || '',
               detail_url: item.detail_url || '#',
               thumb_url: item.thumb_url || '',
+              title: item.title || '',
+              subtitle: item.subtitle || '',
+              target_url: item.target_url || '',
+              target_label: item.target_label || '',
+              items: Array.isArray(item.items) ? item.items : [],
+              renderChild: typeof mediaEl._renderImageGroup === 'function' ? (index) => {
+                mediaEl._renderImageGroup(index);
+                return Number(mediaEl._activeChildIndex) || 0;
+              } : null,
+              activeChildIndex: Number(mediaEl._activeChildIndex) || 0,
               el: mediaEl,
             };
           }).filter(Boolean);
@@ -1547,7 +2070,7 @@ em.coll-count {
     }
 
     const hammer = new Hammer(overlayLayer);
-    hammer.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
+    hammer.get('swipe').set({ direction: Hammer.DIRECTION_ALL });
     hammer.on('swipeup', () => {
       if (isMagnifying) return;
       goNext();
@@ -1555,6 +2078,14 @@ em.coll-count {
     hammer.on('swipedown', () => {
       if (isMagnifying) return;
       goPrev();
+    });
+    hammer.on('swipeleft', () => {
+      if (isMagnifying) return;
+      goGroupNext();
+    });
+    hammer.on('swiperight', () => {
+      if (isMagnifying) return;
+      goGroupPrev();
     });
 
     overlayLayer.addEventListener('click', () => {
@@ -1577,6 +2108,23 @@ em.coll-count {
       }
       lastClickTime = now;
     });
+    overlayLayer.addEventListener('touchstart', (event) => {
+      const touch = event.changedTouches && event.changedTouches[0];
+      if (!touch) return;
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    }, { passive: true });
+    overlayLayer.addEventListener('touchend', (event) => {
+      const item = currentItem();
+      if (!item || item.type !== 'image_group' || isMagnifying) return;
+      const touch = event.changedTouches && event.changedTouches[0];
+      if (!touch) return;
+      const deltaX = touch.clientX - touchStartX;
+      const deltaY = touch.clientY - touchStartY;
+      if (Math.abs(deltaX) < 36 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+      if (deltaX < 0) goGroupNext();
+      else goGroupPrev();
+    }, { passive: true });
 
     speedBtn.addEventListener('click', () => {
       currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.length;
@@ -1650,8 +2198,14 @@ em.coll-count {
           return;
         }
       }
-      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') goNext();
-      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') goPrev();
+      if (event.key === 'ArrowRight') {
+        if (!goGroupNext()) goNext();
+      }
+      if (event.key === 'ArrowLeft') {
+        if (!goGroupPrev()) goPrev();
+      }
+      if (event.key === 'ArrowDown') goNext();
+      if (event.key === 'ArrowUp') goPrev();
       if (event.key === ' ') {
         event.preventDefault();
         togglePlay();
