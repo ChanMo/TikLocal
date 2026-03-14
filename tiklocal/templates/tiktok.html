@@ -1527,7 +1527,6 @@ em.coll-count {
           const removeCount = 30;
           const removed = flowSession.dropHead(removeCount);
           removed.forEach((entry) => entry.el.remove());
-          setCurrentIndex(Math.max(0, getCurrentIndex() - removeCount));
         }
       } catch (error) {
         flowSession.setHasMore(false);

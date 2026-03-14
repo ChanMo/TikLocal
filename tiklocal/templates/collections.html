@@ -76,7 +76,8 @@
   [data-theme="dark"] .collection-cover {
     background: linear-gradient(135deg, #1e293b, #334155);
   }
-  .collection-cover img {
+  .collection-cover img,
+  .collection-cover video {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -354,9 +355,15 @@
         const count = Number(item.item_count || 0);
         const detail = String(item.detail_url || '#');
         const name = escapeHtml(item.name || '未命名集合');
-        const coverHtml = cover
-          ? `<img src="${cover}" alt="" loading="lazy" />`
-          : `<div class="collection-cover-empty"><i data-feather="folder"></i></div>`;
+        const coverType = String(item.cover_type || 'image');
+        let coverHtml;
+        if (!cover) {
+          coverHtml = `<div class="collection-cover-empty"><i data-feather="folder"></i></div>`;
+        } else if (coverType === 'video') {
+          coverHtml = `<video src="${cover}" muted preload="metadata" playsinline></video>`;
+        } else {
+          coverHtml = `<img src="${cover}" alt="" loading="lazy" />`;
+        }
         return `
           <article class="collection-item" data-collection-id="${id}">
             <a class="collection-card" href="${detail}">
