@@ -8,6 +8,7 @@ from pathlib import Path
 
 VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.mkv', '.avi', '.m4v'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+AUDIO_EXTENSIONS = {'.mp3', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wav'}
 FAVORITE_FILENAME = 'favorite.json'
 
 class LibraryService:
@@ -42,6 +43,17 @@ class LibraryService:
                 videos.extend(self.media_root.glob(f"{pattern}{ext}"))
             # Sort by modification time (newest first) by default
             return sorted(videos, key=lambda p: p.stat().st_mtime, reverse=True)
+        except Exception:
+            return []
+
+    def scan_audios(self, recursive=True) -> list[Path]:
+        """Scan for audio files."""
+        pattern = '**/*' if recursive else '*'
+        audios = []
+        try:
+            for ext in AUDIO_EXTENSIONS:
+                audios.extend(self.media_root.glob(f"{pattern}{ext}"))
+            return sorted(audios, key=lambda p: p.stat().st_mtime, reverse=True)
         except Exception:
             return []
 

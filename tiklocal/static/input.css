@@ -61,6 +61,29 @@ video, img, canvas, svg {
   @apply bg-gray-400 dark:bg-gray-500;
 }
 
+/* Radio 波形动画 */
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1); }
+}
+.audio-waveform {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+.audio-waveform span {
+  width: 5px;
+  border-radius: 3px;
+  background: currentColor;
+  animation: wave-bar 1s ease-in-out infinite;
+}
+.audio-waveform span:nth-child(2) { animation-delay: 0.1s; }
+.audio-waveform span:nth-child(3) { animation-delay: 0.2s; }
+.audio-waveform span:nth-child(4) { animation-delay: 0.3s; }
+.audio-waveform span:nth-child(5) { animation-delay: 0.4s; }
+.audio-waveform.paused span { animation-play-state: paused; }
+
 /* 焦点环优化 */
 .focus-ring {
   @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800;

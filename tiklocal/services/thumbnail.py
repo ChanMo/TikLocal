@@ -6,6 +6,8 @@ import subprocess as sp
 from pathlib import Path
 from tiklocal.paths import get_thumbnails_dir, get_thumbs_map_path
 
+AUDIO_EXTENSIONS = {'.mp3', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wav'}
+
 class ThumbnailService:
     def __init__(self, media_root: Path):
         self.media_root = media_root
@@ -36,8 +38,21 @@ class ThumbnailService:
         return self.placeholder, 'image/png'
 
     def _generate(self, video_path: Path, output_path: Path, timestamp: float = None) -> bool:
+        suffix = video_path.suffix.lower()
+
+        # Audio: extract embedded cover art
+        if suffix in AUDIO_EXTENSIONS:
+            cmd = ['ffmpeg', '-i', str(video_path), '-an', '-vframes', '1', str(output_path), '-y']
+            try:
+                sp.run(cmd, stdout=sp.DEVNULL, stderr=sp.DEVNULL, timeout=30)
+                if output_path.exists() and output_path.stat().st_size > 0:
+                    return True
+            except Exception:
+                pass
+            return False
+
         candidates = [timestamp] if timestamp is not None else [5.0, 1.0, 0.1]
-        
+
         for t in candidates:
             cmd = [
                 'ffmpeg', '-y',
