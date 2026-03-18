@@ -9,7 +9,7 @@ from pathlib import Path
 from flask import Flask, render_template, send_from_directory, request, redirect, send_file
 
 # Service Imports
-from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS
+from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS, AUDIO_EXTENSIONS
 from tiklocal.services.thumbnail import ThumbnailService
 from tiklocal.services.metadata import (
     ImageMetadataStore,
@@ -284,6 +284,11 @@ def create_app(test_config=None):
         """Immersive Mixed Media Feed"""
         return render_template('tiktok.html', menu='index')
 
+    @app.route('/radio')
+    def radio_view():
+        """Audio Radio Player"""
+        return render_template('radio.html', menu='radio')
+
     @app.route('/download')
     def download_view():
         """URL Download Center"""
@@ -519,6 +524,31 @@ def create_app(test_config=None):
 
 
     # --- API Routes ---
+    @app.route('/api/radio/items')
+    def api_radio_items():
+        offset = _read_int_arg('offset', 0, minimum=0)
+        limit = _read_int_arg('limit', 200, minimum=1, maximum=500)
+        audios = library_service.scan_audios()
+        favorites = favorite_service.load()
+        total = len(audios)
+        page = audios[offset:offset + limit]
+        items = []
+        for p in page:
+            name = library_service.get_relative_path(p)
+            items.append({
+                'name': name,
+                'media_url': f'/media/{quote(name, safe="/")}',
+                'thumb_url': f'/thumb?uri={quote(name, safe="")}',
+                'title': p.stem,
+                'duration': None,
+                'is_favorite': name in favorites,
+            })
+        return {'success': True, 'data': {
+            'items': items,
+            'total': total,
+            'has_more': offset + limit < total,
+        }}
+
     @app.route('/api/feed/mix')
     def api_feed_mix():
         page = _read_int_arg('page', 1, minimum=1)
