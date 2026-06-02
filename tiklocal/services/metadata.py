@@ -24,24 +24,11 @@ LLM_BASE_URL_MAX_LENGTH = 512
 LLM_MODEL_NAME_MAX_LENGTH = 256
 
 DEFAULT_PROMPT_CONFIG = {
-    "system_prompt": (
-        "你是我的私人媒体库助手，风格自然、真实、有轻微情绪起伏。"
-        "只根据图片可见信息，不要臆测地点、人物身份或具体事件。"
-        "输出必须是严格 JSON，不要包含多余文字。"
-    ),
-    "user_prompt": (
-        "这是一张我从社交媒体保存的图片。"
-        "请用中文、第一人称、带情绪的一句话给出图片标题。"
-        "请给出 1 到 {tags_limit} 个标签。"
-        "风格要求：更口语、更生活化，避免模板句；"
-        "语气可以轻微变化（偶尔克制、偶尔感慨、偶尔俏皮）。"
-        "不确定的信息不要写，避免具体人名/地名/时间。"
-        "标签用简短词语，不要带 #，允许情绪词。"
-        "输出格式：{\"title\": \"...\", \"tags\": [\"...\", \"...\"]}。"
-    ),
+    "system_prompt": "",
+    "user_prompt": "",
     "temperature": 0.6,
     "tags_limit": 5,
-    "enabled": True,
+    "enabled": False,
 }
 
 DEFAULT_LLM_CONFIG = {
@@ -66,6 +53,14 @@ def merge_prompt_config(base: dict[str, Any], override: dict[str, Any] | None) -
         if key in override:
             merged[key] = override[key]
     return merged
+
+
+def has_required_prompt_text(prompt_config: dict[str, Any] | None) -> bool:
+    if not prompt_config:
+        return False
+    return bool(str(prompt_config.get("system_prompt") or "").strip()) and bool(
+        str(prompt_config.get("user_prompt") or "").strip()
+    )
 
 
 def validate_prompt_config(
@@ -342,6 +337,8 @@ class CaptionService:
         temperature = float(effective_prompt["temperature"])
         system_prompt = str(effective_prompt["system_prompt"])
         user_prompt = self._render_user_prompt(str(effective_prompt["user_prompt"]), tags_limit)
+        if not system_prompt.strip() or not user_prompt.strip():
+            raise RuntimeError("请先在设置中保存自定义 AI Prompt，或使用本次覆盖提示词。")
 
         text = self._request_chat_completion(system_prompt, user_prompt, data_url, temperature)
         if self._looks_like_html(text):

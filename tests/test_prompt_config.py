@@ -73,6 +73,8 @@ def test_prompt_config_api_crud(client):
     assert res.status_code == 200
     assert data["success"] is True
     assert data["data"]["active_profile"] == "default"
+    assert data["data"]["default"]["system_prompt"] == ""
+    assert data["data"]["default"]["user_prompt"] == ""
 
     save_payload = _build_prompt_payload(enabled=True, tags_limit=7, temperature=0.8)
     res = test_client.post("/api/ai/prompt-config", json=save_payload)
@@ -136,6 +138,20 @@ def test_metadata_prompt_source_priority(client):
     assert calls[-1]["prompt_config"]["tags_limit"] == 3
 
 
+def test_metadata_requires_custom_or_override_prompt(client):
+    test_client, calls = client
+
+    res = test_client.post(
+        "/api/image/metadata",
+        json={"uri": "photo.jpg", "force": True},
+    )
+    data = res.get_json()
+    assert res.status_code == 400
+    assert data["success"] is False
+    assert "AI Prompt" in data["error"]
+    assert calls == []
+
+
 def test_llm_config_api_crud(client):
     test_client, _ = client
 
@@ -179,6 +195,9 @@ def test_llm_config_api_validation(client):
 
 def test_metadata_uses_custom_llm_settings(client):
     test_client, _ = client
+
+    prompt_res = test_client.post("/api/ai/prompt-config", json=_build_prompt_payload())
+    assert prompt_res.status_code == 200
 
     res = test_client.post(
         "/api/ai/llm-config",
