@@ -22,6 +22,7 @@ from tiklocal.services.metadata import (
     merge_llm_config,
     validate_prompt_config,
     validate_llm_config,
+    has_required_prompt_text,
     compute_prompt_hash,
 )
 from tiklocal.services.downloader import (
@@ -856,6 +857,11 @@ def create_app(test_config=None):
 
         try:
             effective_prompt, prompt_source = resolve_effective_prompt_config(override_config)
+            if not has_required_prompt_text(effective_prompt):
+                return {
+                    'success': False,
+                    'error': '请先在设置中保存自定义 AI Prompt，或使用本次覆盖提示词。',
+                }, 400
             effective_llm, llm_source = resolve_effective_llm_config()
             caption_service = CaptionService(
                 model=effective_llm.get('model_name') or None,

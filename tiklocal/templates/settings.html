@@ -102,7 +102,7 @@
               <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
                 <div>
                   <p class="text-sm font-semibold text-gray-900 dark:text-white">启用自定义提示词</p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">关闭后将使用内置默认提示词。</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">关闭后不会使用默认提示词。</p>
                 </div>
                 <input type="checkbox" id="ai-prompt-enabled" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
               </div>
@@ -145,7 +145,7 @@
                 </button>
                 <button id="ai-prompt-reset-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                   <i data-feather="rotate-ccw" class="w-4 h-4"></i>
-                  恢复默认
+                  清空配置
                 </button>
               </div>
             </div>
@@ -615,18 +615,18 @@ async function savePromptConfig() {
 }
 
 async function resetPromptConfig() {
-  showModal('恢复默认提示词？', '这会清空当前自定义提示词并回到内置默认配置。', async () => {
+  showModal('清空提示词配置？', '这会清空当前自定义提示词，之后生成图片标题前需要重新填写提示词。', async () => {
     try {
       const res = await fetch('/api/ai/prompt-config/reset', { method: 'POST' });
       const data = await res.json();
       if (!data.success) {
-        showNotification(data.error || '恢复失败', 'error');
+        showNotification(data.error || '清空失败', 'error');
         return;
       }
       applyPromptConfig(data.data);
-      showNotification('已恢复默认提示词', 'success');
+      showNotification('已清空提示词配置', 'success');
     } catch (err) {
-      showNotification('恢复失败，请重试', 'error');
+      showNotification('清空失败，请重试', 'error');
     }
   });
 }
