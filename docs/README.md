@@ -8,4 +8,5 @@
 
 - `docs/mixed-feed-design.md`：首页混合流（视频+图片）设计与实现说明。
 - `docs/flow-interaction-unification.md`：Home / Library / Favorites 统一交互内核设计与落地说明。
+- `docs/openrouter-image-to-video-research.md`：OpenRouter 图片生成视频能力调研、PoC 流程与未来产品化约束。
 - `docs/release_notes.md`：版本发布记录与未发布变更清单。

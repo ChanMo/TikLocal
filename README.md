@@ -125,6 +125,7 @@ TikLocal provides some configuration options that you can adjust to your needs.
 
 - Docs index: `docs/README.md`
 - Flow interaction unification: `docs/flow-interaction-unification.md`
+- OpenRouter image-to-video research: `docs/openrouter-image-to-video-research.md`
 - Release notes: `docs/release_notes.md`
 
 
