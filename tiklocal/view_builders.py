@@ -9,6 +9,15 @@ from urllib.parse import quote
 from PIL import Image
 
 
+def legacy_media_key(uri: str) -> str:
+    text = str(uri or '').strip().replace('\\', '/')
+    if text.startswith('@'):
+        _, sep, rel_path = text[1:].partition('/')
+        if sep and rel_path:
+            return rel_path
+    return text
+
+
 def build_feed_media_item(name: str, media_type: str) -> dict[str, str]:
     encoded = quote(name)
     detail_url = f"/detail/{encoded}" if media_type == 'video' else f"/image?uri={encoded}"
@@ -28,19 +37,24 @@ def collect_source_media_groups(
     build_item: Callable[[str, str], dict[str, str]] = build_feed_media_item,
 ) -> list[dict]:
     records_by_name = {str(item.get('name') or ''): item for item in records if item.get('name')}
-    source_map = download_source_store.get_many(list(records_by_name.keys()))
+    record_lookup = dict(records_by_name)
+    for name, record in records_by_name.items():
+        record_lookup.setdefault(legacy_media_key(name), record)
+    source_keys = list(dict.fromkeys(list(record_lookup.keys()) + [legacy_media_key(name) for name in records_by_name]))
+    source_map = download_source_store.get_many(source_keys)
     groups_by_source: dict[str, dict] = {}
     groups_by_job: dict[str, dict] = {}
 
     for name, source_meta in source_map.items():
         if not isinstance(source_meta, dict):
             continue
-        record = records_by_name.get(name)
+        record = record_lookup.get(name)
         if not record:
             continue
+        canonical_name = str(record.get('name') or name)
 
         normalized_item = {
-            'name': name,
+            'name': canonical_name,
             'media_type': str(record.get('media_type') or ''),
             'sort_ts': float(record.get('mtime_ts') or 0),
         }
@@ -137,7 +151,7 @@ def collect_library_records(
                 'media_type': media_type,
                 'mtime_ts': float(stat.st_mtime),
                 'size_bytes': int(stat.st_size),
-                'is_favorite': rel in favorite_set,
+                'is_favorite': library_service.is_uri_in_set(rel, favorite_set),
             }
 
             existing = records_by_identity.get(identity)
@@ -174,6 +188,9 @@ def build_theme_strip_candidates(
     build_item: Callable[[str, str], dict[str, str]] = build_feed_media_item,
 ) -> list[dict]:
     records_by_name = {str(item.get('name') or ''): item for item in records if item.get('name')}
+    records_by_lookup = dict(records_by_name)
+    for name, record in records_by_name.items():
+        records_by_lookup.setdefault(legacy_media_key(name), record)
     candidates: list[dict] = []
 
     favorite_records = [
@@ -196,46 +213,24 @@ def build_theme_strip_candidates(
             'items': favorite_items,
         })
 
-    history = download_history_store.get()
-    recent_download_names: list[str] = []
-    seen_names: set[str] = set()
-    sorted_history = sorted(
-        [item for item in history if isinstance(item, dict)],
-        key=lambda item: str(item.get('created_at') or ''),
-        reverse=True,
-    )
-    for job in sorted_history:
-        if str(job.get('status') or '') != 'success':
-            continue
-        raw_files = job.get('output_files_rel')
-        if not isinstance(raw_files, list):
-            continue
-        for value in raw_files:
-            name = str(value or '').strip().replace('\\', '/')
-            while name.startswith('./'):
-                name = name[2:]
-            if not name or name in seen_names or name not in records_by_name:
-                continue
-            seen_names.add(name)
-            recent_download_names.append(name)
-            if len(recent_download_names) >= 8:
-                break
-        if len(recent_download_names) >= 8:
-            break
-
-    download_items = [
-        build_item(name, str(records_by_name[name]['media_type']))
-        for name in recent_download_names
+    recent_records = [
+        item for item in records
+        if item.get('name') and item.get('media_type') in {'video', 'image'}
     ]
-    if len(download_items) >= 3:
+    recent_records.sort(key=lambda item: (float(item.get('mtime_ts') or 0), str(item.get('name') or '')), reverse=True)
+    recent_items = [
+        build_item(str(item['name']), str(item['media_type']))
+        for item in recent_records[:8]
+    ]
+    if len(recent_items) >= 3:
         candidates.append({
             'type': 'theme_strip',
-            'name': 'theme:recent-downloads',
-            'title': '最近下载',
+            'name': 'theme:recent-added',
+            'title': '最近加入',
             'subtitle': '快速跳去媒体库继续看。',
             'target_url': '/library',
             'target_label': '打开媒体库',
-            'items': download_items,
+            'items': recent_items,
         })
 
     return candidates
@@ -315,6 +310,12 @@ def probe_media_dims(library_service, name: str, media_type: str) -> tuple[int |
 
 def get_or_probe_media_dims(metadata_store, library_service, name: str, media_type: str) -> tuple[int | None, int | None]:
     width, height = read_media_dims_from_metadata(metadata_store, name)
+    if not (width and height):
+        for legacy_key in library_service.legacy_candidates(name)[1:]:
+            width, height = read_media_dims_from_metadata(metadata_store, legacy_key)
+            if width and height:
+                save_media_dims_to_metadata(metadata_store, name, media_type, width, height)
+                return width, height
     if width and height:
         return width, height
     width, height = probe_media_dims(library_service, name, media_type)
@@ -360,6 +361,7 @@ def collect_collection_records(
     for uri in uris:
         if uri in seen:
             continue
+        uri = library_service.find_existing_uri(uri)
         seen.add(uri)
         target = library_service.resolve_path(uri)
         if not target or not target.exists():
@@ -374,7 +376,7 @@ def collect_collection_records(
             'media_type': media_type,
             'mtime_ts': float(stat.st_mtime),
             'size_bytes': int(stat.st_size),
-            'is_favorite': uri in favorites,
+            'is_favorite': library_service.is_uri_in_set(uri, favorites),
         })
     return collection, records
 
@@ -382,6 +384,7 @@ def collect_collection_records(
 def collection_cover_payload(collection: dict, collection_store, library_service, image_extensions: set[str]) -> tuple[str, str]:
     cover_uri = str(collection.get('cover_uri') or '').strip()
     if cover_uri:
+        cover_uri = library_service.find_existing_uri(cover_uri)
         target = library_service.resolve_path(cover_uri)
         if target and target.exists():
             media_type = 'image' if target.suffix.lower() in image_extensions else 'video'
@@ -389,6 +392,7 @@ def collection_cover_payload(collection: dict, collection_store, library_service
 
     uris = collection_store.list_item_uris(str(collection.get('id') or ''), newest_first=True)
     for uri in uris:
+        uri = library_service.find_existing_uri(uri)
         target = library_service.resolve_path(uri)
         if not target or not target.exists():
             continue

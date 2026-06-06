@@ -6,6 +6,7 @@ from waitress import serve
 from tiklocal.app import create_app
 from tiklocal.thumbs import generate_thumbnails
 from tiklocal.paths import get_data_dir
+from tiklocal.services import normalize_source_id
 
 try:
     import yaml
@@ -36,6 +37,41 @@ def load_config():
                 print(f"警告: 读取配置文件 {config_path} 失败: {e}", file=sys.stderr)
 
     return config
+
+
+def normalize_media_sources(config, cli_sources=None, media_root=None):
+    raw_sources = cli_sources or config.get('media_sources') or []
+    sources = []
+    if isinstance(raw_sources, dict):
+        raw_sources = [{'id': key, 'path': value, 'name': key} for key, value in raw_sources.items()]
+    if isinstance(raw_sources, list):
+        for item in raw_sources:
+            if not isinstance(item, dict):
+                continue
+            source_id = normalize_source_id(item.get('id') or item.get('name'))
+            path = str(item.get('path') or '').strip()
+            if not path:
+                continue
+            sources.append({
+                'id': source_id,
+                'name': str(item.get('name') or source_id).strip() or source_id,
+                'path': path,
+            })
+    if media_root and all(item.get('id') != 'default' for item in sources):
+        sources.insert(0, {'id': 'default', 'name': 'Default', 'path': str(media_root)})
+    return sources
+
+
+def parse_cli_media_source(value):
+    text = str(value or '').strip()
+    if '=' not in text:
+        raise argparse.ArgumentTypeError('格式必须是 id=/path/to/media')
+    source_id, path = text.split('=', 1)
+    source_id = normalize_source_id(source_id)
+    path = path.strip()
+    if not path:
+        raise argparse.ArgumentTypeError('媒体目录不能为空')
+    return {'id': source_id, 'name': source_id, 'path': path}
 
 
 def main():
@@ -83,6 +119,9 @@ def main():
     serve_parser.add_argument('--host', default=None, help='服务器监听地址 (默认: 0.0.0.0)')
     serve_parser.add_argument('--port', type=int, default=None, help='服务器端口 (默认: 8000)')
     serve_parser.add_argument('--dev', action='store_true', help='开发模式（启用热重载和调试）')
+    serve_parser.add_argument('--media-source', action='append', type=parse_cli_media_source,
+                              help='添加媒体源，格式 id=/path/to/media，可重复')
+    serve_parser.add_argument('--download-source', default=None, help='下载保存到的媒体源 id')
 
     # thumbs 子命令
     thumbs_parser = subparsers.add_parser('thumbs', help='批量生成视频缩略图')
@@ -153,30 +192,51 @@ def main():
     media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
     host = args.host or os.environ.get('TIKLOCAL_HOST') or config.get('host', '0.0.0.0')
     port = args.port or int(os.environ.get('TIKLOCAL_PORT', 0)) or config.get('port', 8000)
+    media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
+    download_source = args.download_source or config.get('download_source') or 'default'
 
     # 验证媒体目录
-    if not media_root:
+    if not media_root and not media_sources:
         parser.error('必须指定媒体目录:\n  - 通过命令行参数: tiklocal /path/to/media\n  - 通过环境变量: MEDIA_ROOT=/path/to/media\n  - 通过配置文件: ~/.config/tiklocal/config.yaml')
 
-    media_path = Path(media_root)
-    if not media_path.exists():
-        print(f"错误: 媒体目录不存在: {media_root}", file=sys.stderr)
-        sys.exit(1)
+    if media_root:
+        media_path = Path(media_root).expanduser()
+        if not media_path.exists():
+            print(f"错误: 媒体目录不存在: {media_root}", file=sys.stderr)
+            sys.exit(1)
 
-    if not media_path.is_dir():
-        print(f"错误: 路径不是目录: {media_root}", file=sys.stderr)
-        sys.exit(1)
+        if not media_path.is_dir():
+            print(f"错误: 路径不是目录: {media_root}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        media_path = Path(media_sources[0]['path'])
+
+    for source in media_sources:
+        source_path = Path(str(source.get('path') or '')).expanduser()
+        if not source_path.exists() or not source_path.is_dir():
+            print(f"错误: 媒体源不可用 {source.get('id')}: {source_path}", file=sys.stderr)
+            sys.exit(1)
 
     # 设置环境变量供 Flask 使用
     os.environ['MEDIA_ROOT'] = str(media_path.absolute())
 
     # 启动服务器
     print(f"启动 TikLocal 服务器...")
-    print(f"媒体目录: {media_path.absolute()}")
+    if media_sources:
+        print("媒体源:")
+        for source in media_sources:
+            marker = " (下载)" if normalize_source_id(download_source) == source.get('id') else ""
+            print(f"  @{source.get('id')}: {Path(str(source.get('path'))).expanduser().absolute()}{marker}")
+    else:
+        print(f"媒体目录: {media_path.absolute()}")
     print(f"数据目录: {get_data_dir()}")
     print(f"访问地址: http://{host}:{port}")
 
-    app = create_app()
+    app = create_app({
+        "MEDIA_ROOT": media_path,
+        "MEDIA_SOURCES": media_sources or None,
+        "DOWNLOAD_SOURCE": normalize_source_id(download_source),
+    })
     if getattr(args, 'dev', False):
         # 开发模式：使用Flask内置服务器
         print("⚠️  开发模式已启用（不要在生产环境使用）")

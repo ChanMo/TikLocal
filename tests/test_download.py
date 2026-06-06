@@ -91,8 +91,8 @@ def test_create_download_job_success(client):
 
     final_job = _wait_for_job(client, job_id)
     assert final_job["status"] == "success"
-    assert final_job["output_path_rel"] == "mock-output.mp4"
-    assert final_job["output_files_rel"] == ["mock-output.mp4"]
+    assert final_job["output_path_rel"] == "@default/mock-output.mp4"
+    assert final_job["output_files_rel"] == ["@default/mock-output.mp4"]
     assert final_job["file_count"] == 1
     assert final_job["engine"] == "yt-dlp"
     assert final_job["cookie_match_mode"] == "none"

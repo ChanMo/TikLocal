@@ -9,8 +9,9 @@ from tiklocal.paths import get_thumbnails_dir, get_thumbs_map_path
 AUDIO_EXTENSIONS = {'.mp3', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wav'}
 
 class ThumbnailService:
-    def __init__(self, media_root: Path):
+    def __init__(self, media_root: Path, library_service=None):
         self.media_root = media_root
+        self.library_service = library_service
         self.thumb_dir = get_thumbnails_dir()
         self.thumb_map_file = get_thumbs_map_path()
         self.placeholder = (
@@ -30,8 +31,8 @@ class ThumbnailService:
             return thumb_path, 'image/jpeg'
 
         # Generate new
-        full_path = self.media_root / rel_path
-        if full_path.exists():
+        full_path = self.library_service.resolve_path(rel_path) if self.library_service else self.media_root / rel_path
+        if full_path and full_path.exists():
             if self._generate(full_path, thumb_path):
                 return thumb_path, 'image/jpeg'
         

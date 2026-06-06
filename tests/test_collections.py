@@ -80,11 +80,9 @@ def test_collection_scope_library_items_and_page(client):
     page = client.get(f"/collection/{quote(collection_id, safe='')}")
     assert page.status_code == 200
     body = page.data.decode("utf-8")
-    assert 'const scope = "collection";' in body
-    assert f'const collectionId = "{collection_id}";' in body
+    assert "library_page_controller.js" in body
     assert 'id="quick-set-cover"' in body
     assert 'id="quick-collection-count"' in body
-    assert "toggleCollectionMembership(" in body
 
     api_res = client.get(
         f"/api/library/items?scope=collection&collection_id={quote(collection_id, safe='')}&offset=0&limit=20"
@@ -92,8 +90,8 @@ def test_collection_scope_library_items_and_page(client):
     assert api_res.status_code == 200
     payload = api_res.get_json()["data"]
     names = {item["name"] for item in payload["items"]}
-    assert "clip.mp4" in names
-    assert "cover.jpg" in names
+    assert "@default/clip.mp4" in names
+    assert "@default/cover.jpg" in names
 
     bad = client.get("/api/library/items?scope=collection&offset=0&limit=20")
     assert bad.status_code == 400
@@ -115,11 +113,11 @@ def test_collection_patch_cover_and_delete(client):
     assert renamed.status_code == 200
     item = renamed.get_json()["data"]["item"]
     assert item["name"] == "新名字"
-    assert item["cover_uri"] == "cover.jpg"
+    assert item["cover_uri"] == "@default/cover.jpg"
 
     detail = client.get(f"/api/collections/{quote(collection_id, safe='')}")
     assert detail.status_code == 200
-    assert detail.get_json()["data"]["item"]["cover_uri"] == "cover.jpg"
+    assert detail.get_json()["data"]["item"]["cover_uri"] == "@default/cover.jpg"
 
     deleted = client.delete(f"/api/collections/{quote(collection_id, safe='')}")
     assert deleted.status_code == 200

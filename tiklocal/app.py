@@ -6,10 +6,10 @@ from urllib.parse import quote, unquote
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 
-from flask import Flask, render_template, send_from_directory, request, redirect, send_file
+from flask import Flask, render_template, request, redirect, send_file
 
 # Service Imports
-from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS, AUDIO_EXTENSIONS
+from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS, AUDIO_EXTENSIONS, build_media_sources
 from tiklocal.services.thumbnail import ThumbnailService
 from tiklocal.services.metadata import (
     ImageMetadataStore,
@@ -37,6 +37,7 @@ from tiklocal.services.downloader import (
 from tiklocal.services.collections import CollectionStore
 from tiklocal.paths import (
     get_metadata_path,
+    get_favorites_path,
     get_prompt_config_path,
     get_llm_config_path,
     get_download_config_path,
@@ -82,7 +83,9 @@ def create_app(test_config=None):
     app.config.from_prefixed_env()
     app.config.from_mapping(
         SECRET_KEY = 'dev',
-        MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', '.'))
+        MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', '.')),
+        MEDIA_SOURCES = None,
+        DOWNLOAD_SOURCE = 'default',
     )
     app.config.from_pyfile('config.py', silent=True)
     if test_config is not None:
@@ -93,11 +96,14 @@ def create_app(test_config=None):
         pass
 
     # Initialize Services
-    media_root_str = str(app.config['MEDIA_ROOT'])
-    library_service = LibraryService(media_root_str)
-    favorite_service = FavoriteService(media_root_str)
+    media_sources = build_media_sources(app.config['MEDIA_ROOT'], app.config.get('MEDIA_SOURCES'))
+    library_service = LibraryService(app.config['MEDIA_ROOT'], media_sources=media_sources)
+    default_media_root = library_service.media_root
+    media_root_str = str(default_media_root)
+    app.config['MEDIA_ROOT'] = default_media_root
+    favorite_service = FavoriteService(media_root_str, db_path=get_favorites_path(), library_service=library_service)
     recommend_service = RecommendService(library_service, favorite_service)
-    thumbnail_service = ThumbnailService(Path(media_root_str))
+    thumbnail_service = ThumbnailService(Path(media_root_str), library_service=library_service)
     metadata_store = ImageMetadataStore(get_metadata_path())
     prompt_config_store = PromptConfigStore(get_prompt_config_path())
     llm_config_store = LLMConfigStore(get_llm_config_path())
@@ -105,11 +111,14 @@ def create_app(test_config=None):
     download_history_store = DownloadHistoryStore(get_download_jobs_path())
     download_source_store = DownloadSourceStore(get_download_sources_path())
     collection_store = CollectionStore(get_collections_path())
+    download_source_id = str(app.config.get('DOWNLOAD_SOURCE') or library_service.default_source_id).strip() or library_service.default_source_id
+    download_source = library_service.sources_by_id.get(download_source_id) or library_service.sources_by_id[library_service.default_source_id]
     download_manager = DownloadManager(
-        Path(media_root_str),
+        download_source.path,
         download_config_store,
         download_history_store,
         source_store=download_source_store,
+        output_source_id=download_source.id,
     )
 
     def build_prompt_config_payload(custom_config=None):
@@ -278,6 +287,13 @@ def create_app(test_config=None):
     _normalize_collection_mutation_uris = view_builders.normalize_collection_mutation_uris
     _build_library_template_context = view_builders.build_library_template_context
 
+    def _canonicalize_collection_uris(raw: object) -> list[str]:
+        return [
+            library_service.canonicalize_uri(uri)
+            for uri in _normalize_collection_mutation_uris(raw)
+            if uri
+        ]
+
 
     # --- Web Routes ---
     @app.route('/')
@@ -358,6 +374,7 @@ def create_app(test_config=None):
     
     @app.route('/detail/<path:name>')
     def detail_view(name):
+        name = library_service.find_existing_uri(name)
         target = library_service.resolve_path(name)
         if not target or not target.exists():
             return "File not found", 404
@@ -401,15 +418,18 @@ def create_app(test_config=None):
     def image_view():
         uri = request.args.get('uri')
         if not uri: return "Missing uri", 400
+        uri = library_service.find_existing_uri(uri)
         
         target = library_service.resolve_path(uri)
         if not target or not target.exists(): return "File not found", 404
         source_meta = download_manager.resolve_source_for_file(uri)
+        uri_path_encoded = quote(uri, safe='/')
         uri_query_encoded = quote(uri, safe='')
         return render_template(
             'image_detail.html',
             image=target,
             uri=uri,
+            uri_path_encoded=uri_path_encoded,
             uri_query_encoded=uri_query_encoded,
             stat=target.stat(),
             source_meta=source_meta,
@@ -417,6 +437,7 @@ def create_app(test_config=None):
 
     @app.route("/delete/<path:name>", methods=['POST', 'GET'])
     def delete_view(name):
+        name = library_service.find_existing_uri(name)
         target = library_service.resolve_path(name)
         if request.method == 'POST':
             if target and target.exists():
@@ -500,25 +521,24 @@ def create_app(test_config=None):
 
     @app.route("/media/<path:filename>")
     def serve_media(filename):
-        # Consolidated media serving
-        try:
-            return send_from_directory(app.config["MEDIA_ROOT"], filename)
-        except Exception:
+        target = library_service.resolve_path(filename)
+        if not target or not target.exists() or not target.is_file():
             return "File not found", 404
+        return send_file(target)
 
     @app.route("/media")
     def serve_media_legacy():
         # Legacy support for /media?uri=...
         uri = request.args.get('uri')
         if not uri: return "Missing uri", 400
-        return redirect(f"/media/{quote(uri, safe='/')}")
+        return redirect(f"/media/{quote(library_service.find_existing_uri(uri), safe='/')}")
 
     @app.route('/thumb')
     def thumb_view():
         uri = request.args.get('uri')
         if not uri: return send_file(io.BytesIO(thumbnail_service.placeholder), mimetype='image/png')
         
-        path, mimetype = thumbnail_service.get_thumbnail(unquote(uri))
+        path, mimetype = thumbnail_service.get_thumbnail(library_service.find_existing_uri(unquote(uri)))
         if isinstance(path, bytes):
             return send_file(io.BytesIO(path), mimetype=mimetype)
         return send_file(path, mimetype=mimetype)
@@ -678,6 +698,7 @@ def create_app(test_config=None):
         file_rel = str(request.args.get('file', '')).strip()
         if not file_rel:
             return {'success': False, 'error': 'file 不能为空。'}, 400
+        file_rel = library_service.find_existing_uri(file_rel)
         source = download_manager.resolve_source_for_file(file_rel)
         return {'success': True, 'data': {'file': file_rel, 'source': source}}
 
@@ -689,13 +710,17 @@ def create_app(test_config=None):
             return {'success': False, 'error': 'files 必须是数组。'}, 400
 
         normalized: list[str] = []
+        response_keys: list[tuple[str, str]] = []
         for item in files:
             value = str(item or '').strip()
             if value:
-                normalized.append(value)
+                canonical = library_service.find_existing_uri(value)
+                normalized.append(canonical)
+                response_keys.append((value, canonical))
             if len(normalized) >= 200:
                 break
-        items = download_manager.resolve_sources_for_files(normalized)
+        resolved_items = download_manager.resolve_sources_for_files(normalized)
+        items = {original: resolved_items.get(canonical) for original, canonical in response_keys}
         return {'success': True, 'data': {'items': items}}
 
     @app.route('/api/collections', methods=['GET', 'POST'])
@@ -733,7 +758,7 @@ def create_app(test_config=None):
         payload = request.get_json(silent=True) or {}
         name = payload['name'] if 'name' in payload else None
         description = payload['description'] if 'description' in payload else None
-        cover_uri = payload['cover_uri'] if 'cover_uri' in payload else None
+        cover_uri = library_service.canonicalize_uri(payload['cover_uri']) if 'cover_uri' in payload else None
         try:
             updated = collection_store.update(
                 collection_id,
@@ -767,7 +792,7 @@ def create_app(test_config=None):
             return {'success': True, 'data': page}
 
         payload = request.get_json(silent=True) or {}
-        uris = _normalize_collection_mutation_uris(payload.get('uris'))
+        uris = _canonicalize_collection_uris(payload.get('uris'))
         if not uris:
             return {'success': False, 'error': 'uris 不能为空。'}, 400
 
@@ -784,7 +809,13 @@ def create_app(test_config=None):
         uri = str(request.args.get('uri', '')).strip()
         if not uri:
             return {'success': False, 'error': 'uri 不能为空。'}, 400
-        items = collection_store.list_for_media(uri)
+        canonical_uri = library_service.canonicalize_uri(uri)
+        items = collection_store.list_for_media(canonical_uri)
+        if not items:
+            for legacy_uri in library_service.legacy_candidates(canonical_uri)[1:]:
+                items = collection_store.list_for_media(legacy_uri)
+                if items:
+                    break
         payload = [_serialize_collection_summary(item) for item in items]
         return {'success': True, 'data': {'items': payload}}
 
@@ -830,7 +861,14 @@ def create_app(test_config=None):
             uri = request.args.get('uri')
             if not uri:
                 return {'success': False, 'error': 'Missing uri'}, 400
-            return {'success': True, 'data': metadata_store.get(uri)}
+            canonical_uri = library_service.canonicalize_uri(uri)
+            data = metadata_store.get(canonical_uri)
+            if data is None:
+                for legacy_uri in library_service.legacy_candidates(canonical_uri)[1:]:
+                    data = metadata_store.get(legacy_uri)
+                    if data is not None:
+                        break
+            return {'success': True, 'data': data}
 
         payload = request.get_json(silent=True) or {}
         uri = payload.get('uri')
@@ -838,6 +876,7 @@ def create_app(test_config=None):
         prompt_override = payload.get('prompt_override')
         if not uri:
             return {'success': False, 'error': 'Missing uri'}, 400
+        uri = library_service.canonicalize_uri(uri)
 
         override_config = None
         if prompt_override is not None:
@@ -848,6 +887,11 @@ def create_app(test_config=None):
                 override_config = None
 
         existing = metadata_store.get(uri)
+        if existing is None:
+            for legacy_uri in library_service.legacy_candidates(uri)[1:]:
+                existing = metadata_store.get(legacy_uri)
+                if existing is not None:
+                    break
         if existing and not force:
             return {'success': True, 'data': existing, 'skipped': True}
 
@@ -885,6 +929,7 @@ def create_app(test_config=None):
 
     @app.route('/api/favorite/<path:name>', methods=['GET', 'POST'])
     def api_favorite(name):
+        name = library_service.canonicalize_uri(name)
         if request.method == 'GET':
             return {'favorite': favorite_service.is_favorite(name)}
         
@@ -893,6 +938,7 @@ def create_app(test_config=None):
 
     @app.route('/api/thumbnail/<path:name>', methods=['POST'])
     def api_set_thumbnail(name):
+        name = library_service.find_existing_uri(name)
         target = library_service.resolve_path(name)
         if not target: return {'success': False, 'error': 'Invalid path'}, 400
 

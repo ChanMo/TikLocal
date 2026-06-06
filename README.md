@@ -52,6 +52,7 @@ TikLocal provides several CLI commands:
 ```bash
 tiklocal /path/to/media           # Start with media directory
 tiklocal --port 9000              # Use custom port
+tiklocal --media-source photos=~/Pictures/AI  # Add a media source, repeatable
 ```
 
 **Generate video thumbnails:**
@@ -117,6 +118,27 @@ The home page (`/`) now uses a mixed immersive feed:
 ### Configuration
 
 TikLocal provides some configuration options that you can adjust to your needs.
+
+You can configure one or more media directories in `~/.config/tiklocal/config.yaml`:
+
+```yaml
+media_sources:
+  - id: default
+    name: Main Library
+    path: ~/Videos/TikLocal
+  - id: photos
+    name: Photos
+    path: ~/Pictures/AI
+download_source: default
+```
+
+The legacy single-directory configuration still works:
+
+```yaml
+media_root: ~/Videos/TikLocal
+```
+
+Multiple media sources are merged into one unified library. Internal media URIs use the `@source_id/path` format, while old bare-path links and favorites remain compatible through the default source.
 
 * **Light and dark modes:** You can choose to use light or dark mode.
 * **Video playback speed:** You can adjust the video playback speed.

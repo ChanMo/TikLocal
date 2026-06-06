@@ -432,8 +432,10 @@ class DownloadManager:
         config_store: DownloadConfigStore,
         history_store: DownloadHistoryStore,
         source_store: DownloadSourceStore | None = None,
+        output_source_id: str = "default",
     ):
         self.media_root = media_root.resolve()
+        self.output_source_id = str(output_source_id or "default").strip() or "default"
         self.config_store = config_store
         self.history_store = history_store
         self.source_store = source_store
@@ -1174,7 +1176,8 @@ class DownloadManager:
             absolute = Path(path_text).resolve()
             media_root = self.media_root.resolve()
             if str(absolute).startswith(str(media_root)):
-                return str(absolute.relative_to(media_root))
+                rel = str(absolute.relative_to(media_root)).replace("\\", "/")
+                return f"@{self.output_source_id}/{rel}"
         except Exception:
             return ""
         return ""
@@ -1210,7 +1213,17 @@ class DownloadManager:
             outputs = [str(item).strip() for item in raw_output if str(item).strip()]
         else:
             outputs = []
+        outputs = [self._canonical_output_uri(item) for item in outputs]
+        outputs = [item for item in outputs if item]
         return return_code, error_message, outputs
+
+    def _canonical_output_uri(self, value: str) -> str:
+        key = _normalize_file_rel(value)
+        if not key:
+            return ""
+        if key.startswith("@"):
+            return key
+        return f"@{self.output_source_id}/{key}"
 
     def _probe_binary(self, command: str) -> tuple[str | None, str]:
         binary_path = shutil.which(command)
@@ -1309,6 +1322,9 @@ class DownloadManager:
         if not self.source_store:
             return None
         mapped = self.source_store.get(file_rel)
+        if not mapped:
+            legacy = self._strip_output_source_prefix(file_rel)
+            mapped = self.source_store.get(legacy) if legacy != file_rel else None
         if not mapped:
             return None
         return _normalize_source_meta(mapped, resolved_by="map")
@@ -1442,7 +1458,8 @@ class DownloadManager:
         return None
 
     def _resolve_media_file_path(self, file_rel: str) -> Path | None:
-        key = _normalize_file_rel(file_rel)
+        key = self._strip_output_source_prefix(file_rel)
+        key = _normalize_file_rel(key)
         if not key:
             return None
         path = (self.media_root / key).resolve()
@@ -1451,6 +1468,13 @@ class DownloadManager:
         except ValueError:
             return None
         return path
+
+    def _strip_output_source_prefix(self, file_rel: str) -> str:
+        key = _normalize_file_rel(file_rel)
+        prefix = f"@{self.output_source_id}/"
+        if key.startswith(prefix):
+            return key[len(prefix):]
+        return key
 
     def _resolve_cookie_choice(self, *, url: str, cookie_mode: str, cookie_file: str) -> tuple[str, str, str | None]:
         with self._lock:

@@ -50,6 +50,7 @@ TikLocal 提供了多个 CLI 命令：
 ```bash
 tiklocal /path/to/media           # 指定媒体目录启动
 tiklocal --port 9000              # 使用自定义端口
+tiklocal --media-source photos=~/Pictures/AI  # 追加媒体源，可重复
 ```
 
 **生成视频缩略图：**
@@ -115,6 +116,27 @@ sudo apt install yt-dlp gallery-dl ffmpeg
 ### 配置
 
 TikLocal 提供了一些配置选项，您可以根据自己的需要进行调整。
+
+可以在 `~/.config/tiklocal/config.yaml` 中配置一个或多个媒体目录：
+
+```yaml
+media_sources:
+  - id: default
+    name: 主媒体库
+    path: ~/Videos/TikLocal
+  - id: photos
+    name: 图片库
+    path: ~/Pictures/AI
+download_source: default
+```
+
+也可以继续使用旧的单目录配置：
+
+```yaml
+media_root: ~/Videos/TikLocal
+```
+
+多媒体源会合并为一个统一媒体库，内部媒体 URI 使用 `@source_id/path` 格式；旧的裸路径链接和收藏会自动兼容到 `@default/...`。
 
 * 浅色模式/暗色模式：您可以选择使用浅色模式或暗色模式。
 * 视频播放速度：您可以调整视频播放速度。

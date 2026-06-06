@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 
@@ -45,6 +46,10 @@ def test_mix_feed_returns_typed_items(client):
 
     for item in items:
         assert "name" in item
+        if item.get("type") == "theme_strip":
+            assert item["items"]
+            assert item["target_url"]
+            continue
         assert "media_url" in item
         assert "detail_url" in item
         assert item["type"] in {"video", "image"}
@@ -76,11 +81,14 @@ def test_mix_feed_falls_back_to_videos_when_no_images(tmp_path, monkeypatch):
     assert all(item["type"] == "video" for item in items)
 
 
-def test_mix_feed_can_insert_theme_strip_for_recent_downloads_and_favorites(tmp_path, monkeypatch):
+def test_mix_feed_can_insert_theme_strip_for_recent_added_and_favorites(tmp_path, monkeypatch):
     media_root = tmp_path / "media"
     media_root.mkdir(parents=True, exist_ok=True)
-    for name in ("v1.mp4", "v2.mp4", "i1.jpg", "i2.png", "i3.jpg"):
-        (media_root / name).write_bytes(b"00")
+    for idx, name in enumerate(("v1.mp4", "v2.mp4", "i1.jpg", "i2.png", "i3.jpg")):
+        path = media_root / name
+        path.write_bytes(b"00")
+        ts = 1_700_000_000 + idx
+        os.utime(path, (ts, ts))
 
     (media_root / "favorite.json").write_text(
         json.dumps(["i1.jpg", "i2.png", "v1.mp4"]),
@@ -89,17 +97,6 @@ def test_mix_feed_can_insert_theme_strip_for_recent_downloads_and_favorites(tmp_
 
     data_root = tmp_path / "tiklocal-data"
     data_root.mkdir(parents=True, exist_ok=True)
-    (data_root / "download_jobs.json").write_text(
-        json.dumps([
-            {
-                "id": "job-1",
-                "status": "success",
-                "created_at": "2026-03-14T10:00:00Z",
-                "output_files_rel": ["i3.jpg", "v2.mp4", "i2.png"],
-            }
-        ]),
-        encoding="utf-8",
-    )
 
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
     monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
@@ -114,7 +111,7 @@ def test_mix_feed_can_insert_theme_strip_for_recent_downloads_and_favorites(tmp_
     items = data["items"]
     strip = next((item for item in items if item.get("type") == "theme_strip"), None)
     assert strip is not None
-    assert strip["name"] in {"theme:recent-downloads", "theme:favorite-picks"}
+    assert strip["name"] in {"theme:recent-added", "theme:favorite-picks"}
     assert strip["title"]
     assert strip["target_url"] in {"/favorite", "/library"}
     assert strip["target_label"]
@@ -183,6 +180,6 @@ def test_mix_feed_prefers_original_post_group_when_source_has_multiple_media(tmp
     assert group is not None
     assert group["title"] == "原始图集"
     names = [child["name"] for child in group["items"]]
-    assert "set-1.jpg" in names
-    assert "set-2.jpg" in names
+    assert "@default/set-1.jpg" in names
+    assert "@default/set-2.jpg" in names
     assert all(child["media_url"] for child in group["items"])
