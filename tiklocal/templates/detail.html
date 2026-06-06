@@ -456,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 复制链接功能
   copyLinkBtn?.addEventListener('click', async () => {
     try {
-      const url = window.location.origin + '/media/' + encodeURIComponent(fileName);
+      const url = window.location.origin + '/media?uri=' + encodeURIComponent(fileName);
       await navigator.clipboard.writeText(url);
       showNotification('链接已复制到剪贴板', 'success');
     } catch (err) {
@@ -533,8 +533,17 @@ function confirmDelete() {
   showModal(
     '确定要删除这个视频吗？', 
     '此操作不可撤销，视频将被永久删除。', 
-    () => {
-      window.location.href = '/delete/{{ file_path_encoded }}';
+    async () => {
+      try {
+        const response = await fetch('/delete/{{ file_path_encoded }}', { method: 'POST' });
+        if (response.ok || response.redirected) {
+          window.location.href = '/library';
+          return;
+        }
+        showNotification('删除失败，请重试', 'error');
+      } catch (error) {
+        showNotification('删除失败，请重试', 'error');
+      }
     }
   );
 }

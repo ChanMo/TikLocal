@@ -35,6 +35,7 @@ from tiklocal.services.downloader import (
     validate_download_url,
 )
 from tiklocal.services.collections import CollectionStore
+from tiklocal.services.embedded_metadata import read_embedded_generation
 from tiklocal.paths import (
     get_metadata_path,
     get_favorites_path,
@@ -926,6 +927,17 @@ def create_app(test_config=None):
             return {'success': True, 'data': merged}
         except Exception as e:
             return {'success': False, 'error': str(e)}, 500
+
+    @app.route('/api/image/embedded-metadata')
+    def api_image_embedded_metadata():
+        uri = request.args.get('uri')
+        if not uri:
+            return {'success': False, 'error': 'Missing uri'}, 400
+        canonical_uri = library_service.find_existing_uri(uri)
+        target = library_service.resolve_path(canonical_uri)
+        if not target or not target.exists():
+            return {'success': False, 'error': 'File not found'}, 404
+        return {'success': True, 'data': {'embedded_generation': read_embedded_generation(target)}}
 
     @app.route('/api/favorite/<path:name>', methods=['GET', 'POST'])
     def api_favorite(name):

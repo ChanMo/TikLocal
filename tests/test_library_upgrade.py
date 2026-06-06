@@ -49,18 +49,12 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert "#quick-view.immersive .quick-caption-panel" in body
     assert "image-focus" not in body
     assert "waterfall-col" in body
-    assert "scheduleWaterfallRelayout" in body
+    assert "library_page_controller.js" in body
     assert "flow_ui_shared.js" in body
     assert "flow_state_controller.js" in body
     assert "flow_session.js" in body
     assert "flow_actions_shared.js" in body
     assert "flow_media_actions_controller.js" in body
-    assert "createFlowStateController(" in body
-    assert "createFlowSession(" in body
-    assert "createFlowMediaActionsController(" in body
-    assert "uiShared.updateMagnifierContent({" in body
-    assert "collectionModalOpenedAt" in body
-    assert "quickCollectionList.addEventListener('change'" in body
 
 
 def test_home_feed_uses_unified_immersive_model(client):
@@ -73,17 +67,10 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert "flow_session.js" in body
     assert "flow_actions_shared.js" in body
     assert "flow_media_actions_controller.js" in body
-    assert "createFlowStateController(" in body
-    assert "createFlowSession(" in body
-    assert "createFlowMediaActionsController(" in body
-    assert "flowState.toggleImmersive()" in body
-    assert "flowState.setMagnifying(active)" in body
-    assert "uiShared.updateMagnifierContent({" in body
+    assert "home_feed_controller.js" in body
     assert 'id="collection-btn"' in body
     assert 'id="collection-count"' in body
     assert 'id="collection-modal"' in body
-    assert "toggleCollectionMembership(" in body
-    assert "collectionList.addEventListener('change'" in body
     assert "image-focus-mode" not in body
 
 
@@ -112,7 +99,7 @@ def test_api_library_items_supports_modes_and_seed(client):
     big_items = big_res.get_json()["data"]["items"]
     assert len(big_items) >= 1
     assert all(item["type"] == "video" for item in big_items)
-    assert any(item["name"] == "big.mp4" for item in big_items)
+    assert any(item["name"] == "@default/big.mp4" for item in big_items)
 
 
 def test_api_library_items_no_duplicates_across_offsets(client):
@@ -154,7 +141,43 @@ def test_api_library_items_dedupes_symlink_aliases(tmp_path, monkeypatch):
     items = res.get_json()["data"]["items"]
     video_items = [item for item in items if item["type"] == "video"]
     assert len(video_items) == 1
-    assert video_items[0]["name"] in {"origin.mp4", "alias.mp4"}
+    assert video_items[0]["name"] in {"@default/origin.mp4", "@default/alias.mp4"}
+
+
+def test_api_library_items_merges_multiple_media_sources(tmp_path, monkeypatch):
+    default_root = tmp_path / "default"
+    extra_root = tmp_path / "extra"
+    default_root.mkdir(parents=True, exist_ok=True)
+    extra_root.mkdir(parents=True, exist_ok=True)
+    (default_root / "main.mp4").write_bytes(b"video")
+    (extra_root / "photo.jpg").write_bytes(b"image")
+
+    data_root = tmp_path / "tiklocal-data"
+    monkeypatch.setenv("MEDIA_ROOT", str(default_root))
+    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
+    app = create_app({
+        "TESTING": True,
+        "MEDIA_ROOT": default_root,
+        "MEDIA_SOURCES": [
+            {"id": "default", "name": "Default", "path": str(default_root)},
+            {"id": "photos", "name": "Photos", "path": str(extra_root)},
+        ],
+    })
+    local_client = app.test_client()
+
+    res = local_client.get("/api/library/items?scope=all&mode=all&offset=0&limit=20")
+    assert res.status_code == 200
+    names = {item["name"] for item in res.get_json()["data"]["items"]}
+    assert "@default/main.mp4" in names
+    assert "@photos/photo.jpg" in names
+
+    legacy_media = local_client.get("/media?uri=main.mp4", follow_redirects=False)
+    assert legacy_media.status_code in {301, 302, 308}
+    assert legacy_media.headers.get("Location", "").endswith("/media/%40default/main.mp4")
+
+    extra_media = local_client.get("/media?uri=%40photos/photo.jpg", follow_redirects=True)
+    assert extra_media.status_code == 200
+    assert extra_media.data == b"image"
 
 
 def test_removed_legacy_routes_and_apis_return_404(client):
@@ -179,10 +202,10 @@ def test_favorite_scope_and_detail_links(client):
     assert res.status_code == 200
     data = res.get_json()["data"]
     names = {item["name"] for item in data["items"]}
-    assert "v01.mp4" in names
-    assert "i01.jpg" in names
-    assert any(item["detail_url"] == "/detail/v01.mp4" for item in data["items"])
-    assert any(item["detail_url"] == "/image?uri=i01.jpg" for item in data["items"])
+    assert "@default/v01.mp4" in names
+    assert "@default/i01.jpg" in names
+    assert any(item["detail_url"] == "/detail/%40default/v01.mp4" for item in data["items"])
+    assert any(item["detail_url"] == "/image?uri=%40default/i01.jpg" for item in data["items"])
 
 
 def test_special_chars_in_media_urls_are_encoded(tmp_path, monkeypatch):
@@ -202,18 +225,24 @@ def test_special_chars_in_media_urls_are_encoded(tmp_path, monkeypatch):
     video_detail = local_client.get(f"/detail/{quote(video_name, safe='')}")
     assert video_detail.status_code == 200
     video_body = video_detail.data.decode("utf-8")
-    assert 'src="/media/v%231%2B.mp4"' in video_body
-    assert 'poster="/thumb?uri=v%231%2B.mp4"' in video_body
-    assert "const fileName = \"v#1+.mp4\";" in video_body
+    assert 'src="/media/%40default/v%231%2B.mp4"' in video_body
+    assert 'poster="/thumb?uri=%40default%2Fv%231%2B.mp4"' in video_body
+    assert "const fileName = \"@default/v#1+.mp4\";" in video_body
+    assert "fetch('/delete/%40default/v%231%2B.mp4', { method: 'POST' })" in video_body
 
     image_detail = local_client.get(f"/image?uri={quote(image_name, safe='')}")
     assert image_detail.status_code == 200
     image_body = image_detail.data.decode("utf-8")
-    assert 'src="/media?uri=a%26b.jpg"' in image_body
-    assert "const imageUri = \"a\\u0026b.jpg\";" in image_body
-    assert "const imageUriEncoded = \"a%26b.jpg\";" in image_body
-    assert "window.location.href = '/delete?uri=a%26b.jpg';" in image_body
+    assert 'src="/media?uri=%40default%2Fa%26b.jpg"' in image_body
+    assert "const imageUri = \"@default/a\\u0026b.jpg\";" in image_body
+    assert "const imageUriEncoded = \"%40default%2Fa%26b.jpg\";" in image_body
+    assert "image_viewer_controller.js" in image_body
+    assert 'id="zoom-in-btn"' in image_body
+    assert 'id="zoom-out-btn"' in image_body
+    assert 'id="fullscreen-stage"' in image_body
+    assert "fetch('/delete/%40default/a%26b.jpg', { method: 'POST' })" in image_body
+    assert "window.location.href = '/library';" in image_body
 
     media_res = local_client.get(f"/media?uri={quote(video_name, safe='')}", follow_redirects=False)
     assert media_res.status_code in {301, 302, 308}
-    assert media_res.headers.get("Location", "").endswith("/media/v%231%2B.mp4")
+    assert media_res.headers.get("Location", "").endswith("/media/%40default/v%231%2B.mp4")

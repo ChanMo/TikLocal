@@ -3,14 +3,40 @@
 {% block extra_head %}
 <style>
   .image-viewer {
-    max-height: 80vh;
+    max-height: 72vh;
     object-fit: contain;
     cursor: zoom-in;
+    transform-origin: center center;
+    will-change: transform;
+    user-select: none;
+    -webkit-user-drag: none;
   }
   
-  .image-viewer.zoomed {
-    cursor: zoom-out;
-    transform-origin: center;
+  .image-stage {
+    min-height: min(72vh, 760px);
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .image-stage.is-zoomed .image-viewer {
+    cursor: grab;
+  }
+
+  .image-stage.is-dragging .image-viewer {
+    cursor: grabbing;
+  }
+
+  #fullscreen-stage {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  #fullscreen-stage .image-viewer {
+    max-height: 92vh;
+    max-width: 92vw;
   }
   
   .info-card {
@@ -39,6 +65,15 @@
   #caption-generate-btn.is-loading {
     cursor: default;
   }
+  #embedded-prompt {
+    max-height: 7.5rem;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #embedded-prompt.is-expanded {
+    max-height: none;
+  }
   @keyframes caption-spin {
     to { transform: rotate(360deg); }
   }
@@ -61,23 +96,37 @@
       <div class="lg:col-span-2">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
           <!-- 图片容器 -->
-          <div class="relative bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4" id="image-container">
+          <div class="image-stage relative bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4" id="image-container">
             <img 
               src="/media?uri={{ uri_query_encoded }}" 
               alt="{{image.name}}"
-              class="image-viewer rounded-lg shadow-md max-w-full transition-transform duration-300"
+              class="image-viewer rounded-lg shadow-md max-w-full"
               id="main-image"
               loading="lazy"
             />
             
             <!-- 图片控制按钮 -->
-            <div class="absolute top-4 right-4 flex gap-2">
+            <div class="absolute top-4 right-4 flex flex-wrap justify-end gap-2">
               <button 
-                id="zoom-btn" 
+                id="zoom-out-btn" 
                 class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-                aria-label="缩放图片"
+                aria-label="缩小图片"
+              >
+                <i data-feather="zoom-out" class="w-5 h-5"></i>
+              </button>
+              <button 
+                id="zoom-in-btn" 
+                class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+                aria-label="放大图片"
               >
                 <i data-feather="zoom-in" class="w-5 h-5"></i>
+              </button>
+              <button
+                id="zoom-reset-btn"
+                class="px-3 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200 text-xs font-semibold"
+                aria-label="重置缩放"
+              >
+                <span id="zoom-label">100%</span>
               </button>
               <button 
                 id="fullscreen-btn" 
@@ -135,6 +184,33 @@
                 <span class="text-sm text-gray-500 dark:text-gray-400">修改时间</span>
                 <span class="text-sm font-medium text-gray-900 dark:text-white">{{ stat.st_mtime | timestamp_to_date }}</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 生成信息 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 hidden" id="embedded-generation-card">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <i data-feather="cpu" class="w-5 h-5 text-violet-500"></i>
+            生成信息
+          </h2>
+          <div class="space-y-3">
+            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">模型</div>
+              <div id="embedded-model" class="text-sm font-medium text-gray-900 dark:text-white break-all"></div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+              <div class="flex items-center justify-between gap-3 mb-2">
+                <div class="text-xs text-gray-500 dark:text-gray-400">Prompt</div>
+                <button
+                  id="embedded-prompt-toggle"
+                  class="text-xs font-semibold text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-200"
+                  type="button"
+                >
+                  展开全部
+                </button>
+              </div>
+              <div id="embedded-prompt" class="text-xs leading-relaxed text-gray-700 dark:text-gray-200"></div>
             </div>
           </div>
         </div>
@@ -249,20 +325,44 @@
   </div>
 
   <!-- 全屏模态框 -->
-  <div id="fullscreen-modal" class="fixed inset-0 z-50 bg-black bg-opacity-95 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="relative max-w-full max-h-full">
-      <img 
-        id="fullscreen-image" 
-        src="/media?uri={{ uri_query_encoded }}" 
-        alt="{{image.name}}"
-        class="max-w-full max-h-full object-contain"
-      />
+  <div id="fullscreen-modal" class="fixed inset-0 z-50 bg-black bg-opacity-95 backdrop-blur-sm hidden">
+    <div class="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
+      <button
+        id="fullscreen-zoom-out"
+        class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+        aria-label="缩小图片"
+      >
+        <i data-feather="zoom-out" class="w-5 h-5"></i>
+      </button>
+      <button
+        id="fullscreen-zoom-in"
+        class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+        aria-label="放大图片"
+      >
+        <i data-feather="zoom-in" class="w-5 h-5"></i>
+      </button>
+      <button
+        id="fullscreen-reset"
+        class="px-3 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200 text-xs font-semibold"
+        aria-label="重置缩放"
+      >
+        <span id="fullscreen-zoom-label">100%</span>
+      </button>
       <button 
         id="close-fullscreen" 
-        class="absolute top-4 right-4 w-12 h-12 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+        class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
+        aria-label="关闭全屏"
       >
         <i data-feather="x" class="w-6 h-6"></i>
       </button>
+    </div>
+    <div class="image-stage flex items-center justify-center p-4" id="fullscreen-stage">
+      <img
+        id="fullscreen-viewer-image"
+        src="/media?uri={{ uri_query_encoded }}"
+        alt="{{image.name}}"
+        class="image-viewer max-w-full object-contain"
+      />
     </div>
   </div>
 
@@ -306,12 +406,23 @@
 {% endblock %}
 
 {% block extra_body %}
+<script src="{{ url_for('static', filename='image_viewer_controller.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const mainImage = document.getElementById('main-image');
-  const zoomBtn = document.getElementById('zoom-btn');
+  const imageContainer = document.getElementById('image-container');
+  const zoomInBtn = document.getElementById('zoom-in-btn');
+  const zoomOutBtn = document.getElementById('zoom-out-btn');
+  const zoomResetBtn = document.getElementById('zoom-reset-btn');
+  const zoomLabel = document.getElementById('zoom-label');
   const fullscreenBtn = document.getElementById('fullscreen-btn');
   const fullscreenModal = document.getElementById('fullscreen-modal');
+  const fullscreenStage = document.getElementById('fullscreen-stage');
+  const fullscreenViewerImage = document.getElementById('fullscreen-viewer-image');
+  const fullscreenZoomIn = document.getElementById('fullscreen-zoom-in');
+  const fullscreenZoomOut = document.getElementById('fullscreen-zoom-out');
+  const fullscreenReset = document.getElementById('fullscreen-reset');
+  const fullscreenZoomLabel = document.getElementById('fullscreen-zoom-label');
   const closeFullscreen = document.getElementById('close-fullscreen');
   const copyLinkBtn = document.getElementById('copy-link-btn');
   const captionBtn = document.getElementById('caption-generate-btn');
@@ -319,6 +430,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const captionContent = document.getElementById('caption-content');
   const captionTitle = document.getElementById('caption-title');
   const captionTags = document.getElementById('caption-tags');
+  const embeddedGenerationCard = document.getElementById('embedded-generation-card');
+  const embeddedModel = document.getElementById('embedded-model');
+  const embeddedPrompt = document.getElementById('embedded-prompt');
+  const embeddedPromptToggle = document.getElementById('embedded-prompt-toggle');
   const promptModal = document.getElementById('caption-prompt-modal');
   const promptCloseBtn = document.getElementById('caption-prompt-close');
   const promptCancelBtn = document.getElementById('caption-override-cancel');
@@ -331,32 +446,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const imageUriEncoded = {{ uri_query_encoded|tojson }};
   let currentCaption = null;
   let promptConfigCache = null;
-  
-  let isZoomed = false;
-  
-  // 图片缩放功能
-  function toggleZoom() {
-    isZoomed = !isZoomed;
-    if (isZoomed) {
-      mainImage.style.transform = 'scale(1.5)';
-      mainImage.classList.add('zoomed');
-      zoomBtn.querySelector('i').setAttribute('data-feather', 'zoom-out');
-    } else {
-      mainImage.style.transform = 'scale(1)';
-      mainImage.classList.remove('zoomed');
-      zoomBtn.querySelector('i').setAttribute('data-feather', 'zoom-in');
-    }
-    feather.replace();
-  }
-  
-  // 绑定缩放事件
-  zoomBtn?.addEventListener('click', toggleZoom);
-  mainImage?.addEventListener('click', toggleZoom);
+  const mainViewer = window.createImageViewerController({
+    stage: imageContainer,
+    image: mainImage,
+    zoomInButton: zoomInBtn,
+    zoomOutButton: zoomOutBtn,
+    resetButton: zoomResetBtn,
+    zoomLabel
+  });
+  const fullscreenViewer = window.createImageViewerController({
+    stage: fullscreenStage,
+    image: fullscreenViewerImage,
+    zoomInButton: fullscreenZoomIn,
+    zoomOutButton: fullscreenZoomOut,
+    resetButton: fullscreenReset,
+    zoomLabel: fullscreenZoomLabel
+  });
   
   // 全屏功能
   fullscreenBtn?.addEventListener('click', () => {
     fullscreenModal.classList.remove('hidden');
     fullscreenModal.classList.add('flex');
+    requestAnimationFrame(() => fullscreenViewer.reset());
   });
   
   closeFullscreen?.addEventListener('click', () => {
@@ -439,6 +550,36 @@ document.addEventListener('DOMContentLoaded', () => {
       showNotification('读取失败', 'error');
     }
   };
+
+  const renderEmbeddedGeneration = (data) => {
+    const embedded = data && data.embedded_generation ? data.embedded_generation : null;
+    if (!embedded || (!embedded.prompt && !embedded.model)) {
+      embeddedGenerationCard?.classList.add('hidden');
+      return;
+    }
+    embeddedGenerationCard?.classList.remove('hidden');
+    embeddedModel.textContent = embedded.model || '未知';
+    embeddedPrompt.textContent = embedded.prompt || '';
+    embeddedPromptToggle.hidden = !embedded.prompt;
+    if (typeof feather !== 'undefined') feather.replace();
+  };
+
+  const loadEmbeddedGeneration = async () => {
+    try {
+      const res = await fetch(`/api/image/embedded-metadata?uri=${encodeURIComponent(imageUri)}`);
+      const data = await res.json();
+      if (data.success) {
+        renderEmbeddedGeneration(data.data);
+      }
+    } catch (err) {
+      embeddedGenerationCard?.classList.add('hidden');
+    }
+  };
+
+  embeddedPromptToggle?.addEventListener('click', () => {
+    const expanded = embeddedPrompt.classList.toggle('is-expanded');
+    embeddedPromptToggle.textContent = expanded ? '收起' : '展开全部';
+  });
 
   const openPromptModal = () => {
     if (!promptModal) return;
@@ -552,6 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   loadCaption();
+  loadEmbeddedGeneration();
   
   // 键盘导航
   document.addEventListener('keydown', (e) => {
@@ -560,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
         case ' ':
         case 'Enter':
           e.preventDefault();
-          toggleZoom();
+          mainViewer.zoomIn();
           break;
         case 'f':
         case 'F':
@@ -577,8 +719,17 @@ function confirmDelete() {
   showModal(
     '确定要删除这张图片吗？', 
     '此操作不可撤销，图片将被永久删除。', 
-    () => {
-      window.location.href = '/delete?uri={{ uri_query_encoded }}';
+    async () => {
+      try {
+        const response = await fetch('/delete/{{ uri_path_encoded }}', { method: 'POST' });
+        if (response.ok || response.redirected) {
+          window.location.href = '/library';
+          return;
+        }
+        showNotification('删除失败，请重试', 'error');
+      } catch (error) {
+        showNotification('删除失败，请重试', 'error');
+      }
     }
   );
 }
