@@ -24,8 +24,16 @@ LLM_BASE_URL_MAX_LENGTH = 512
 LLM_MODEL_NAME_MAX_LENGTH = 256
 
 DEFAULT_PROMPT_CONFIG = {
-    "system_prompt": "",
-    "user_prompt": "",
+    "system_prompt": (
+        "你是一个图片内容分析助手。请根据图片内容生成适合本地媒体库浏览的中文标题和标签。"
+        "只输出 JSON，不要输出 Markdown。"
+    ),
+    "user_prompt": (
+        "请分析这张图片，生成：\n"
+        "1. 一个简短自然的中文标题\n"
+        "2. 最多 {tags_limit} 个中文标签\n\n"
+        "输出 JSON：{\"title\":\"...\",\"tags\":[\"...\"]}"
+    ),
     "temperature": 0.6,
     "tags_limit": 5,
     "enabled": False,
@@ -36,6 +44,16 @@ DEFAULT_LLM_CONFIG = {
     "model_name": "",
 }
 
+DEFAULT_VISION_CONFIG = {
+    "enabled": True,
+    "base_url": "",
+    "model_name": "",
+    "system_prompt": DEFAULT_PROMPT_CONFIG["system_prompt"],
+    "user_prompt": DEFAULT_PROMPT_CONFIG["user_prompt"],
+    "temperature": DEFAULT_PROMPT_CONFIG["temperature"],
+    "tags_limit": DEFAULT_PROMPT_CONFIG["tags_limit"],
+}
+
 
 def get_default_prompt_config() -> dict[str, Any]:
     return dict(DEFAULT_PROMPT_CONFIG)
@@ -43,6 +61,20 @@ def get_default_prompt_config() -> dict[str, Any]:
 
 def get_default_llm_config() -> dict[str, Any]:
     return dict(DEFAULT_LLM_CONFIG)
+
+
+def get_default_vision_config() -> dict[str, Any]:
+    return dict(DEFAULT_VISION_CONFIG)
+
+
+def merge_vision_config(base: dict[str, Any], override: dict[str, Any] | None) -> dict[str, Any]:
+    merged = dict(base)
+    if not override:
+        return merged
+    for key in ("enabled", "base_url", "model_name", "system_prompt", "user_prompt", "temperature", "tags_limit"):
+        if key in override:
+            merged[key] = override[key]
+    return merged
 
 
 def merge_prompt_config(base: dict[str, Any], override: dict[str, Any] | None) -> dict[str, Any]:
@@ -155,6 +187,78 @@ def validate_llm_config(
         if len(model_name) > LLM_MODEL_NAME_MAX_LENGTH:
             return None, f"model_name 不能超过 {LLM_MODEL_NAME_MAX_LENGTH} 个字符。"
         cleaned["model_name"] = model_name
+
+    return cleaned, None
+
+
+def validate_vision_config(
+    payload: Any,
+    *,
+    partial: bool = False,
+) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(payload, dict):
+        return None, "配置格式必须是 JSON 对象。"
+
+    cleaned: dict[str, Any] = {}
+
+    if "enabled" in payload:
+        if not isinstance(payload["enabled"], bool):
+            return None, "enabled 必须是布尔值。"
+        cleaned["enabled"] = payload["enabled"]
+    elif not partial:
+        cleaned["enabled"] = bool(DEFAULT_VISION_CONFIG["enabled"])
+
+    if "base_url" in payload or not partial:
+        base_url = str(payload.get("base_url", DEFAULT_VISION_CONFIG["base_url"])).strip()
+        if len(base_url) > LLM_BASE_URL_MAX_LENGTH:
+            return None, f"base_url 不能超过 {LLM_BASE_URL_MAX_LENGTH} 个字符。"
+        if base_url and not (base_url.startswith("http://") or base_url.startswith("https://")):
+            return None, "base_url 必须以 http:// 或 https:// 开头。"
+        cleaned["base_url"] = base_url
+
+    if "model_name" in payload or not partial:
+        model_name = str(payload.get("model_name", DEFAULT_VISION_CONFIG["model_name"])).strip()
+        if len(model_name) > LLM_MODEL_NAME_MAX_LENGTH:
+            return None, f"model_name 不能超过 {LLM_MODEL_NAME_MAX_LENGTH} 个字符。"
+        cleaned["model_name"] = model_name
+
+    prompt_payload = dict(payload)
+    if "prompt" in payload and isinstance(payload.get("prompt"), dict):
+        prompt = payload["prompt"]
+        if "system" in prompt:
+            prompt_payload["system_prompt"] = prompt["system"]
+        if "user" in prompt:
+            prompt_payload["user_prompt"] = prompt["user"]
+
+    for source_key, output_key, max_length in (
+        ("system_prompt", "system_prompt", PROMPT_MAX_SYSTEM_LENGTH),
+        ("user_prompt", "user_prompt", PROMPT_MAX_USER_LENGTH),
+    ):
+        if source_key in prompt_payload or not partial:
+            value = str(prompt_payload.get(source_key, DEFAULT_VISION_CONFIG[output_key])).strip()
+            if not value:
+                return None, f"{output_key} 不能为空。"
+            if len(value) > max_length:
+                return None, f"{output_key} 不能超过 {max_length} 个字符。"
+            cleaned[output_key] = value
+
+    if "temperature" in payload or not partial:
+        try:
+            temperature = float(payload.get("temperature", DEFAULT_VISION_CONFIG["temperature"]))
+        except (TypeError, ValueError):
+            return None, "temperature 必须是数字。"
+        if not (PROMPT_TEMPERATURE_MIN <= temperature <= PROMPT_TEMPERATURE_MAX):
+            return None, f"temperature 必须在 {PROMPT_TEMPERATURE_MIN} 到 {PROMPT_TEMPERATURE_MAX} 之间。"
+        cleaned["temperature"] = temperature
+
+    if "tags_limit" in payload or not partial:
+        try:
+            tags_limit = int(payload.get("tags_limit", DEFAULT_VISION_CONFIG["tags_limit"]))
+        except (TypeError, ValueError):
+            return None, "tags_limit 必须是整数。"
+        if not (PROMPT_TAGS_MIN <= tags_limit <= PROMPT_TAGS_MAX):
+            return None, f"tags_limit 必须在 {PROMPT_TAGS_MIN} 到 {PROMPT_TAGS_MAX} 之间。"
+        cleaned["tags_limit"] = tags_limit
 
     return cleaned, None
 
@@ -319,7 +423,7 @@ class CaptionService:
         if not self.model:
             raise RuntimeError("未配置 TIKLOCAL_LLM_MODEL。")
         if self.base_url and "openrouter.ai" in self.base_url and "/api/v1" not in self.base_url:
-            raise RuntimeError("OpenRouter base_url 需要包含 /api/v1，例如 https://openrouter.ai/api/v1")
+            raise RuntimeError("base_url 需要包含完整 API 路径，例如 https://openrouter.ai/api/v1")
 
     def generate(
         self,
@@ -338,7 +442,7 @@ class CaptionService:
         system_prompt = str(effective_prompt["system_prompt"])
         user_prompt = self._render_user_prompt(str(effective_prompt["user_prompt"]), tags_limit)
         if not system_prompt.strip() or not user_prompt.strip():
-            raise RuntimeError("请先在设置中保存自定义 AI Prompt，或使用本次覆盖提示词。")
+            raise RuntimeError("请先在配置文件中设置 vision Prompt，或使用本次覆盖提示词。")
 
         text = self._request_chat_completion(system_prompt, user_prompt, data_url, temperature)
         if self._looks_like_html(text):

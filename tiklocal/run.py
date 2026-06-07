@@ -5,8 +5,17 @@ from pathlib import Path
 from waitress import serve
 from tiklocal.app import create_app
 from tiklocal.thumbs import generate_thumbnails
-from tiklocal.paths import get_data_dir
-from tiklocal.services import normalize_source_id
+from tiklocal.paths import get_data_dir, get_database_path
+from tiklocal.services import LibraryService, build_media_sources, normalize_source_id
+from tiklocal.services.embedding import (
+    ImageVectorService,
+    OpenAICompatibleImageEmbeddingClient,
+    SQLiteImageVectorStore,
+    get_default_embedding_config,
+    merge_embedding_config,
+    validate_embedding_config,
+)
+from tiklocal.services.database import AppDatabase
 
 try:
     import yaml
@@ -74,6 +83,130 @@ def parse_cli_media_source(value):
     return {'id': source_id, 'name': source_id, 'path': path}
 
 
+def resolve_embedding_config(config, args=None):
+    effective = get_default_embedding_config()
+    file_config, error = validate_embedding_config(config.get('embedding') or config.get('embedding_config') or {}, partial=True)
+    if error:
+        file_config = {}
+    effective = merge_embedding_config(effective, file_config)
+
+    if args is not None:
+        overrides = {}
+        if getattr(args, 'max_size', None):
+            overrides['image_max_size'] = args.max_size
+        if getattr(args, 'quality', None):
+            overrides['image_quality'] = args.quality
+        if getattr(args, 'dimensions', None):
+            overrides['dimensions'] = args.dimensions
+        if overrides:
+            validated, error = validate_embedding_config(overrides, partial=True)
+            if error:
+                raise ValueError(error)
+            effective = merge_embedding_config(effective, validated)
+    return effective
+
+
+def run_vectorize(config, args, parser):
+    media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
+    media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
+    if not media_root and not media_sources:
+        parser.error('必须指定媒体目录:\n  - tiklocal vectorize /path/to/media\n  - 或设置 media_root/media_sources')
+
+    media_path = Path(media_root).expanduser() if media_root else Path(media_sources[0]['path']).expanduser()
+    for source in media_sources:
+        source_path = Path(str(source.get('path') or '')).expanduser()
+        if not source_path.exists() or not source_path.is_dir():
+            print(f"错误: 媒体源不可用 {source.get('id')}: {source_path}", file=sys.stderr)
+            sys.exit(1)
+
+    try:
+        embedding_config = resolve_embedding_config(config, args)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    if not bool(embedding_config.get('enabled')):
+        parser.error('请先在 config.yaml 中设置 embedding.enabled: true')
+
+    library = LibraryService(media_path, media_sources=build_media_sources(media_path, media_sources or None))
+    app_database = AppDatabase(get_database_path())
+    app_database.migrate()
+    vector_index = SQLiteImageVectorStore(app_database)
+    vector_service = ImageVectorService(library, vector_index)
+
+    if args.cleanup:
+        result = vector_service.cleanup_missing()
+        print(f"已清理失效向量: {result['deleted']}")
+        if not args.continue_after_cleanup:
+            return
+
+    source_id = normalize_source_id(args.source) if args.source else None
+    plan = vector_service.plan_records(
+        config=embedding_config,
+        limit=max(int(args.limit or 0), 0),
+        order=args.order,
+        source_id=source_id,
+        force=bool(args.force),
+    )
+
+    print("TikLocal image vectorization")
+    print("Media sources:")
+    for source in library.sources:
+        print(f"  @{source.id}: {source.path}")
+    print("Config:")
+    print(f"  model: {embedding_config.get('model_name')}")
+    print(f"  dimensions: {embedding_config.get('dimensions')}")
+    print(f"  image_max_size: {embedding_config.get('image_max_size')}")
+    print(f"  image_quality: {embedding_config.get('image_quality')}")
+    print("Images:")
+    print(f"  total: {plan['total_images']}")
+    print(f"  indexed current: {plan['indexed_current']}")
+    print(f"  missing: {plan['missing']}")
+    print(f"  stale: {plan['stale']}")
+    print(f"  selected this run: {plan['selected_count']}")
+    print(f"  order: {plan['order']}")
+    if plan.get('source_id'):
+        print(f"  source: @{plan['source_id']}")
+
+    if args.dry_run:
+        return
+    if plan['selected_count'] == 0:
+        print("没有需要向量化的图片。")
+        return
+    if not args.yes:
+        answer = input("Proceed? [y/N] ").strip().lower()
+        if answer not in {'y', 'yes'}:
+            print("已取消。")
+            return
+
+    client = OpenAICompatibleImageEmbeddingClient(
+        model=str(embedding_config.get('model_name') or ''),
+        base_url=str(embedding_config.get('base_url') or ''),
+        dimensions=int(embedding_config.get('dimensions') or 768),
+        image_max_size=int(embedding_config.get('image_max_size') or 512),
+        image_quality=int(embedding_config.get('image_quality') or 82),
+    )
+
+    def report(index, total, record, status, error_text):
+        uri = str(record.get('uri') or '')
+        if status == 'indexed':
+            print(f"[{index}/{total}] {uri} indexed")
+        else:
+            print(f"[{index}/{total}] {uri} failed: {error_text}", file=sys.stderr)
+
+    result = vector_service.index_missing_or_stale(
+        config=embedding_config,
+        client=client,
+        limit=int(args.limit or 0),
+        order=args.order,
+        source_id=source_id,
+        force=bool(args.force),
+        progress_callback=report,
+    )
+    print("Done:")
+    print(f"  indexed: {result['indexed']}")
+    print(f"  failed: {result['failed']}")
+
+
 def main():
     # 读取配置文件
     config = load_config()
@@ -91,7 +224,7 @@ def main():
             if idx != 0:
                 argv.pop(idx)
                 argv.insert(0, 'thumbs')
-        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe'):
+        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize'):
             # 默认回退 serve（空参数或第一个不是已知子命令）
             argv.insert(0, 'serve')
 
@@ -108,6 +241,7 @@ def main():
   tiklocal thumbs /path --overwrite        # 批量生成缩略图
   tiklocal dedupe /path --dry-run          # 查找重复文件（预演）
   tiklocal dedupe /path --execute          # 删除重复，保留最早文件
+  tiklocal vectorize /path --limit 200     # 按最新时间向量化前 200 张
         '''
     )
 
@@ -144,6 +278,24 @@ def main():
                               help='执行实际删除（关闭 dry-run）')
     dedupe_parser.add_argument('--auto-confirm', action='store_true',
                               help='自动确认删除，跳过确认提示（危险）')
+
+    # vectorize 子命令
+    vectorize_parser = subparsers.add_parser('vectorize', help='批量生成图片向量索引')
+    vectorize_parser.add_argument('media_root', nargs='?', help='媒体文件根目录路径（可省略以使用环境变量/配置文件）')
+    vectorize_parser.add_argument('--media-source', action='append', type=parse_cli_media_source,
+                                  help='添加媒体源，格式 id=/path/to/media，可重复')
+    vectorize_parser.add_argument('--source', default=None, help='只处理指定媒体源 id')
+    vectorize_parser.add_argument('--limit', type=int, default=0, help='最多处理多少张（0 表示全部）')
+    vectorize_parser.add_argument('--order', choices=['latest', 'oldest', 'path'], default='latest',
+                                  help='处理顺序（默认：latest）')
+    vectorize_parser.add_argument('--dry-run', action='store_true', help='只显示计划，不调用模型')
+    vectorize_parser.add_argument('--force', action='store_true', help='忽略已有向量，强制重建')
+    vectorize_parser.add_argument('--cleanup', action='store_true', help='清理本地不存在文件对应的向量')
+    vectorize_parser.add_argument('--continue-after-cleanup', action='store_true', help='清理后继续执行向量化')
+    vectorize_parser.add_argument('--max-size', type=int, default=None, help='覆盖 embedding.image_max_size')
+    vectorize_parser.add_argument('--quality', type=int, default=None, help='覆盖 embedding.image_quality')
+    vectorize_parser.add_argument('--dimensions', type=int, default=None, help='覆盖 embedding.dimensions')
+    vectorize_parser.add_argument('--yes', action='store_true', help='跳过确认提示')
 
     args = parser.parse_args(argv)
 
@@ -188,12 +340,18 @@ def main():
         )
         return
 
+    if cmd == 'vectorize':
+        run_vectorize(config, args, parser)
+        return
+
     # serve 路径
     media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
     host = args.host or os.environ.get('TIKLOCAL_HOST') or config.get('host', '0.0.0.0')
     port = args.port or int(os.environ.get('TIKLOCAL_PORT', 0)) or config.get('port', 8000)
     media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
     download_source = args.download_source or config.get('download_source') or 'default'
+    vision_config = config.get('vision') or config.get('vision_config') or None
+    embedding_config = config.get('embedding') or config.get('embedding_config') or None
 
     # 验证媒体目录
     if not media_root and not media_sources:
@@ -236,6 +394,8 @@ def main():
         "MEDIA_ROOT": media_path,
         "MEDIA_SOURCES": media_sources or None,
         "DOWNLOAD_SOURCE": normalize_source_id(download_source),
+        "VISION_CONFIG": vision_config,
+        "EMBEDDING_CONFIG": embedding_config,
     })
     if getattr(args, 'dev', False):
         # 开发模式：使用Flask内置服务器

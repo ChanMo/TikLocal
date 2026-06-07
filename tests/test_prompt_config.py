@@ -73,8 +73,8 @@ def test_prompt_config_api_crud(client):
     assert res.status_code == 200
     assert data["success"] is True
     assert data["data"]["active_profile"] == "default"
-    assert data["data"]["default"]["system_prompt"] == ""
-    assert data["data"]["default"]["user_prompt"] == ""
+    assert data["data"]["default"]["system_prompt"]
+    assert data["data"]["default"]["user_prompt"]
 
     save_payload = _build_prompt_payload(enabled=True, tags_limit=7, temperature=0.8)
     res = test_client.post("/api/ai/prompt-config", json=save_payload)
@@ -138,8 +138,69 @@ def test_metadata_prompt_source_priority(client):
     assert calls[-1]["prompt_config"]["tags_limit"] == 3
 
 
-def test_metadata_requires_custom_or_override_prompt(client):
-    test_client, calls = client
+def test_vision_config_api_uses_file_config(tmp_path, monkeypatch):
+    media_root = tmp_path / "media"
+    media_root.mkdir(parents=True, exist_ok=True)
+    data_root = tmp_path / "tiklocal-data"
+    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
+
+    app = create_app({
+        "TESTING": True,
+        "MEDIA_ROOT": media_root,
+        "VISION_CONFIG": {
+            "enabled": True,
+            "base_url": "https://vision.example/v1",
+            "model_name": "vision-model",
+            "system_prompt": "配置文件系统提示词",
+            "user_prompt": "配置文件用户提示词 {tags_limit}",
+            "temperature": 0.2,
+            "tags_limit": 4,
+        },
+    })
+    test_client = app.test_client()
+
+    res = test_client.get("/api/ai/vision-config")
+    data = res.get_json()
+    assert res.status_code == 200
+    assert data["success"] is True
+    assert data["data"]["active_profile"] == "config"
+    assert data["data"]["effective"]["model_name"] == "vision-model"
+    assert data["data"]["effective"]["system_prompt"] == "配置文件系统提示词"
+    assert data["data"]["effective"]["tags_limit"] == 4
+
+
+def test_metadata_requires_model_configuration(tmp_path, monkeypatch):
+    media_root = tmp_path / "media"
+    media_root.mkdir(parents=True, exist_ok=True)
+    (media_root / "photo.jpg").write_bytes(b"fake-image")
+    data_root = tmp_path / "tiklocal-data"
+    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
+    test_client = app.test_client()
+
+    res = test_client.post(
+        "/api/image/metadata",
+        json={"uri": "photo.jpg", "force": True},
+    )
+    data = res.get_json()
+    assert res.status_code == 500
+    assert data["success"] is False
+    assert "model" in data["error"].lower() or "模型" in data["error"]
+
+
+def test_metadata_respects_disabled_vision_config(tmp_path, monkeypatch):
+    media_root = tmp_path / "media"
+    media_root.mkdir(parents=True, exist_ok=True)
+    (media_root / "photo.jpg").write_bytes(b"fake-image")
+    data_root = tmp_path / "tiklocal-data"
+    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("TIKLOCAL_LLM_MODEL", "test-model")
+
+    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root, "VISION_CONFIG": {"enabled": False}})
+    test_client = app.test_client()
 
     res = test_client.post(
         "/api/image/metadata",
@@ -148,8 +209,20 @@ def test_metadata_requires_custom_or_override_prompt(client):
     data = res.get_json()
     assert res.status_code == 400
     assert data["success"] is False
-    assert "AI Prompt" in data["error"]
-    assert calls == []
+    assert "vision.enabled" in data["error"]
+
+
+def test_metadata_uses_default_prompt_when_model_configured(client):
+    test_client, calls = client
+
+    res = test_client.post(
+        "/api/image/metadata",
+        json={"uri": "photo.jpg", "force": True},
+    )
+    data = res.get_json()
+    assert res.status_code == 200
+    assert data["success"] is True
+    assert calls[-1]["prompt_config"]["system_prompt"]
 
 
 def test_llm_config_api_crud(client):

@@ -18,13 +18,26 @@ from tiklocal.services.metadata import (
     CaptionService,
     get_default_prompt_config,
     get_default_llm_config,
+    get_default_vision_config,
     merge_prompt_config,
     merge_llm_config,
+    merge_vision_config,
     validate_prompt_config,
     validate_llm_config,
+    validate_vision_config,
     has_required_prompt_text,
     compute_prompt_hash,
 )
+from tiklocal.services.embedding import (
+    EmbeddingConfigStore,
+    ImageVectorService,
+    OpenAICompatibleImageEmbeddingClient,
+    SQLiteImageVectorStore,
+    get_default_embedding_config,
+    merge_embedding_config,
+    validate_embedding_config,
+)
+from tiklocal.services.database import AppDatabase
 from tiklocal.services.downloader import (
     DEFAULT_DOWNLOAD_CONFIG,
     DownloadConfigStore,
@@ -41,6 +54,8 @@ from tiklocal.paths import (
     get_favorites_path,
     get_prompt_config_path,
     get_llm_config_path,
+    get_embedding_config_path,
+    get_database_path,
     get_download_config_path,
     get_download_jobs_path,
     get_download_sources_path,
@@ -87,6 +102,9 @@ def create_app(test_config=None):
         MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', '.')),
         MEDIA_SOURCES = None,
         DOWNLOAD_SOURCE = 'default',
+        VISION_CONFIG = None,
+        EMBEDDING_CONFIG = None,
+        VECTOR_INDEX = None,
     )
     app.config.from_pyfile('config.py', silent=True)
     if test_config is not None:
@@ -108,6 +126,11 @@ def create_app(test_config=None):
     metadata_store = ImageMetadataStore(get_metadata_path())
     prompt_config_store = PromptConfigStore(get_prompt_config_path())
     llm_config_store = LLMConfigStore(get_llm_config_path())
+    embedding_config_store = EmbeddingConfigStore(get_embedding_config_path())
+    app_database = app.config.get('APP_DATABASE') or AppDatabase(get_database_path())
+    app_database.migrate()
+    vector_index = app.config.get('VECTOR_INDEX') or SQLiteImageVectorStore(app_database)
+    image_vector_service = ImageVectorService(library_service, vector_index)
     download_config_store = DownloadConfigStore(get_download_config_path())
     download_history_store = DownloadHistoryStore(get_download_jobs_path())
     download_source_store = DownloadSourceStore(get_download_sources_path())
@@ -153,12 +176,66 @@ def create_app(test_config=None):
             'has_api_key': bool(os.environ.get('OPENAI_API_KEY')),
         }
 
+    def build_embedding_config_payload(custom_config=None):
+        default_config = get_default_embedding_config()
+        file_config, file_error = validate_embedding_config(app.config.get('EMBEDDING_CONFIG') or {}, partial=True)
+        if file_error:
+            file_config = {}
+        default_config = merge_embedding_config(default_config, file_config)
+
+        custom = custom_config if custom_config is not None else embedding_config_store.get()
+        effective = merge_embedding_config(default_config, custom)
+        active_profile = 'custom' if custom else ('config' if file_config else 'default')
+        return {
+            'active_profile': active_profile,
+            'custom': custom,
+            'default': default_config,
+            'effective': effective,
+            'has_api_key': bool(
+                os.environ.get('TIKLOCAL_EMBEDDING_API_KEY')
+                or os.environ.get('OPENAI_API_KEY')
+                or os.environ.get('OPENROUTER_API_KEY')
+            ),
+        }
+
+    def build_vision_config_payload():
+        default_config = get_default_vision_config()
+        default_config['base_url'] = str(os.environ.get('TIKLOCAL_VISION_BASE_URL') or '').strip()
+        default_config['model_name'] = str(os.environ.get('TIKLOCAL_VISION_MODEL') or '').strip()
+
+        file_config, file_error = validate_vision_config(app.config.get('VISION_CONFIG') or {}, partial=True)
+        if file_error:
+            file_config = {}
+        effective = merge_vision_config(default_config, file_config)
+        return {
+            'active_profile': 'config' if file_config else 'default',
+            'default': default_config,
+            'config': file_config,
+            'effective': effective,
+            'has_api_key': bool(
+                os.environ.get('TIKLOCAL_VISION_API_KEY')
+                or os.environ.get('TIKLOCAL_AI_API_KEY')
+                or os.environ.get('OPENAI_API_KEY')
+                or os.environ.get('OPENROUTER_API_KEY')
+            ),
+        }
+
+    def resolve_effective_embedding_config():
+        return build_embedding_config_payload().get('effective') or get_default_embedding_config()
+
     def resolve_effective_prompt_config(override_config=None):
-        effective = get_default_prompt_config()
-        source = 'default'
+        vision_payload = build_vision_config_payload()
+        vision_config = vision_payload.get('effective') or {}
+        effective = {
+            'system_prompt': str(vision_config.get('system_prompt') or ''),
+            'user_prompt': str(vision_config.get('user_prompt') or ''),
+            'temperature': float(vision_config.get('temperature', 0.6)),
+            'tags_limit': int(vision_config.get('tags_limit', 5)),
+        }
+        source = 'config' if vision_payload.get('active_profile') == 'config' else 'default'
 
         custom = prompt_config_store.get()
-        if custom and custom.get('enabled', True):
+        if vision_payload.get('active_profile') != 'config' and custom and custom.get('enabled', True):
             effective = merge_prompt_config(effective, custom)
             source = 'custom'
 
@@ -171,6 +248,16 @@ def create_app(test_config=None):
         return effective, source
 
     def resolve_effective_llm_config():
+        vision_payload = build_vision_config_payload()
+        vision_config = vision_payload.get('effective') or {}
+        vision_model = str(vision_config.get('model_name') or '').strip()
+        vision_base_url = str(vision_config.get('base_url') or '').strip()
+        if vision_model or vision_base_url:
+            return {
+                'model_name': vision_model,
+                'base_url': vision_base_url,
+            }, 'config'
+
         default_config = get_default_llm_config()
         default_config['base_url'] = str(os.environ.get('TIKLOCAL_LLM_BASE_URL', '')).strip()
         default_config['model_name'] = str(os.environ.get('TIKLOCAL_LLM_MODEL', '')).strip()
@@ -856,6 +943,100 @@ def create_app(test_config=None):
         llm_config_store.reset()
         return {'success': True, 'data': build_llm_config_payload()}
 
+    @app.route('/api/ai/vision-config')
+    def api_vision_config():
+        return {'success': True, 'data': build_vision_config_payload()}
+
+    @app.route('/api/ai/embedding-config', methods=['GET', 'POST'])
+    def api_embedding_config():
+        if request.method == 'GET':
+            return {'success': True, 'data': build_embedding_config_payload()}
+
+        payload = request.get_json(silent=True) or {}
+        validated, error = validate_embedding_config(payload, partial=False)
+        if error:
+            return {'success': False, 'error': error}, 400
+
+        saved = embedding_config_store.set(validated)
+        return {'success': True, 'data': build_embedding_config_payload(saved)}
+
+    @app.route('/api/ai/embedding-config/reset', methods=['POST'])
+    def api_embedding_config_reset():
+        embedding_config_store.reset()
+        return {'success': True, 'data': build_embedding_config_payload()}
+
+    @app.route('/api/ai/embedding-index/status')
+    def api_embedding_index_status():
+        config = resolve_effective_embedding_config()
+        try:
+            return {'success': True, 'data': image_vector_service.status(config)}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}, 500
+
+    @app.route('/api/ai/embedding-index/run', methods=['POST'])
+    def api_embedding_index_run():
+        config = resolve_effective_embedding_config()
+        if not bool(config.get('enabled')):
+            return {'success': False, 'error': '请先在配置文件中启用 embedding.enabled。'}, 400
+        try:
+            client = OpenAICompatibleImageEmbeddingClient(
+                model=str(config.get('model_name') or ''),
+                base_url=str(config.get('base_url') or ''),
+                dimensions=int(config.get('dimensions') or 768),
+                image_max_size=int(config.get('image_max_size') or 512),
+                image_quality=int(config.get('image_quality') or 82),
+                api_key=(
+                    os.environ.get('TIKLOCAL_EMBEDDING_API_KEY')
+                    or os.environ.get('TIKLOCAL_AI_API_KEY')
+                    or os.environ.get('OPENAI_API_KEY')
+                    or os.environ.get('OPENROUTER_API_KEY')
+                    or None
+                ),
+            )
+            result = image_vector_service.index_missing_or_stale(config=config, client=client)
+            result['status'] = image_vector_service.status(config)
+            return {'success': True, 'data': result}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}, 500
+
+    @app.route('/api/ai/embedding-index/cleanup', methods=['POST'])
+    def api_embedding_index_cleanup():
+        try:
+            result = image_vector_service.cleanup_missing()
+            return {'success': True, 'data': result}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}, 500
+
+    @app.route('/api/recommend/similar')
+    def api_similar_images():
+        uri = request.args.get('uri')
+        if not uri:
+            return {'success': False, 'error': 'Missing uri'}, 400
+        canonical_uri = library_service.find_existing_uri(uri)
+        target = library_service.resolve_path(canonical_uri)
+        if not target or not target.exists():
+            return {'success': False, 'error': 'File not found'}, 404
+        try:
+            existing = vector_index.get_metadata(canonical_uri)
+            if not existing:
+                return {'success': True, 'data': {'available': True, 'indexed': False, 'items': []}}
+            limit = _read_int_arg('limit', 12, minimum=1, maximum=48)
+            candidates = vector_index.query_similar(canonical_uri, limit=limit * 2)
+            items = []
+            for candidate in candidates:
+                item_uri = library_service.find_existing_uri(str(candidate.get('uri') or ''))
+                item_path = library_service.resolve_path(item_uri)
+                if not item_path or not item_path.exists() or item_path.suffix.lower() not in IMAGE_EXTENSIONS:
+                    continue
+                item = view_builders.build_feed_media_item(item_uri, 'image')
+                item['distance'] = candidate.get('distance')
+                items.append(item)
+                if len(items) >= limit:
+                    break
+            return {'success': True, 'data': {'available': True, 'indexed': True, 'items': items}}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}, 500
+
     @app.route('/api/image/metadata', methods=['GET', 'POST'])
     def api_image_metadata():
         if request.method == 'GET':
@@ -901,17 +1082,26 @@ def create_app(test_config=None):
             return {'success': False, 'error': 'File not found'}, 404
 
         try:
+            vision_config = build_vision_config_payload().get('effective') or {}
+            if not bool(vision_config.get('enabled', True)):
+                return {'success': False, 'error': '图片识别未启用，请在配置文件中设置 vision.enabled。'}, 400
             effective_prompt, prompt_source = resolve_effective_prompt_config(override_config)
             if not has_required_prompt_text(effective_prompt):
                 return {
                     'success': False,
-                    'error': '请先在设置中保存自定义 AI Prompt，或使用本次覆盖提示词。',
+                    'error': '请在配置文件中设置 vision 默认 Prompt，或使用本次覆盖提示词。',
                 }, 400
             effective_llm, llm_source = resolve_effective_llm_config()
             caption_service = CaptionService(
                 model=effective_llm.get('model_name') or None,
                 base_url=effective_llm.get('base_url') or None,
-                api_key=os.environ.get('OPENAI_API_KEY') or None,
+                api_key=(
+                    os.environ.get('TIKLOCAL_VISION_API_KEY')
+                    or os.environ.get('TIKLOCAL_AI_API_KEY')
+                    or os.environ.get('OPENAI_API_KEY')
+                    or os.environ.get('OPENROUTER_API_KEY')
+                    or None
+                ),
             )
             result = caption_service.generate(
                 target,

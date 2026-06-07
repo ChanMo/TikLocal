@@ -65,6 +65,14 @@
   #caption-generate-btn.is-loading {
     cursor: default;
   }
+  .similar-image-card {
+    aspect-ratio: 1 / 1;
+  }
+  .similar-image-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
   #embedded-prompt {
     max-height: 7.5rem;
     overflow: hidden;
@@ -153,6 +161,25 @@
             </div>
           </div>
         </div>
+
+        <!-- 相似图片推荐 -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden mt-6">
+          <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <i data-feather="grid" class="w-5 h-5 text-cyan-500"></i>
+                相似图片
+              </h2>
+              <p id="similar-images-status" class="mt-1 text-xs text-gray-500 dark:text-gray-400">正在检查向量索引...</p>
+            </div>
+          </div>
+          <div class="p-5">
+            <div id="similar-images-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+            <div id="similar-images-empty" class="hidden rounded-lg border border-dashed border-gray-200 dark:border-gray-700 p-5 text-sm text-gray-500 dark:text-gray-400">
+              暂无相似图片。运行 tiklocal vectorize 后可查看推荐。
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 侧边栏信息 -->
@@ -237,7 +264,7 @@
               </button>
             </div>
           </div>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">使用设置页中保存的 AI Prompt，你也可以在“高级”里仅本次覆盖。</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">使用配置文件中的 vision 默认 Prompt，你也可以在“高级”里仅本次覆盖。</p>
           <div id="caption-content" class="hidden">
             <p id="caption-title" class="text-sm text-gray-700 dark:text-gray-200 mb-3"></p>
             <div id="caption-tags" class="flex flex-wrap gap-2"></div>
@@ -426,6 +453,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeFullscreen = document.getElementById('close-fullscreen');
   const copyLinkBtn = document.getElementById('copy-link-btn');
   const captionBtn = document.getElementById('caption-generate-btn');
+  const similarImagesStatus = document.getElementById('similar-images-status');
+  const similarImagesGrid = document.getElementById('similar-images-grid');
+  const similarImagesEmpty = document.getElementById('similar-images-empty');
   const captionAdvancedBtn = document.getElementById('caption-advanced-btn');
   const captionContent = document.getElementById('caption-content');
   const captionTitle = document.getElementById('caption-title');
@@ -576,6 +606,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const renderSimilarImages = (payload) => {
+    const items = payload && Array.isArray(payload.items) ? payload.items : [];
+    similarImagesGrid.innerHTML = '';
+    if (!payload || payload.available === false) {
+      similarImagesStatus.textContent = '相似图片索引不可用。';
+      similarImagesEmpty.classList.remove('hidden');
+      return;
+    }
+    if (!payload.indexed) {
+      similarImagesStatus.textContent = '当前图片尚未向量化。';
+      similarImagesEmpty.classList.remove('hidden');
+      return;
+    }
+    if (items.length === 0) {
+      similarImagesStatus.textContent = '已向量化，暂未找到相似图片。';
+      similarImagesEmpty.classList.remove('hidden');
+      return;
+    }
+    similarImagesStatus.textContent = `找到 ${items.length} 张相似图片。`;
+    similarImagesEmpty.classList.add('hidden');
+    items.forEach((item) => {
+      const link = document.createElement('a');
+      link.href = item.detail_url || '#';
+      link.className = 'similar-image-card block overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700 ring-1 ring-gray-200 dark:ring-gray-700 hover:ring-cyan-400 dark:hover:ring-cyan-500 transition-all';
+      const img = document.createElement('img');
+      img.src = item.media_url;
+      img.alt = item.name || 'similar image';
+      img.loading = 'lazy';
+      link.appendChild(img);
+      similarImagesGrid.appendChild(link);
+    });
+  };
+
+  const loadSimilarImages = async () => {
+    if (!similarImagesGrid || !similarImagesStatus) return;
+    try {
+      const res = await fetch(`/api/recommend/similar?uri=${encodeURIComponent(imageUri)}&limit=12`);
+      const data = await res.json();
+      if (!data.success) {
+        similarImagesStatus.textContent = data.error || '读取相似图片失败';
+        similarImagesEmpty.classList.remove('hidden');
+        return;
+      }
+      renderSimilarImages(data.data);
+    } catch (err) {
+      similarImagesStatus.textContent = '读取相似图片失败';
+      similarImagesEmpty.classList.remove('hidden');
+    }
+  };
+
   embeddedPromptToggle?.addEventListener('click', () => {
     const expanded = embeddedPrompt.classList.toggle('is-expanded');
     embeddedPromptToggle.textContent = expanded ? '收起' : '展开全部';
@@ -595,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const loadPromptConfig = async () => {
     if (promptConfigCache) return promptConfigCache;
-    const res = await fetch('/api/ai/prompt-config');
+    const res = await fetch('/api/ai/vision-config');
     const data = await res.json();
     if (!data.success) {
       throw new Error(data.error || '读取提示词配置失败');
@@ -607,7 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fillPromptModal = async () => {
     try {
       const configData = await loadPromptConfig();
-      const source = configData.custom || configData.default;
+      const source = configData.effective || configData.config || configData.default;
       if (!source) return;
       promptSystemInput.value = source.system_prompt || '';
       promptUserInput.value = source.user_prompt || '';
@@ -694,6 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   loadCaption();
   loadEmbeddedGeneration();
+  loadSimilarImages();
   
   // 键盘导航
   document.addEventListener('keydown', (e) => {
@@ -770,17 +851,26 @@ function showNotification(message, type = 'info') {
 }
 
 // 模态框函数（复用设置页面的）
-function showModal(title, text, onConfirm) {
+function showModal(title, text, onConfirm, options = {}) {
   const existingModal = document.getElementById('confirmation-modal');
   if (existingModal) existingModal.remove();
+  const confirmLabel = options.confirmLabel || '确认删除';
+  const confirmTone = options.confirmTone || 'red';
+  const toneClass = confirmTone === 'blue'
+    ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500';
+  const iconToneClass = confirmTone === 'blue'
+    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+    : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
+  const iconName = options.icon || (confirmTone === 'blue' ? 'cpu' : 'alert-triangle');
 
   const modalHTML = `
     <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" aria-labelledby="modal-title" role="dialog" aria-modal="true">
       <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md m-4 transform transition-all" role="document">
         <div class="p-6">
           <div class="flex items-start gap-4">
-            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
-              <i data-feather="alert-triangle" class="h-6 w-6 text-red-600 dark:text-red-400"></i>
+            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${iconToneClass} sm:mx-0 sm:h-10 sm:w-10">
+              <i data-feather="${iconName}" class="h-6 w-6"></i>
             </div>
             <div class="mt-0 text-center sm:text-left">
               <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">${title}</h3>
@@ -791,8 +881,8 @@ function showModal(title, text, onConfirm) {
           </div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-2xl">
-          <button type="button" id="confirm-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
-            确认删除
+          <button type="button" id="confirm-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 ${toneClass} text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm">
+            ${confirmLabel}
           </button>
           <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
             取消
