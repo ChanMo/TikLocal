@@ -5,7 +5,8 @@ import pytest
 from PIL import Image
 
 from tiklocal.app import create_app
-from tiklocal.run import run_vectorize
+from tiklocal.run import run_analyze_similar, run_vectorize
+from tiklocal.paths import get_database_path
 from tiklocal.services.database import AppDatabase
 from tiklocal.services.embedding import (
     EmbeddingConfigStore,
@@ -13,6 +14,7 @@ from tiklocal.services.embedding import (
     SQLiteImageVectorStore,
     validate_embedding_config,
 )
+from tiklocal.services.similarity import SQLiteSimilarityGroupStore
 
 
 class FakeVectorIndex:
@@ -45,6 +47,18 @@ class FakeVectorIndex:
             if len(results) >= limit:
                 break
         return results
+
+    def list_vectors(self, *, limit=1000):
+        result = []
+        for uri, item in list(self.items.items())[:limit]:
+            embedding = item["embedding"]
+            result.append({
+                "uri": uri,
+                "embedding": embedding,
+                "embedding_norm": sum(float(value) * float(value) for value in embedding) ** 0.5,
+                "metadata": item["metadata"],
+            })
+        return result
 
 
 def test_embedding_config_store_roundtrip(tmp_path):
@@ -269,6 +283,70 @@ def test_embedding_index_run_and_similar_api(embedding_client):
     assert data["data"]["items"][0]["name"].endswith("b.jpg")
 
 
+def test_library_similar_groups_api(embedding_client):
+    client, fake_index = embedding_client
+
+    client.post("/api/ai/embedding-index/run")
+    media_root = Path(client.application.config["MEDIA_ROOT"])
+    (media_root / "c.jpg").write_bytes(b"fake-c")
+    fake_index.upsert_image(
+        uri="c.jpg",
+        embedding=[0.88, 0.12],
+        metadata={
+            "source_id": "default",
+            "rel_path": "c.jpg",
+            "model": "google/gemini-embedding-2",
+            "dimensions": 768,
+            "image_max_size": 512,
+            "image_quality": 82,
+            "mtime": 1,
+            "size_bytes": 1,
+            "indexed_at": "2026-01-01T00:00:00Z",
+        },
+    )
+    a_key = next(key for key in fake_index.items if key.endswith("a.jpg"))
+    b_key = next(key for key in fake_index.items if key.endswith("b.jpg"))
+    group_store = SQLiteSimilarityGroupStore(AppDatabase(get_database_path()))
+    group_store.save_groups(
+        [
+            {
+                "group_key": "group-a",
+                "seed_uri": "a.jpg",
+                "score": 0.91,
+                "items": [
+                    {"uri": a_key, "score": 1.0, "metadata": fake_index.items[a_key]["metadata"]},
+                    {"uri": b_key, "score": 0.9, "metadata": fake_index.items[b_key]["metadata"]},
+                    {"uri": "c.jpg", "score": 0.88, "metadata": fake_index.items["c.jpg"]["metadata"]},
+                ],
+            }
+        ],
+        threshold=0.8,
+        min_group_size=3,
+        max_group_size=8,
+    )
+
+    res = client.get("/api/library/similar-groups?threshold=0.8&min_group_size=3")
+    data = res.get_json()
+
+    assert res.status_code == 200
+    assert data["success"] is True
+    assert len(data["data"]["items"]) == 1
+    group = data["data"]["items"][0]
+    assert group["type"] == "similar_group"
+    assert group["count"] == 3
+    assert all(item["type"] == "image" for item in group["items"])
+
+
+def test_library_page_has_similar_images_tab(embedding_client):
+    client, _ = embedding_client
+
+    res = client.get("/library")
+    body = res.get_data(as_text=True)
+
+    assert res.status_code == 200
+    assert 'data-mode="similar_images"' in body
+
+
 def test_vectorize_cli_dry_run(tmp_path, monkeypatch, capsys):
     media_root = tmp_path / "media"
     media_root.mkdir(parents=True, exist_ok=True)
@@ -313,3 +391,63 @@ def test_vectorize_cli_dry_run(tmp_path, monkeypatch, capsys):
     assert "TikLocal image vectorization" in out
     assert "selected this run: 1" in out
     assert "image_max_size: 512" in out
+
+
+def test_analyze_similar_cli_saves_groups(tmp_path, monkeypatch, capsys):
+    media_root = tmp_path / "media"
+    media_root.mkdir(parents=True, exist_ok=True)
+    for name in ("a.jpg", "b.jpg", "c.jpg"):
+        (media_root / name).write_bytes(b"fake")
+
+    data_root = tmp_path / "tiklocal-data"
+    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
+
+    database = AppDatabase(get_database_path())
+    database.migrate()
+    vector_store = SQLiteImageVectorStore(database)
+    for name, embedding in {
+        "a.jpg": [1.0, 0.0],
+        "b.jpg": [0.95, 0.05],
+        "c.jpg": [0.9, 0.1],
+    }.items():
+        vector_store.upsert_image(
+            uri=f"@default/{name}",
+            embedding=embedding,
+            metadata={
+                "source_id": "default",
+                "rel_path": name,
+                "model": "demo-embedding",
+                "dimensions": 2,
+                "image_max_size": 512,
+                "image_quality": 82,
+                "mtime": 1,
+                "size_bytes": 1,
+                "indexed_at": "2026-01-01T00:00:00Z",
+            },
+        )
+
+    class Parser:
+        def error(self, message):
+            raise AssertionError(message)
+
+    args = SimpleNamespace(
+        media_root=str(media_root),
+        media_source=None,
+        limit=500,
+        threshold=0.8,
+        min_group_size=2,
+        max_group_size=8,
+        profile=False,
+        dry_run=False,
+        clear=False,
+        continue_after_clear=False,
+        yes=True,
+    )
+    run_analyze_similar({}, args, Parser())
+
+    out = capsys.readouterr().out
+    assert "TikLocal similar image analysis" in out
+    assert "groups found: 1" in out
+    payload = SQLiteSimilarityGroupStore(database).list_groups()
+    assert payload["total"] == 1
+    assert payload["items"][0]["count"] == 3

@@ -37,6 +37,7 @@ from tiklocal.services.embedding import (
     merge_embedding_config,
     validate_embedding_config,
 )
+from tiklocal.services.similarity import SQLiteSimilarityGroupStore
 from tiklocal.services.database import AppDatabase
 from tiklocal.services.downloader import (
     DEFAULT_DOWNLOAD_CONFIG,
@@ -131,6 +132,7 @@ def create_app(test_config=None):
     app_database.migrate()
     vector_index = app.config.get('VECTOR_INDEX') or SQLiteImageVectorStore(app_database)
     image_vector_service = ImageVectorService(library_service, vector_index)
+    similarity_group_store = app.config.get('SIMILARITY_GROUP_STORE') or SQLiteSimilarityGroupStore(app_database)
     download_config_store = DownloadConfigStore(get_download_config_path())
     download_history_store = DownloadHistoryStore(get_download_jobs_path())
     download_source_store = DownloadSourceStore(get_download_sources_path())
@@ -333,6 +335,52 @@ def create_app(test_config=None):
     def _serialize_library_item(record: dict) -> dict:
         return view_builders.serialize_library_item(record, metadata_store, library_service)
 
+    def _serialize_similar_group(group: dict) -> dict:
+        items = []
+        for member in group.get('items') or []:
+            uri = library_service.find_existing_uri(str(member.get('uri') or ''))
+            target = library_service.resolve_path(uri)
+            if not target or not target.exists():
+                continue
+            encoded = quote(uri, safe='')
+            items.append({
+                'type': 'image',
+                'name': uri,
+                'media_url': f"/media?uri={encoded}",
+                'thumb_url': f"/media?uri={encoded}",
+                'detail_url': f"/image?uri={encoded}",
+                'score': float(member.get('score') or 0),
+            })
+        return {
+            'type': 'similar_group',
+            'name': str(group.get('name') or ''),
+            'group_key': str(group.get('group_key') or ''),
+            'seed_uri': str(group.get('seed_uri') or ''),
+            'count': len(items),
+            'score': float(group.get('score') or 0),
+            'items': items,
+        }
+
+    def _build_similar_groups_page(
+        *,
+        offset: int = 0,
+        limit: int = 24,
+        threshold: float = 0.88,
+        min_group_size: int = 3,
+        max_group_size: int = 8,
+        scan_limit: int = 1000,
+    ) -> dict:
+        payload = similarity_group_store.list_groups(
+            offset=offset,
+            limit=limit,
+        )
+        items = [_serialize_similar_group(group) for group in payload.get('items') or []]
+        items = [item for item in items if len(item.get('items') or []) >= min_group_size]
+        return {
+            **payload,
+            'items': items,
+        }
+
     def _collect_collection_records(collection_id: str) -> tuple[dict | None, list[dict]]:
         return view_builders.collect_collection_records(
             collection_id,
@@ -427,7 +475,7 @@ def create_app(test_config=None):
 
     @app.route('/library')
     def library_view():
-        allowed_modes = {'all', 'image_random', 'video_latest', 'big_files'}
+        allowed_modes = {'all', 'image_random', 'similar_images', 'video_latest', 'big_files'}
         mode = _read_choice_arg('mode', 'all', allowed_modes)
         min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
         limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
@@ -435,14 +483,17 @@ def create_app(test_config=None):
         if mode == 'image_random' and not seed:
             seed = str(random.randint(1, 999999))
 
-        initial_page = _build_library_page(
-            favorites_only=False,
-            mode=mode,
-            offset=0,
-            limit=limit,
-            min_mb=min_mb,
-            seed=seed,
-        )
+        if mode == 'similar_images':
+            initial_page = _build_similar_groups_page(offset=0, limit=min(limit, 24))
+        else:
+            initial_page = _build_library_page(
+                favorites_only=False,
+                mode=mode,
+                offset=0,
+                limit=limit,
+                min_mb=min_mb,
+                seed=seed,
+            )
         return render_template(
             'library.html',
             **_build_library_template_context(
@@ -452,7 +503,7 @@ def create_app(test_config=None):
                 collection_name='',
                 active_mode=mode,
                 min_mb=min_mb,
-                empty_message='暂无可展示媒体。',
+                empty_message='暂无可展示媒体。' if mode != 'similar_images' else '运行 tiklocal analyze-similar 后查看相似图片组。',
                 initial_page=initial_page,
             ),
         )
@@ -1232,6 +1283,35 @@ def create_app(test_config=None):
             min_mb=min_mb,
             seed=seed,
             collection_id=collection_id,
+        )
+        return {
+            'success': True,
+            'data': payload,
+        }
+
+    @app.route('/api/library/similar-groups')
+    def api_library_similar_groups():
+        offset = _read_int_arg('offset', 0, minimum=0)
+        limit = _read_int_arg('limit', 24, minimum=4, maximum=48)
+        threshold_raw = request.args.get('threshold', 0.88)
+        try:
+            threshold = float(threshold_raw)
+        except (TypeError, ValueError):
+            threshold = 0.88
+        threshold = max(0.5, min(threshold, 0.99))
+        min_group_size = _read_int_arg('min_group_size', 3, minimum=2, maximum=12)
+        max_group_size = _read_int_arg('max_group_size', 8, minimum=2, maximum=16)
+        scan_limit = _read_int_arg('scan_limit', 1000, minimum=50, maximum=5000)
+        if max_group_size < min_group_size:
+            max_group_size = min_group_size
+
+        payload = _build_similar_groups_page(
+            offset=offset,
+            limit=limit,
+            threshold=threshold,
+            min_group_size=min_group_size,
+            max_group_size=max_group_size,
+            scan_limit=scan_limit,
         )
         return {
             'success': True,

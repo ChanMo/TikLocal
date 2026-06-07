@@ -360,6 +360,27 @@ class SQLiteImageVectorStore:
         scored.sort(key=lambda item: float(item.get("distance") or 0))
         return scored[:limit]
 
+    def list_vectors(self, *, limit: int = 1000) -> list[dict[str, Any]]:
+        safe_limit = max(1, min(int(limit), 5000))
+        with self.database.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM image_vectors
+                ORDER BY mtime DESC, uri ASC
+                LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+        return [
+            {
+                "uri": str(row["uri"]),
+                "embedding": self._blob_to_embedding(row["embedding"]),
+                "embedding_norm": float(row["embedding_norm"] or 0),
+                "metadata": self._row_metadata(row),
+            }
+            for row in rows
+        ]
+
     def _row_metadata(self, row) -> dict[str, Any]:
         return {
             "uri": str(row["uri"]),

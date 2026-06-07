@@ -16,6 +16,14 @@ from tiklocal.services.embedding import (
     validate_embedding_config,
 )
 from tiklocal.services.database import AppDatabase
+from tiklocal.services.similarity import (
+    DEFAULT_SIMILARITY_MAX_GROUP_SIZE,
+    DEFAULT_SIMILARITY_MIN_GROUP_SIZE,
+    DEFAULT_SIMILARITY_SCAN_LIMIT,
+    DEFAULT_SIMILARITY_THRESHOLD,
+    ImageSimilarityService,
+    SQLiteSimilarityGroupStore,
+)
 
 try:
     import yaml
@@ -207,6 +215,103 @@ def run_vectorize(config, args, parser):
     print(f"  failed: {result['failed']}")
 
 
+def run_analyze_similar(config, args, parser):
+    media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
+    media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
+    if not media_root and not media_sources:
+        parser.error('必须指定媒体目录:\n  - tiklocal analyze-similar /path/to/media\n  - 或设置 media_root/media_sources')
+
+    media_path = Path(media_root).expanduser() if media_root else Path(media_sources[0]['path']).expanduser()
+    for source in media_sources:
+        source_path = Path(str(source.get('path') or '')).expanduser()
+        if not source_path.exists() or not source_path.is_dir():
+            print(f"错误: 媒体源不可用 {source.get('id')}: {source_path}", file=sys.stderr)
+            sys.exit(1)
+
+    library = LibraryService(media_path, media_sources=build_media_sources(media_path, media_sources or None))
+    app_database = AppDatabase(get_database_path())
+    app_database.migrate()
+    vector_index = SQLiteImageVectorStore(app_database)
+    similarity_service = ImageSimilarityService(library, vector_index)
+    group_store = SQLiteSimilarityGroupStore(app_database)
+
+    scan_limit = max(50, min(int(args.limit or DEFAULT_SIMILARITY_SCAN_LIMIT), 5000))
+    threshold = max(0.5, min(float(args.threshold), 0.99))
+    min_group_size = max(2, min(int(args.min_group_size), 12))
+    max_group_size = max(2, min(int(args.max_group_size), 16))
+    if max_group_size < min_group_size:
+        max_group_size = min_group_size
+
+    if args.clear:
+        deleted = group_store.clear()
+        print(f"已清理相似图片组: {deleted}")
+        if not args.continue_after_clear:
+            return
+
+    vectors = similarity_service.load_vectors(scan_limit=scan_limit)
+    comparisons = max(0, len(vectors) * (len(vectors) - 1) // 2)
+    candidate_pairs = similarity_service.count_candidate_pairs(vectors, threshold=threshold)
+    payload = similarity_service.build_groups(
+        offset=0,
+        limit=5000,
+        threshold=threshold,
+        min_group_size=min_group_size,
+        max_group_size=max_group_size,
+        scan_limit=scan_limit,
+    )
+    groups = payload.get('items') or []
+    grouped_images = sum(len(group.get('items') or []) for group in groups)
+
+    print("TikLocal similar image analysis")
+    print("Media sources:")
+    for source in library.sources:
+        print(f"  @{source.id}: {source.path}")
+    print("Analysis:")
+    print(f"  vectors loaded: {len(vectors)}")
+    print(f"  scan limit: {scan_limit}")
+    print(f"  threshold: {threshold}")
+    print(f"  min group size: {min_group_size}")
+    print(f"  max group size: {max_group_size}")
+    print(f"  pair comparisons: {comparisons}")
+    print(f"  candidate pairs: {candidate_pairs}")
+    print(f"  groups found: {len(groups)}")
+    print(f"  grouped images: {grouped_images}")
+    print(f"  singleton images: {max(0, len(vectors) - grouped_images)}")
+
+    if args.profile:
+        print("Threshold profile:")
+        for item in similarity_service.profile_thresholds(
+            scan_limit=scan_limit,
+            min_group_size=min_group_size,
+            max_group_size=max_group_size,
+        ):
+            print(
+                f"  {item['threshold']:.2f}: "
+                f"groups {item['groups']}, pairs {item['candidate_pairs']}, grouped {item['grouped_images']}"
+            )
+
+    if args.dry_run:
+        return
+    if not groups:
+        print("没有可保存的相似图片组。")
+        return
+    if not args.yes:
+        answer = input("Save groups to SQLite? [y/N] ").strip().lower()
+        if answer not in {'y', 'yes'}:
+            print("已取消。")
+            return
+
+    saved = group_store.save_groups(
+        groups,
+        threshold=threshold,
+        min_group_size=min_group_size,
+        max_group_size=max_group_size,
+        exclusive=True,
+    )
+    print("Done:")
+    print(f"  saved groups: {saved}")
+
+
 def main():
     # 读取配置文件
     config = load_config()
@@ -224,7 +329,7 @@ def main():
             if idx != 0:
                 argv.pop(idx)
                 argv.insert(0, 'thumbs')
-        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize'):
+        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize', 'analyze-similar'):
             # 默认回退 serve（空参数或第一个不是已知子命令）
             argv.insert(0, 'serve')
 
@@ -242,6 +347,7 @@ def main():
   tiklocal dedupe /path --dry-run          # 查找重复文件（预演）
   tiklocal dedupe /path --execute          # 删除重复，保留最早文件
   tiklocal vectorize /path --limit 200     # 按最新时间向量化前 200 张
+  tiklocal analyze-similar /path --yes     # 预生成相似图片组
         '''
     )
 
@@ -297,6 +403,25 @@ def main():
     vectorize_parser.add_argument('--dimensions', type=int, default=None, help='覆盖 embedding.dimensions')
     vectorize_parser.add_argument('--yes', action='store_true', help='跳过确认提示')
 
+    # analyze-similar 子命令
+    analyze_parser = subparsers.add_parser('analyze-similar', help='基于已有图片向量预生成相似图片组')
+    analyze_parser.add_argument('media_root', nargs='?', help='媒体文件根目录路径（可省略以使用环境变量/配置文件）')
+    analyze_parser.add_argument('--media-source', action='append', type=parse_cli_media_source,
+                                help='添加媒体源，格式 id=/path/to/media，可重复')
+    analyze_parser.add_argument('--limit', type=int, default=DEFAULT_SIMILARITY_SCAN_LIMIT,
+                                help=f'分析最近多少张已有向量的图片（默认：{DEFAULT_SIMILARITY_SCAN_LIMIT}）')
+    analyze_parser.add_argument('--threshold', type=float, default=DEFAULT_SIMILARITY_THRESHOLD,
+                                help=f'相似度阈值（默认：{DEFAULT_SIMILARITY_THRESHOLD}）')
+    analyze_parser.add_argument('--min-group-size', type=int, default=DEFAULT_SIMILARITY_MIN_GROUP_SIZE,
+                                help=f'最小成组图片数（默认：{DEFAULT_SIMILARITY_MIN_GROUP_SIZE}）')
+    analyze_parser.add_argument('--max-group-size', type=int, default=DEFAULT_SIMILARITY_MAX_GROUP_SIZE,
+                                help=f'每组最多保存图片数（默认：{DEFAULT_SIMILARITY_MAX_GROUP_SIZE}）')
+    analyze_parser.add_argument('--profile', action='store_true', help='同时输出多个阈值下的分组概况')
+    analyze_parser.add_argument('--dry-run', action='store_true', help='只显示分析结果，不写入数据库')
+    analyze_parser.add_argument('--clear', action='store_true', help='清理已有相似图片组')
+    analyze_parser.add_argument('--continue-after-clear', action='store_true', help='清理后继续重新分析')
+    analyze_parser.add_argument('--yes', action='store_true', help='跳过确认提示')
+
     args = parser.parse_args(argv)
 
     # 判断命令类型（无子命令时视为 serve）
@@ -342,6 +467,10 @@ def main():
 
     if cmd == 'vectorize':
         run_vectorize(config, args, parser)
+        return
+
+    if cmd == 'analyze-similar':
+        run_analyze_similar(config, args, parser)
         return
 
     # serve 路径

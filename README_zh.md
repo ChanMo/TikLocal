@@ -163,6 +163,7 @@ media_root: ~/Videos/TikLocal
 ```bash
 tiklocal vectorize ~/Videos/TikLocal --limit 200 --order latest
 tiklocal vectorize ~/Videos/TikLocal --dry-run
+tiklocal analyze-similar ~/Videos/TikLocal --limit 500 --yes
 ```
 
 API Key 通过环境变量读取：图片识别优先使用 `TIKLOCAL_VISION_API_KEY`，图片向量优先使用 `TIKLOCAL_EMBEDDING_API_KEY`，之后回退到 `TIKLOCAL_AI_API_KEY`、`OPENAI_API_KEY` 或 `OPENROUTER_API_KEY`。
@@ -177,6 +178,8 @@ tiklocal vectorize /path/to/media --limit 200 --order latest
 tiklocal vectorize /path/to/media --source photos --limit 200
 tiklocal vectorize /path/to/media --cleanup
 tiklocal vectorize /path/to/media --max-size 512 --quality 82
+tiklocal analyze-similar /path/to/media --limit 500 --yes
+tiklocal analyze-similar /path/to/media --profile --dry-run
 ```
 
 推荐流程：
@@ -189,6 +192,8 @@ tiklocal vectorize /path/to/media --max-size 512 --quality 82
 - 自动化脚本可加 `--yes` 跳过确认提示。
 
 `vectorize` 只会上传缺失或过期的图片。文件大小、修改时间、模型、维度、`image_max_size` 或 `image_quality` 变化时，已有向量会被视为过期。发送前图片会处理 EXIF 方向、缩放、重新编码为 JPEG，并且不会携带原始 EXIF/ICC/XMP/IPTC metadata。
+
+向量构建完成后，运行 `analyze-similar` 可把视觉相似组预生成到 SQLite。图片详情页会直接读取本地向量查询相似图片；Library 的“相似图片”模式只读取预生成分组，因此加载更快。
 
 * 浅色模式/暗色模式：您可以选择使用浅色模式或暗色模式。
 * 视频播放速度：您可以调整视频播放速度。

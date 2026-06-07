@@ -84,6 +84,8 @@ tiklocal vectorize /path/to/media --limit 200 --order latest
 tiklocal vectorize /path/to/media --source photos --limit 200
 tiklocal vectorize /path/to/media --cleanup
 tiklocal vectorize /path/to/media --max-size 512 --quality 82
+tiklocal analyze-similar /path/to/media --limit 500 --yes
+tiklocal analyze-similar /path/to/media --profile --dry-run
 ```
 
 Recommended workflow:
@@ -95,6 +97,8 @@ Recommended workflow:
 - Use `--yes` to skip the confirmation prompt in scripts.
 
 `vectorize` only uploads images that are missing or stale. A vector becomes stale when file size, mtime, model, dimensions, `image_max_size`, or `image_quality` changes. Images are EXIF-transposed, resized, re-encoded as JPEG, and sent without original EXIF/ICC/XMP/IPTC metadata.
+
+After vectors are built, run `analyze-similar` to precompute visual similarity groups into SQLite. The image detail page can query similar images directly from local vectors, while the Library `Similar Images` mode only reads precomputed groups for fast loading.
 
 ### URL Download (Web)
 
@@ -184,6 +188,7 @@ Image recognition uses `vision`; image vectorization uses `embedding` and stores
 ```bash
 tiklocal vectorize ~/Videos/TikLocal --limit 200 --order latest
 tiklocal vectorize ~/Videos/TikLocal --dry-run
+tiklocal analyze-similar ~/Videos/TikLocal --limit 500 --yes
 ```
 
 API keys are read from environment variables, preferring `TIKLOCAL_VISION_API_KEY` for vision, `TIKLOCAL_EMBEDDING_API_KEY` for embedding, then falling back to `TIKLOCAL_AI_API_KEY`, `OPENAI_API_KEY`, or `OPENROUTER_API_KEY`.

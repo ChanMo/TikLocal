@@ -41,8 +41,57 @@ def _migrate_001_create_image_vectors(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_002_create_media_similarity_groups(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS media_similarity_groups (
+          group_key TEXT PRIMARY KEY,
+          kind TEXT NOT NULL,
+          seed_uri TEXT NOT NULL,
+          score REAL NOT NULL,
+          item_count INTEGER NOT NULL,
+          threshold REAL NOT NULL,
+          min_group_size INTEGER NOT NULL,
+          max_group_size INTEGER NOT NULL,
+          exclusive INTEGER NOT NULL,
+          model TEXT NOT NULL,
+          dimensions INTEGER NOT NULL,
+          image_max_size INTEGER NOT NULL,
+          image_quality INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS media_similarity_group_items (
+          group_key TEXT NOT NULL,
+          uri TEXT NOT NULL,
+          rank INTEGER NOT NULL,
+          score REAL NOT NULL,
+          PRIMARY KEY (group_key, uri),
+          FOREIGN KEY (group_key) REFERENCES media_similarity_groups(group_key) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_media_similarity_groups_rank
+        ON media_similarity_groups(kind, item_count DESC, score DESC, updated_at DESC)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_media_similarity_group_items_group_rank
+        ON media_similarity_group_items(group_key, rank)
+        """
+    )
+
+
 MIGRATIONS = [
     Migration(1, "create_image_vectors", _migrate_001_create_image_vectors),
+    Migration(2, "create_media_similarity_groups", _migrate_002_create_media_similarity_groups),
 ]
 
 
