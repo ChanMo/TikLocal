@@ -61,6 +61,7 @@
 
   let mode = scope === 'all' ? initialMode : 'all';
   let seed = initialSeed || '';
+  const similarMode = 'similar_images';
   const collectionStateCache = new Map();
   let collectionCatalog = [];
   let collectionSelectedIds = new Set();
@@ -152,6 +153,40 @@
     });
   }
 
+  function isSimilarMode() {
+    return scope === 'all' && mode === similarMode;
+  }
+
+  function readLibraryStateFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const nextMode = params.get('mode') || 'all';
+    const allowed = new Set(['all', 'image_random', similarMode, 'video_latest', 'big_files']);
+    return {
+      mode: allowed.has(nextMode) ? nextMode : 'all',
+      seed: params.get('seed') || '',
+    };
+  }
+
+  function syncLibraryUrl(replace = false) {
+    if (scope !== 'all') return;
+    const params = new URLSearchParams(window.location.search);
+    params.delete('focus');
+    if (mode === 'all') {
+      params.delete('mode');
+      params.delete('seed');
+    } else {
+      params.set('mode', mode);
+      if (mode === 'image_random' && seed) params.set('seed', seed);
+      else params.delete('seed');
+    }
+    if (mode === 'big_files' && minMb) params.set('min_mb', String(minMb));
+    else params.delete('min_mb');
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+    const method = replace ? 'replaceState' : 'pushState';
+    window.history[method]({ mode, seed }, '', nextUrl);
+  }
+
   function getTileAspectRatio(item) {
     const width = Number(item?.width || 0);
     const height = Number(item?.height || 0);
@@ -206,6 +241,7 @@
     waterfall.columns = [];
     waterfall.heights = [];
     grid.innerHTML = '';
+    grid.classList.remove('similar-groups-grid');
   }
 
   function ensureWaterfallLayout(force = false) {
@@ -277,6 +313,63 @@
     return tile;
   }
 
+  function createSimilarGroupCard(group) {
+    const card = document.createElement('article');
+    const groupItems = Array.isArray(group?.items) ? group.items : [];
+    const visibleItems = groupItems.slice(0, 6);
+    card.className = 'similar-group-card';
+    card.dataset.name = String(group?.name || '');
+    card.dataset.count = String(groupItems.length || 0);
+    const count = groupItems.length;
+    const layout = count >= 6 ? 'many' : String(Math.max(2, count));
+    card.dataset.layout = layout;
+
+    const inner = document.createElement('div');
+    inner.className = 'similar-group-grid';
+    visibleItems.forEach((item, itemIndex) => {
+      const link = document.createElement('a');
+      link.className = 'similar-group-link';
+      link.href = item.detail_url || '#';
+      link.title = item.name || '相似图片';
+      if (layout === 'many' && itemIndex === visibleItems.length - 1) {
+        link.classList.add('has-count-overlay');
+      }
+
+      const img = document.createElement('img');
+      img.src = item.thumb_url || item.media_url || '';
+      img.alt = '';
+      img.loading = 'lazy';
+      link.appendChild(img);
+      if (layout === 'many' && itemIndex === visibleItems.length - 1) {
+        const overlay = document.createElement('span');
+        overlay.className = 'similar-group-count-overlay';
+        overlay.textContent = String(count);
+        link.appendChild(overlay);
+      }
+      inner.appendChild(link);
+    });
+    card.appendChild(inner);
+    return card;
+  }
+
+  function resetSimilarLayout() {
+    waterfall.count = 0;
+    waterfall.columnWidth = 0;
+    waterfall.columns = [];
+    waterfall.heights = [];
+    grid.innerHTML = '';
+    grid.classList.add('similar-groups-grid');
+  }
+
+  function appendIndexToSimilarGrid(index) {
+    const group = items[index];
+    if (!group) return;
+    if (!grid.classList.contains('similar-groups-grid')) {
+      resetSimilarLayout();
+    }
+    grid.appendChild(createSimilarGroupCard(group));
+  }
+
   function appendIndexToWaterfall(index) {
     const item = items[index];
     if (!item) return;
@@ -288,6 +381,13 @@
   }
 
   function relayoutWaterfall() {
+    if (isSimilarMode()) {
+      resetSimilarLayout();
+      for (let i = 0; i < items.length; i += 1) {
+        appendIndexToSimilarGrid(i);
+      }
+      return;
+    }
     if (!items.length) {
       resetWaterfallLayout();
       ensureWaterfallLayout(true);
@@ -342,13 +442,23 @@
     return params;
   }
 
+  function similarGroupApiParams(offset) {
+    return new URLSearchParams({
+      offset: String(offset),
+      limit: String(Math.min(pageSize || 24, 24)),
+    });
+  }
+
   async function loadNextPage() {
     if (flowSession.isLoading() || !flowSession.hasMore()) return;
     setLoadingText('正在加载...');
     try {
       await flowSession.loadMore(async (cursor) => {
         const offset = Number(cursor?.offset || 0);
-        const res = await fetch(`/api/library/items?${apiParams(offset).toString()}`);
+        const url = isSimilarMode()
+          ? `/api/library/similar-groups?${similarGroupApiParams(offset).toString()}`
+          : `/api/library/items?${apiParams(offset).toString()}`;
+        const res = await fetch(url);
         const data = await res.json();
         if (!data?.success) throw new Error('request failed');
 
@@ -362,9 +472,14 @@
       }).then((result) => {
         const appendedIndexes = result.appendedIndices || [];
         if (appendedIndexes.length) {
-          ensureWaterfallLayout(!waterfall.columns.length);
-          updateWaterfallMetrics();
-          appendedIndexes.forEach((idx) => appendIndexToWaterfall(idx));
+          if (isSimilarMode()) {
+            if (!grid.classList.contains('similar-groups-grid')) resetSimilarLayout();
+            appendedIndexes.forEach((idx) => appendIndexToSimilarGrid(idx));
+          } else {
+            ensureWaterfallLayout(!waterfall.columns.length);
+            updateWaterfallMetrics();
+            appendedIndexes.forEach((idx) => appendIndexToWaterfall(idx));
+          }
           feather.replace();
           if (quickView.classList.contains('active') && getCurrentIndex() >= 0) {
             quickCounter.textContent = `${getCurrentIndex() + 1} / ${items.length}`;
@@ -416,20 +531,35 @@
     }
   }
 
-  async function reloadMode(nextMode) {
+  async function reloadCurrentMode() {
     closeViewer();
-    mode = nextMode;
-    if (mode === 'image_random') seed = makeRandomSeed();
-    else seed = '';
-
     flowSession.reset({
       hasMore: true,
       cursor: { offset: 0 },
     });
-    resetWaterfallLayout();
+    if (isSimilarMode()) resetSimilarLayout();
+    else resetWaterfallLayout();
     activeTab();
     setLoadingText('正在加载...');
     await loadNextPage();
+  }
+
+  async function reloadMode(nextMode) {
+    mode = nextMode;
+    if (mode === 'image_random') seed = makeRandomSeed();
+    else seed = '';
+    syncLibraryUrl(false);
+    await reloadCurrentMode();
+  }
+
+  async function reloadModeFromUrl() {
+    if (scope !== 'all') return;
+    const state = readLibraryStateFromUrl();
+    mode = state.mode;
+    seed = state.seed;
+    if (mode === 'image_random' && !seed) seed = makeRandomSeed();
+    syncLibraryUrl(true);
+    await reloadCurrentMode();
   }
 
   async function collectionsRequest(url, options = {}) {
@@ -1327,6 +1457,10 @@
       });
     });
     activeTab();
+    syncLibraryUrl(true);
+    window.addEventListener('popstate', () => {
+      reloadModeFromUrl();
+    });
   }
 
   quickSpeed.textContent = `${speedOptions[currentSpeedIndex]}x`;

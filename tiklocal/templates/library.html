@@ -139,7 +139,103 @@
     font-size: 12px;
     padding: 16px 0 8px;
   }
-
+  .masonry-grid.similar-groups-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  @media (min-width: 768px) {
+    .masonry-grid.similar-groups-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+  }
+  @media (min-width: 1180px) {
+    .masonry-grid.similar-groups-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1536px) {
+    .masonry-grid.similar-groups-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+  .similar-group-card {
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0b0f15;
+    position: relative;
+    min-height: 0;
+  }
+  .similar-group-grid {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    gap: 2px;
+  }
+  .similar-group-card[data-layout="2"] .similar-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: 1fr;
+  }
+  .similar-group-card[data-layout="3"] .similar-group-grid {
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+  .similar-group-card[data-layout="4"] .similar-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+  .similar-group-card[data-layout="5"] .similar-group-grid {
+    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+  .similar-group-card[data-layout="many"] .similar-group-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+  }
+  .similar-group-link {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    background: #111827;
+  }
+  .similar-group-card[data-layout="3"] .similar-group-link:first-child,
+  .similar-group-card[data-layout="5"] .similar-group-link:first-child {
+    grid-row: span 2;
+  }
+  .similar-group-card[data-layout="many"] .similar-group-link:first-child {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+  .similar-group-link img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .similar-group-count-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.48);
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    font-weight: 800;
+    pointer-events: none;
+  }
+  .similar-group-link.has-count-overlay img {
+    filter: saturate(0.88) brightness(0.78);
+  }
+  .similar-group-card[data-layout="2"] .similar-group-count-overlay,
+  .similar-group-card[data-layout="3"] .similar-group-count-overlay,
+  .similar-group-card[data-layout="4"] .similar-group-count-overlay,
+  .similar-group-card[data-layout="5"] .similar-group-count-overlay {
+    display: none;
+  }
   /* Quick Flow Viewer */
   #quick-view {
     position: fixed;
@@ -734,6 +830,7 @@
     <div class="mode-tabs" id="mode-tabs">
       <button type="button" class="mode-tab" data-mode="all">全部</button>
       <button type="button" class="mode-tab" data-mode="image_random">图片随机</button>
+      <button type="button" class="mode-tab" data-mode="similar_images">相似图片</button>
       <button type="button" class="mode-tab" data-mode="video_latest">视频最新</button>
       <button type="button" class="mode-tab" data-mode="big_files">大文件</button>
     </div>
