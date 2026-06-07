@@ -3,7 +3,7 @@
 {% block extra_head %}
 <style>
   .image-viewer {
-    max-height: 72vh;
+    max-height: calc(100vh - 160px);
     object-fit: contain;
     cursor: zoom-in;
     transform-origin: center center;
@@ -13,7 +13,7 @@
   }
   
   .image-stage {
-    min-height: min(72vh, 760px);
+    min-height: min(calc(100vh - 140px), 860px);
     overflow: hidden;
     touch-action: none;
     user-select: none;
@@ -51,7 +51,7 @@
     transform: translateY(-2px);
   }
 
-  #caption-generate-btn.is-loading::after {
+  #caption-primary-btn.is-loading::after {
     content: '';
     position: absolute;
     right: 8px;
@@ -62,8 +62,14 @@
     border-top-color: transparent;
     animation: caption-spin 0.9s linear infinite;
   }
-  #caption-generate-btn.is-loading {
+  #caption-primary-btn.is-loading {
     cursor: default;
+  }
+  #similar-images-section {
+    display: none;
+  }
+  #similar-images-section.is-visible {
+    display: block;
   }
   .similar-image-card {
     aspect-ratio: 1 / 1;
@@ -82,6 +88,127 @@
   #embedded-prompt.is-expanded {
     max-height: none;
   }
+  .detail-disclosure summary {
+    cursor: pointer;
+    list-style: none;
+  }
+  .detail-disclosure summary::-webkit-details-marker {
+    display: none;
+  }
+  .material-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: rgb(55 65 81);
+    transition: background-color 0.16s ease, color 0.16s ease;
+  }
+  .material-icon-btn:hover {
+    background: rgba(229, 231, 235, 0.86);
+    color: rgb(17 24 39);
+  }
+  [data-theme="dark"] .material-icon-btn {
+    color: rgb(209 213 219);
+  }
+  [data-theme="dark"] .material-icon-btn:hover {
+    background: rgba(55, 65, 81, 0.78);
+    color: white;
+  }
+  .more-menu {
+    min-width: 190px;
+    transform-origin: top right;
+    max-width: calc(100vw - 24px);
+  }
+  .more-menu[hidden] {
+    display: none;
+  }
+  .more-menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: rgb(55 65 81);
+    text-align: left;
+  }
+  .more-menu-item:hover {
+    background: rgb(243 244 246);
+  }
+  [data-theme="dark"] .more-menu-item {
+    color: rgb(229 231 235);
+  }
+  [data-theme="dark"] .more-menu-item:hover {
+    background: rgb(55 65 81);
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      "image title"
+      "image info"
+      "similar similar";
+    column-gap: 24px;
+    row-gap: 12px;
+    align-items: start;
+  }
+  .image-area {
+    grid-area: image;
+  }
+  .title-area {
+    grid-area: title;
+  }
+  .info-area {
+    grid-area: info;
+  }
+  .similar-area {
+    grid-area: similar;
+  }
+  .title-empty-cta {
+    width: 100%;
+    min-height: 56px;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: rgb(75 85 99);
+    font-weight: 600;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  }
+  .title-empty-cta.hidden,
+  .title-empty-cta[hidden] {
+    display: none !important;
+  }
+  .title-empty-cta:hover {
+    background: rgb(249 250 251);
+    border-color: rgb(156 163 175);
+    color: rgb(17 24 39);
+  }
+  [data-theme="dark"] .title-empty-cta {
+    border-color: rgb(75 85 99);
+    color: rgb(209 213 219);
+  }
+  [data-theme="dark"] .title-empty-cta:hover {
+    background: rgb(17 24 39);
+    border-color: rgb(107 114 128);
+    color: white;
+  }
+  @media (max-width: 1023px) {
+    .detail-grid {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "image"
+        "title"
+        "similar"
+        "info";
+      gap: 20px;
+    }
+  }
   @keyframes caption-spin {
     to { transform: rotate(360deg); }
   }
@@ -89,26 +216,60 @@
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-6">
-  <div class="container mx-auto px-4 max-w-6xl">
-    <!-- 返回按钮 -->
-    <div class="mb-6">
-      <button onclick="history.back()" class="inline-flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
-        <i data-feather="arrow-left" class="w-4 h-4"></i>
-        <span>返回</span>
+<div class="min-h-screen bg-neutral-50 py-3 dark:bg-neutral-950">
+  <div class="container mx-auto px-3 max-w-7xl">
+    <header class="mb-3 flex h-12 items-center justify-between">
+      <button onclick="history.back()" class="material-icon-btn" aria-label="返回" type="button">
+        <i data-feather="arrow-left" class="w-5 h-5"></i>
       </button>
-    </div>
+      <div class="relative flex items-center gap-1">
+        <button
+          id="caption-primary-btn"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-amber-100 px-4 text-sm font-medium text-amber-700 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30 transition-colors"
+          type="button"
+        >
+          <i data-feather="zap" class="w-4 h-4"></i>
+          <span id="caption-primary-label">生成标题</span>
+        </button>
+        <button id="fullscreen-btn" class="material-icon-btn" aria-label="全屏查看" type="button">
+          <i data-feather="maximize" class="w-5 h-5"></i>
+        </button>
+        <button id="more-menu-btn" class="material-icon-btn" aria-label="更多操作" type="button" aria-haspopup="menu" aria-expanded="false">
+          <i data-feather="more-vertical" class="w-5 h-5"></i>
+        </button>
+        <div id="more-menu" class="more-menu absolute right-0 top-full mt-2 z-30 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-800" hidden>
+          <button id="caption-advanced-btn" class="more-menu-item" type="button">
+            <i data-feather="sliders" class="w-4 h-4"></i>
+            高级生成
+          </button>
+          <button id="copy-link-btn" class="more-menu-item" type="button">
+            <i data-feather="link" class="w-4 h-4"></i>
+            复制链接
+          </button>
+          {% if source_meta and source_meta.url %}
+          <a href="{{ source_meta.url }}" target="_blank" rel="noopener noreferrer" class="more-menu-item">
+            <i data-feather="external-link" class="w-4 h-4"></i>
+            查看来源
+          </a>
+          {% endif %}
+          <button onclick="confirmDelete()" class="more-menu-item text-red-600 dark:text-red-300" type="button">
+            <i data-feather="trash-2" class="w-4 h-4"></i>
+            删除图片
+          </button>
+        </div>
+      </div>
+    </header>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="detail-grid">
       <!-- 图片展示区域 -->
-      <div class="lg:col-span-2">
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+      <div class="image-area">
+        <div>
           <!-- 图片容器 -->
-          <div class="image-stage relative bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4" id="image-container">
+          <div class="image-stage relative bg-neutral-100 dark:bg-black flex items-center justify-center rounded-xl p-3 sm:p-4" id="image-container">
             <img 
               src="/media?uri={{ uri_query_encoded }}" 
               alt="{{image.name}}"
-              class="image-viewer rounded-lg shadow-md max-w-full"
+              class="image-viewer max-w-full"
               id="main-image"
               loading="lazy"
             />
@@ -136,102 +297,73 @@
               >
                 <span id="zoom-label">100%</span>
               </button>
-              <button 
-                id="fullscreen-btn" 
-                class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-                aria-label="全屏查看"
-              >
-                <i data-feather="maximize" class="w-5 h-5"></i>
-              </button>
-            </div>
-          </div>
-
-          <!-- 图片信息栏 -->
-          <div class="p-6 border-t border-gray-200 dark:border-gray-700">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-white mb-2 break-all">{{image.name}}</h1>
-            <div class="flex flex-wrap gap-4 text-sm text-gray-500 dark:text-gray-400">
-              <div class="flex items-center gap-1">
-                <i data-feather="calendar" class="w-4 h-4"></i>
-                <span>修改时间: {{ stat.st_mtime | timestamp_to_date }}</span>
-              </div>
-              <div class="flex items-center gap-1">
-                <i data-feather="hard-drive" class="w-4 h-4"></i>
-                <span>文件大小: {{ stat.st_size | filesizeformat }}</span>
-              </div>
             </div>
           </div>
         </div>
 
-        <!-- 相似图片推荐 -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden mt-6">
-          <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <i data-feather="grid" class="w-5 h-5 text-cyan-500"></i>
-                相似图片
-              </h2>
-              <p id="similar-images-status" class="mt-1 text-xs text-gray-500 dark:text-gray-400">正在检查向量索引...</p>
-            </div>
-          </div>
-          <div class="p-5">
-            <div id="similar-images-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
-            <div id="similar-images-empty" class="hidden rounded-lg border border-dashed border-gray-200 dark:border-gray-700 p-5 text-sm text-gray-500 dark:text-gray-400">
-              暂无相似图片。运行 tiklocal vectorize 后可查看推荐。
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- 侧边栏信息 -->
-      <div class="lg:col-span-1 space-y-6">
-        <!-- 图片统计信息 -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <i data-feather="info" class="w-5 h-5 text-blue-500"></i>
-            图片信息
-          </h2>
-          
-          <div class="space-y-3">
-            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-500 dark:text-gray-400">文件名</span>
-                <span class="text-sm font-medium text-gray-900 dark:text-white">{{image.name}}</span>
-              </div>
-            </div>
-            
-            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-500 dark:text-gray-400">文件大小</span>
-                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ stat.st_size | filesizeformat }}</span>
-              </div>
-            </div>
-            
-            <div class="stat-item bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-500 dark:text-gray-400">修改时间</span>
-                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ stat.st_mtime | timestamp_to_date }}</span>
-              </div>
-            </div>
-          </div>
+      <section class="title-area" id="caption-card">
+        <div id="caption-content" class="hidden min-w-0">
+          <h1 id="caption-title" class="text-xl font-semibold leading-snug text-gray-950 dark:text-white"></h1>
+          <div id="caption-tags" class="mt-3 flex flex-wrap gap-2"></div>
         </div>
+        <button id="caption-empty-cta" class="title-empty-cta hidden" type="button" hidden aria-hidden="true">
+          <i data-feather="zap" class="w-5 h-5"></i>
+          生成标题
+        </button>
+      </section>
 
-        <!-- 生成信息 -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 hidden" id="embedded-generation-card">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <i data-feather="cpu" class="w-5 h-5 text-violet-500"></i>
-            生成信息
-          </h2>
-          <div class="space-y-3">
-            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-              <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">模型</div>
-              <div id="embedded-model" class="text-sm font-medium text-gray-900 dark:text-white break-all"></div>
+      <!-- 相似图片推荐 -->
+      <section id="similar-images-section" class="similar-area">
+          <h2 class="mb-3 text-base font-semibold text-gray-900 dark:text-white">相似图片</h2>
+          <p id="similar-images-status" hidden></p>
+          <div id="similar-images-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+          <div id="similar-images-empty" class="hidden"></div>
+      </section>
+
+      <!-- 侧边栏信息 -->
+      <aside class="info-area space-y-6 lg:border-l lg:border-gray-200 lg:pl-6 dark:lg:border-gray-800">
+        {% if source_meta and source_meta.url %}
+        <section>
+          <div class="mb-1 text-xs text-gray-500 dark:text-gray-400">来源</div>
+          <a
+            href="{{ source_meta.url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 text-sm font-medium text-gray-800 hover:text-gray-950 dark:text-gray-200 dark:hover:text-white"
+          >
+            <i data-feather="external-link" class="w-4 h-4"></i>
+            {{ source_meta.source_domain or '查看来源' }}
+          </a>
+        </section>
+        {% endif %}
+
+        <section>
+          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">文件</div>
+          <div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+            <div class="break-all font-medium text-gray-900 dark:text-white">{{image.name}}</div>
+            <div>{{ stat.st_size | filesizeformat }}</div>
+            <div>{{ stat.st_mtime | timestamp_to_date }}</div>
+          </div>
+        </section>
+
+        <details class="detail-disclosure hidden" id="embedded-generation-card">
+          <summary class="flex items-center justify-between gap-3 text-sm font-semibold text-gray-900 dark:text-white">
+            <span>生成信息</span>
+            <i data-feather="chevron-down" class="w-4 h-4 text-gray-400"></i>
+          </summary>
+          <div class="mt-4 space-y-4">
+            <div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">模型</div>
+              <div id="embedded-model" class="mt-1 text-sm font-medium text-gray-900 dark:text-white break-all"></div>
             </div>
-            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-              <div class="flex items-center justify-between gap-3 mb-2">
+            <div>
+              <div class="mb-2 flex items-center justify-between gap-3">
                 <div class="text-xs text-gray-500 dark:text-gray-400">Prompt</div>
                 <button
                   id="embedded-prompt-toggle"
-                  class="text-xs font-semibold text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-200"
+                  class="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
                   type="button"
                 >
                   展开全部
@@ -240,114 +372,8 @@
               <div id="embedded-prompt" class="text-xs leading-relaxed text-gray-700 dark:text-gray-200"></div>
             </div>
           </div>
-        </div>
-
-        <!-- 智能标题 -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6" id="caption-card">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <i data-feather="zap" class="w-5 h-5 text-amber-500"></i>
-              智能标题
-            </h2>
-            <div class="flex items-center gap-2">
-              <button
-                id="caption-advanced-btn"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:hover:bg-blue-500/30 transition-colors"
-              >
-                高级
-              </button>
-              <button
-                id="caption-generate-btn"
-                class="relative inline-flex items-center gap-1 px-3 pr-7 py-1.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30 transition-colors"
-              >
-                生成/刷新
-              </button>
-            </div>
-          </div>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">使用配置文件中的 vision 默认 Prompt，你也可以在“高级”里仅本次覆盖。</p>
-          <div id="caption-content" class="hidden">
-            <p id="caption-title" class="text-sm text-gray-700 dark:text-gray-200 mb-3"></p>
-            <div id="caption-tags" class="flex flex-wrap gap-2"></div>
-          </div>
-        </div>
-
-        <!-- 操作按钮 -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <i data-feather="settings" class="w-5 h-5 text-green-500"></i>
-            操作
-          </h2>
-          
-          <div class="space-y-3">
-            <a 
-              href="/media?uri={{ uri_query_encoded }}" 
-              target="_blank"
-              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 font-medium"
-            >
-              <i data-feather="download" class="w-4 h-4"></i>
-              下载图片
-            </a>
-
-            {% if source_meta and source_meta.url %}
-            <a
-              href="{{ source_meta.url }}"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-100 rounded-lg transition-colors duration-200 font-medium"
-            >
-              <i data-feather="external-link" class="w-4 h-4"></i>
-              查看来源{% if source_meta.source_domain %}（{{ source_meta.source_domain }}）{% endif %}
-            </a>
-            {% else %}
-            <div class="w-full px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-              未记录来源链接
-            </div>
-            {% endif %}
-            
-            <button 
-              id="copy-link-btn"
-              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors duration-200 font-medium"
-            >
-              <i data-feather="link" class="w-4 h-4"></i>
-              复制链接
-            </button>
-            
-            <button 
-              onclick="confirmDelete()"
-              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 font-medium"
-            >
-              <i data-feather="trash-2" class="w-4 h-4"></i>
-              删除图片
-            </button>
-          </div>
-        </div>
-
-        <!-- 快速导航 -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <i data-feather="navigation" class="w-5 h-5 text-purple-500"></i>
-            快速导航
-          </h2>
-          
-          <div class="space-y-2">
-            <a 
-              href="/library" 
-              class="w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
-            >
-              <i data-feather="image" class="w-4 h-4"></i>
-              返回媒体库（图片）
-            </a>
-            
-            <a 
-              href="/library" 
-              class="w-full inline-flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
-            >
-              <i data-feather="play-circle" class="w-4 h-4"></i>
-              浏览媒体库（视频）
-            </a>
-          </div>
-        </div>
-      </div>
+        </details>
+      </aside>
     </div>
   </div>
 
@@ -452,7 +478,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const fullscreenZoomLabel = document.getElementById('fullscreen-zoom-label');
   const closeFullscreen = document.getElementById('close-fullscreen');
   const copyLinkBtn = document.getElementById('copy-link-btn');
-  const captionBtn = document.getElementById('caption-generate-btn');
+  const moreMenuBtn = document.getElementById('more-menu-btn');
+  const moreMenu = document.getElementById('more-menu');
+  const similarImagesSection = document.getElementById('similar-images-section');
+  const captionBtn = document.getElementById('caption-primary-btn');
+  const captionPrimaryLabel = document.getElementById('caption-primary-label');
+  const captionEmptyCta = document.getElementById('caption-empty-cta');
   const similarImagesStatus = document.getElementById('similar-images-status');
   const similarImagesGrid = document.getElementById('similar-images-grid');
   const similarImagesEmpty = document.getElementById('similar-images-empty');
@@ -492,6 +523,32 @@ document.addEventListener('DOMContentLoaded', () => {
     resetButton: fullscreenReset,
     zoomLabel: fullscreenZoomLabel
   });
+
+  const closeMoreMenu = () => {
+    if (!moreMenu || !moreMenuBtn) return;
+    moreMenu.hidden = true;
+    moreMenuBtn.setAttribute('aria-expanded', 'false');
+  };
+
+  const toggleMoreMenu = () => {
+    if (!moreMenu || !moreMenuBtn) return;
+    const nextOpen = moreMenu.hidden;
+    moreMenu.hidden = !nextOpen;
+    moreMenuBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+  };
+
+  moreMenuBtn?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleMoreMenu();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!moreMenu || moreMenu.hidden) return;
+    const target = event.target;
+    if (moreMenu.contains(target) || moreMenuBtn?.contains(target)) return;
+    closeMoreMenu();
+  });
   
   // 全屏功能
   fullscreenBtn?.addEventListener('click', () => {
@@ -516,6 +573,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // ESC键关闭全屏
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (moreMenu && !moreMenu.hidden) {
+      closeMoreMenu();
+      return;
+    }
     if (promptModal && !promptModal.classList.contains('hidden')) {
       closePromptModal();
       return;
@@ -528,6 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 复制链接功能
   copyLinkBtn?.addEventListener('click', async () => {
+    closeMoreMenu();
     try {
       const url = window.location.origin + '/media?uri=' + imageUriEncoded;
       await navigator.clipboard.writeText(url);
@@ -537,6 +599,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  const setCaptionEmptyVisible = (visible) => {
+    if (!captionEmptyCta) return;
+    captionEmptyCta.hidden = !visible;
+    captionEmptyCta.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    captionEmptyCta.classList.toggle('hidden', !visible);
+  };
+
   const renderCaption = (data) => {
     currentCaption = data || null;
     if (!data) {
@@ -544,6 +613,8 @@ document.addEventListener('DOMContentLoaded', () => {
       captionTags.innerHTML = '';
       captionTitle.classList.add('hidden');
       captionContent.classList.add('hidden');
+      setCaptionEmptyVisible(true);
+      if (captionPrimaryLabel) captionPrimaryLabel.textContent = '生成标题';
       return;
     }
     const title = data.title || '';
@@ -553,15 +624,19 @@ document.addEventListener('DOMContentLoaded', () => {
       captionTags.innerHTML = '';
       captionTitle.classList.add('hidden');
       captionContent.classList.add('hidden');
+      setCaptionEmptyVisible(true);
+      if (captionPrimaryLabel) captionPrimaryLabel.textContent = '生成标题';
       return;
     }
     captionContent.classList.remove('hidden');
+    setCaptionEmptyVisible(false);
+    if (captionPrimaryLabel) captionPrimaryLabel.textContent = '刷新';
     captionTitle.textContent = title;
     captionTitle.classList.toggle('hidden', !title);
     captionTags.innerHTML = '';
     tags.forEach(tag => {
       const chip = document.createElement('span');
-      chip.className = 'inline-flex items-center px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-xs text-gray-600 dark:text-gray-200';
+      chip.className = 'inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-200';
       chip.textContent = tag;
       captionTags.appendChild(chip);
     });
@@ -574,9 +649,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.success) {
         renderCaption(data.data);
       } else {
+        setCaptionEmptyVisible(false);
         showNotification(data.error || '读取失败', 'error');
       }
     } catch (err) {
+      setCaptionEmptyVisible(false);
       showNotification('读取失败', 'error');
     }
   };
@@ -609,23 +686,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderSimilarImages = (payload) => {
     const items = payload && Array.isArray(payload.items) ? payload.items : [];
     similarImagesGrid.innerHTML = '';
+    similarImagesSection?.classList.remove('is-visible');
+    similarImagesEmpty.classList.add('hidden');
     if (!payload || payload.available === false) {
-      similarImagesStatus.textContent = '相似图片索引不可用。';
-      similarImagesEmpty.classList.remove('hidden');
       return;
     }
     if (!payload.indexed) {
-      similarImagesStatus.textContent = '当前图片尚未向量化。';
-      similarImagesEmpty.classList.remove('hidden');
       return;
     }
     if (items.length === 0) {
-      similarImagesStatus.textContent = '已向量化，暂未找到相似图片。';
-      similarImagesEmpty.classList.remove('hidden');
       return;
     }
-    similarImagesStatus.textContent = `找到 ${items.length} 张相似图片。`;
-    similarImagesEmpty.classList.add('hidden');
+    similarImagesSection?.classList.add('is-visible');
     items.forEach((item) => {
       const link = document.createElement('a');
       link.href = item.detail_url || '#';
@@ -645,14 +717,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`/api/recommend/similar?uri=${encodeURIComponent(imageUri)}&limit=12`);
       const data = await res.json();
       if (!data.success) {
-        similarImagesStatus.textContent = data.error || '读取相似图片失败';
-        similarImagesEmpty.classList.remove('hidden');
         return;
       }
       renderSimilarImages(data.data);
     } catch (err) {
-      similarImagesStatus.textContent = '读取相似图片失败';
-      similarImagesEmpty.classList.remove('hidden');
+      similarImagesSection?.classList.remove('is-visible');
     }
   };
 
@@ -755,7 +824,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   captionBtn?.addEventListener('click', () => generateCaption());
-  captionAdvancedBtn?.addEventListener('click', fillPromptModal);
+  captionEmptyCta?.addEventListener('click', () => generateCaption());
+  captionAdvancedBtn?.addEventListener('click', () => {
+    closeMoreMenu();
+    fillPromptModal();
+  });
   promptCloseBtn?.addEventListener('click', closePromptModal);
   promptCancelBtn?.addEventListener('click', closePromptModal);
   promptModal?.addEventListener('click', (e) => {

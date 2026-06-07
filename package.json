@@ -9,7 +9,7 @@
     "build": "npm run build-css-prod"
   },
   "devDependencies": {
-    "tailwindcss": "^4.0.0-alpha.25"
+    "tailwindcss": "^4.3.0"
   },
   "keywords": [
     "tiklocal",
@@ -19,5 +19,8 @@
     "flask"
   ],
   "author": "ChanMo <chan.mo@outlook.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.3.0"
+  }
 }
