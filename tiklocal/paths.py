@@ -41,6 +41,14 @@ def get_llm_config_path() -> Path:
     return get_data_dir() / 'llm_config.json'
 
 
+def get_embedding_config_path() -> Path:
+    return get_data_dir() / 'embedding_config.json'
+
+
+def get_database_path() -> Path:
+    return get_data_dir() / 'tiklocal.sqlite3'
+
+
 def get_download_config_path() -> Path:
     return get_data_dir() / 'download_config.json'
 
