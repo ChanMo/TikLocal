@@ -128,6 +128,26 @@ media_sources:
     name: 图片库
     path: ~/Pictures/AI
 download_source: default
+
+vision:
+  enabled: true
+  base_url: https://openrouter.ai/api/v1
+  model_name: google/gemini-2.5-flash
+  temperature: 0.6
+  tags_limit: 5
+  system_prompt: |
+    你是图片内容分析助手。只输出 JSON。
+  user_prompt: |
+    请分析这张图片，生成一个简短中文标题，并给出最多 {tags_limit} 个中文标签。
+    输出 JSON：{"title":"...","tags":["..."]}
+
+embedding:
+  enabled: true
+  base_url: https://openrouter.ai/api/v1
+  model_name: google/gemini-embedding-2
+  dimensions: 768
+  image_max_size: 512
+  image_quality: 82
 ```
 
 也可以继续使用旧的单目录配置：
@@ -137,6 +157,38 @@ media_root: ~/Videos/TikLocal
 ```
 
 多媒体源会合并为一个统一媒体库，内部媒体 URI 使用 `@source_id/path` 格式；旧的裸路径链接和收藏会自动兼容到 `@default/...`。
+
+图片识别使用 `vision` 配置；图片向量化使用 `embedding` 配置，并把图片向量存入本地 SQLite 应用数据库（默认 `~/.tiklocal/tiklocal.sqlite3`）。图片详情页只读取本地索引用于相似图片推荐；构建或更新向量请使用 CLI：
+
+```bash
+tiklocal vectorize ~/Videos/TikLocal --limit 200 --order latest
+tiklocal vectorize ~/Videos/TikLocal --dry-run
+```
+
+API Key 通过环境变量读取：图片识别优先使用 `TIKLOCAL_VISION_API_KEY`，图片向量优先使用 `TIKLOCAL_EMBEDDING_API_KEY`，之后回退到 `TIKLOCAL_AI_API_KEY`、`OPENAI_API_KEY` 或 `OPENROUTER_API_KEY`。
+
+### 图片向量化 CLI
+
+批量向量化建议使用命令行，先预览再小批量执行：
+
+```bash
+tiklocal vectorize /path/to/media --dry-run
+tiklocal vectorize /path/to/media --limit 200 --order latest
+tiklocal vectorize /path/to/media --source photos --limit 200
+tiklocal vectorize /path/to/media --cleanup
+tiklocal vectorize /path/to/media --max-size 512 --quality 82
+```
+
+推荐流程：
+
+- 先运行 `--dry-run`，查看总图片数、已索引、缺失、过期和本次将处理的数量。
+- 首次低成本执行可用 `--limit 200 --order latest`，先处理最新 200 张。
+- 多媒体源场景可用 `--source <id>` 只处理某个媒体源。
+- 文件删除或移动后，用 `--cleanup` 清理失效向量。
+- 只有明确要重建已有向量时才使用 `--force`。
+- 自动化脚本可加 `--yes` 跳过确认提示。
+
+`vectorize` 只会上传缺失或过期的图片。文件大小、修改时间、模型、维度、`image_max_size` 或 `image_quality` 变化时，已有向量会被视为过期。发送前图片会处理 EXIF 方向、缩放、重新编码为 JPEG，并且不会携带原始 EXIF/ICC/XMP/IPTC metadata。
 
 * 浅色模式/暗色模式：您可以选择使用浅色模式或暗色模式。
 * 视频播放速度：您可以调整视频播放速度。

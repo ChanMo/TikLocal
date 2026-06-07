@@ -77,6 +77,25 @@ Options for `dedupe`:
 - `--execute`: Execute actual deletion
 - `--auto-confirm`: Skip confirmation prompt
 
+**Build image vector index:**
+```bash
+tiklocal vectorize /path/to/media --dry-run
+tiklocal vectorize /path/to/media --limit 200 --order latest
+tiklocal vectorize /path/to/media --source photos --limit 200
+tiklocal vectorize /path/to/media --cleanup
+tiklocal vectorize /path/to/media --max-size 512 --quality 82
+```
+
+Recommended workflow:
+- Run `--dry-run` first to inspect total images, already-indexed images, missing vectors, stale vectors, and selected items.
+- Use `--limit 200 --order latest` for the first low-cost batch.
+- Use `--source <id>` to index one media source from `media_sources`.
+- Use `--cleanup` to remove vectors for files that no longer exist.
+- Use `--force` only when intentionally rebuilding existing vectors.
+- Use `--yes` to skip the confirmation prompt in scripts.
+
+`vectorize` only uploads images that are missing or stale. A vector becomes stale when file size, mtime, model, dimensions, `image_max_size`, or `image_quality` changes. Images are EXIF-transposed, resized, re-encoded as JPEG, and sent without original EXIF/ICC/XMP/IPTC metadata.
+
 ### URL Download (Web)
 
 TikLocal includes a `/download` page where you can paste a media URL and enqueue a background download job.
@@ -130,6 +149,26 @@ media_sources:
     name: Photos
     path: ~/Pictures/AI
 download_source: default
+
+vision:
+  enabled: true
+  base_url: https://openrouter.ai/api/v1
+  model_name: google/gemini-2.5-flash
+  temperature: 0.6
+  tags_limit: 5
+  system_prompt: |
+    You are an image analysis assistant. Return JSON only.
+  user_prompt: |
+    Analyze this image and return a short Chinese title plus up to {tags_limit} Chinese tags.
+    Output JSON: {"title":"...","tags":["..."]}
+
+embedding:
+  enabled: true
+  base_url: https://openrouter.ai/api/v1
+  model_name: google/gemini-embedding-2
+  dimensions: 768
+  image_max_size: 512
+  image_quality: 82
 ```
 
 The legacy single-directory configuration still works:
@@ -139,6 +178,15 @@ media_root: ~/Videos/TikLocal
 ```
 
 Multiple media sources are merged into one unified library. Internal media URIs use the `@source_id/path` format, while old bare-path links and favorites remain compatible through the default source.
+
+Image recognition uses `vision`; image vectorization uses `embedding` and stores image vectors in the local SQLite application database (`~/.tiklocal/tiklocal.sqlite3` by default). The image detail page only reads the local index for similar-image recommendations. Use the CLI to build or update vectors:
+
+```bash
+tiklocal vectorize ~/Videos/TikLocal --limit 200 --order latest
+tiklocal vectorize ~/Videos/TikLocal --dry-run
+```
+
+API keys are read from environment variables, preferring `TIKLOCAL_VISION_API_KEY` for vision, `TIKLOCAL_EMBEDDING_API_KEY` for embedding, then falling back to `TIKLOCAL_AI_API_KEY`, `OPENAI_API_KEY`, or `OPENROUTER_API_KEY`.
 
 * **Light and dark modes:** You can choose to use light or dark mode.
 * **Video playback speed:** You can adjust the video playback speed.
