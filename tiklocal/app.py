@@ -7,6 +7,7 @@ from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 
 from flask import Flask, render_template, request, redirect, send_file
+from PIL import Image, ImageDraw
 
 # Service Imports
 from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS, AUDIO_EXTENSIONS, build_media_sources
@@ -50,6 +51,7 @@ from tiklocal.services.downloader import (
 )
 from tiklocal.services.collections import CollectionStore
 from tiklocal.services.embedded_metadata import read_embedded_generation
+from tiklocal.services.radio import RadioCandidate, RadioService
 from tiklocal.paths import (
     get_metadata_path,
     get_favorites_path,
@@ -123,6 +125,7 @@ def create_app(test_config=None):
     app.config['MEDIA_ROOT'] = default_media_root
     favorite_service = FavoriteService(media_root_str, db_path=get_favorites_path(), library_service=library_service)
     recommend_service = RecommendService(library_service, favorite_service)
+    radio_service = RadioService(library_service, favorite_service)
     thumbnail_service = ThumbnailService(Path(media_root_str), library_service=library_service)
     metadata_store = ImageMetadataStore(get_metadata_path())
     prompt_config_store = PromptConfigStore(get_prompt_config_path())
@@ -315,6 +318,16 @@ def create_app(test_config=None):
     def _read_choice_arg(name: str, default: str, allowed: set[str]) -> str:
         value = str(request.args.get(name, default)).strip()
         return value if value in allowed else default
+
+    def _read_exclude_arg(name: str = 'exclude') -> set[str]:
+        values: list[str] = []
+        for raw in request.args.getlist(name):
+            values.extend(str(raw or '').split(','))
+        return {
+            library_service.canonicalize_uri(value)
+            for value in values
+            if str(value or '').strip()
+        }
 
     _build_feed_media_item = view_builders.build_feed_media_item
 
@@ -682,6 +695,45 @@ def create_app(test_config=None):
             return send_file(io.BytesIO(path), mimetype=mimetype)
         return send_file(path, mimetype=mimetype)
 
+    def _radio_artwork_bytes(uri: str) -> bytes:
+        palettes = [
+            ("#466b61", "#a88756", "#d7d2c4"),
+            ("#5c6750", "#b18462", "#d8d3c8"),
+            ("#57707a", "#9b8257", "#d2d5ce"),
+            ("#675f82", "#9b8b5b", "#d7d1c0"),
+            ("#72634e", "#5f8174", "#d8d4c7"),
+            ("#4f6f7e", "#a36f5d", "#d5d0c4"),
+        ]
+        palette = palettes[sum(uri.encode("utf-8", errors="ignore")) % len(palettes)]
+        size = 512
+        image = Image.new("RGB", (size, size), palette[2])
+        draw = ImageDraw.Draw(image, "RGBA")
+
+        for radius in range(size // 2, 24, -8):
+            idx = (radius // 8) % 2
+            color = palette[idx]
+            alpha = 18 if idx else 26
+            inset = size // 2 - radius
+            draw.ellipse((inset, inset, size - inset, size - inset), fill=color + f"{alpha:02x}")
+
+        draw.ellipse((42, 42, size - 42, size - 42), outline=(36, 36, 31, 38), width=2)
+        draw.ellipse((112, 112, size - 112, size - 112), outline=(70, 107, 97, 34), width=2)
+        draw.ellipse((182, 182, size - 182, size - 182), fill=palette[0], outline=(255, 255, 255, 56), width=2)
+        draw.ellipse((220, 220, size - 220, size - 220), fill=palette[2], outline=(36, 36, 31, 30), width=1)
+
+        output = io.BytesIO()
+        image.save(output, format="PNG", optimize=True)
+        return output.getvalue()
+
+    @app.route('/api/radio/artwork')
+    def api_radio_artwork():
+        uri = library_service.find_existing_uri(unquote(request.args.get('uri') or ''))
+        if uri:
+            path, mimetype = thumbnail_service.get_thumbnail(uri)
+            if not isinstance(path, bytes):
+                return send_file(path, mimetype=mimetype)
+        return send_file(io.BytesIO(_radio_artwork_bytes(uri or "radio")), mimetype='image/png')
+
 
     # --- API Routes ---
     @app.route('/api/radio/items')
@@ -695,12 +747,16 @@ def create_app(test_config=None):
         items = []
         for p in page:
             name = library_service.get_relative_path(p)
+            metadata = radio_service.metadata_for(p)
             items.append({
                 'name': name,
                 'media_url': f'/media/{quote(name, safe="/")}',
                 'thumb_url': f'/thumb?uri={quote(name, safe="")}',
-                'title': p.stem,
-                'duration': None,
+                'artwork_url': f'/api/radio/artwork?uri={quote(name, safe="")}',
+                'title': metadata.title or p.stem,
+                'artist': metadata.artist,
+                'album': metadata.album,
+                'duration': metadata.duration,
                 'is_favorite': name in favorites,
             })
         return {'success': True, 'data': {
@@ -708,6 +764,35 @@ def create_app(test_config=None):
             'total': total,
             'has_more': offset + limit < total,
         }}
+
+    def _serialize_radio_track(item: RadioCandidate) -> dict:
+        return {
+            'name': item.name,
+            'media_url': f'/media/{quote(item.name, safe="/")}',
+            'thumb_url': f'/thumb?uri={quote(item.name, safe="")}',
+            'artwork_url': f'/api/radio/artwork?uri={quote(item.name, safe="")}',
+            'title': item.title,
+            'artist': item.artist,
+            'album': item.album,
+            'duration': item.duration,
+            'is_favorite': item.is_favorite,
+        }
+
+    @app.route('/api/radio/stations')
+    def api_radio_stations():
+        return {'success': True, 'data': {'stations': radio_service.list_stations()}}
+
+    @app.route('/api/radio/tune')
+    def api_radio_tune():
+        limit = _read_int_arg('limit', 12, minimum=1, maximum=30)
+        payload = radio_service.tune(
+            station=str(request.args.get('station', 'default')).strip(),
+            limit=limit,
+            exclude=_read_exclude_arg(),
+            seed=str(request.args.get('seed', '')).strip() or None,
+            serialize_track=_serialize_radio_track,
+        )
+        return {'success': True, 'data': payload}
 
     @app.route('/api/feed/mix')
     def api_feed_mix():
