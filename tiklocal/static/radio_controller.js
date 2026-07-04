@@ -19,6 +19,13 @@
   var saveTick = 0;
   var mediaPositionTick = 0;
   var artLoadToken = 0;
+  var trackPlayReportedFor = '';
+  var trackExitReportedFor = '';
+  var trackInfoTimers = [];
+  var pendingTrackTitle = '';
+  var pendingTrackMeta = '';
+  var trackInfoTransitionId = 0;
+  var metadataLoadToken = 0;
 
   var els = {};
 
@@ -40,7 +47,7 @@
 
   function cacheEls() {
     [
-      'radio-page', 'station-name', 'track-title',
+      'radio-page', 'station-name', 'track-title', 'track-meta',
       'progress-bar', 'time-current', 'time-total', 'btn-play', 'btn-next',
       'btn-fav', 'btn-sleep', 'sleep-label',
       'station-options', 'upcoming-preview', 'upcoming-list', 'cover-wave', 'cover-art'
@@ -50,9 +57,17 @@
   }
 
   function bindEvents() {
-    audio.addEventListener('ended', function () { playNext(true); });
+    audio.addEventListener('ended', function () {
+      reportPlaybackExit('complete');
+      playNext(true);
+    });
+    audio.addEventListener('error', function () {
+      reportPlaybackExit('error');
+      playNext(true);
+    });
     audio.addEventListener('play', function () {
       isPlaying = true;
+      reportTrackPlay();
       updatePlayIcon();
       updateMotion();
       updateMediaSession();
@@ -69,15 +84,18 @@
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', function () {
       restoreSavedTimeOnce();
+      onTimeUpdate();
       updateMediaPosition();
     });
 
     els.btnPlay.addEventListener('click', togglePlay);
-    els.btnNext.addEventListener('click', function () { playNext(true); });
+    els.btnNext.addEventListener('click', function () { playNext(true, { manual: true }); });
     els.btnFav.addEventListener('click', toggleFavorite);
     els.btnSleep.addEventListener('click', cycleSleep);
     els.progressBar.addEventListener('input', function (event) {
-      audio.currentTime = (Number(event.target.value) / 100) * (audio.duration || 0);
+      var duration = playableDuration();
+      if (!duration) return;
+      audio.currentTime = (Number(event.target.value) / 100) * duration;
       updateMediaPosition();
     });
   }
@@ -166,9 +184,12 @@
 
   function prepareTrack(track) {
     currentTrack = track;
+    metadataLoadToken += 1;
     if (!track) {
       audio.removeAttribute('src');
-      setTrackTitle('暂无音频');
+      clearTrackInfoTimers();
+      els.radioPage.classList.remove('is-changing-track');
+      setTrackInfo('暂无音频', '');
       updateSignalArt(null);
       updateFavorite();
       updateMediaSession();
@@ -176,11 +197,14 @@
     }
 
     audio.src = track.media_url;
-    setTrackTitle(track.title || '未命名音频');
+    trackPlayReportedFor = '';
+    trackExitReportedFor = '';
+    transitionTrackInfo(track.title || '未命名音频', buildTrackMeta(track));
     setNeedle();
     updateSignalArt(track);
     updateFavorite();
     updateMediaSession();
+    loadTrackMetadata(track);
   }
 
   function playTrack(track) {
@@ -189,11 +213,17 @@
     rememberRecent(track.name);
     return audio.play().catch(function () {
       isPlaying = false;
+      reportPlaybackExit('error');
       updatePlayIcon();
     });
   }
 
-  function playNext(autoplay) {
+  function playNext(autoplay, options) {
+    options = options || {};
+    if (options.manual) {
+      reportPlaybackExit('skip');
+      settleControl(els.btnNext);
+    }
     if (!upcoming.length) {
       return tune({ reset: false }).then(function () {
         if (!upcoming.length) {
@@ -229,6 +259,7 @@
       .then(function (data) {
         currentTrack.is_favorite = Boolean(data.favorite);
         updateFavorite();
+        if (currentTrack.is_favorite) reportFeedback('favorite', currentTrack, playbackRatio());
         settleControl(els.btnFav);
       })
       .catch(function () {});
@@ -344,11 +375,12 @@
   }
 
   function onTimeUpdate() {
-    var pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+    var duration = playableDuration();
+    var pct = duration ? (audio.currentTime / duration) * 100 : 0;
     els.progressBar.value = pct;
     els.progressBar.style.background = 'linear-gradient(to right, var(--radio-accent) ' + pct + '%, rgba(127,127,127,0.22) ' + pct + '%)';
     els.timeCurrent.textContent = formatTime(audio.currentTime);
-    els.timeTotal.textContent = formatTime(audio.duration);
+    els.timeTotal.textContent = formatTime(duration);
     if (Date.now() - saveTick > 5000) {
       saveTick = Date.now();
       savePosition();
@@ -362,7 +394,8 @@
   function restoreSavedTimeOnce() {
     if (!currentTrack) return;
     var saved = readJson(POSITION_KEY, {});
-    if (saved.name === currentTrack.name && saved.time && audio.duration && saved.time < audio.duration - 5) {
+    var duration = playableDuration();
+    if (saved.name === currentTrack.name && saved.time && duration && saved.time < duration - 5) {
       audio.currentTime = saved.time;
     }
   }
@@ -396,15 +429,33 @@
     try {
       navigator.mediaSession.setActionHandler('play', function () { audio.play(); });
       navigator.mediaSession.setActionHandler('pause', function () { audio.pause(); });
-      navigator.mediaSession.setActionHandler('nexttrack', function () { playNext(true); });
+      navigator.mediaSession.setActionHandler('nexttrack', function () { playNext(true, { manual: true }); });
       navigator.mediaSession.setActionHandler('seekto', function (details) {
-        if (details && typeof details.seekTime === 'number' && isFinite(audio.duration)) {
-          audio.currentTime = Math.max(0, Math.min(details.seekTime, audio.duration));
+        var duration = playableDuration();
+        if (details && typeof details.seekTime === 'number' && duration) {
+          audio.currentTime = Math.max(0, Math.min(details.seekTime, duration));
           updateMediaPosition();
         }
       });
     } catch (error) {}
     updateMediaPosition();
+  }
+
+  function loadTrackMetadata(track) {
+    if (!track || !track.name) return;
+    var token = metadataLoadToken;
+    fetch('/api/radio/metadata?uri=' + encodeURIComponent(track.name))
+      .then(readApi)
+      .then(function (metadata) {
+        if (token !== metadataLoadToken || !currentTrack || metadata.name !== currentTrack.name) return;
+        currentTrack.title = metadata.title || currentTrack.title;
+        currentTrack.artist = metadata.artist || '';
+        currentTrack.album = metadata.album || '';
+        currentTrack.duration = metadata.duration || null;
+        queueTrackInfo(currentTrack.title || '未命名音频', buildTrackMeta(currentTrack));
+        updateMediaSession();
+      })
+      .catch(function () {});
   }
 
   function updateMediaSessionState() {
@@ -416,11 +467,12 @@
 
   function updateMediaPosition() {
     if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
-    if (!audio.duration || !isFinite(audio.duration) || audio.duration <= 0) return;
-    var position = Math.max(0, Math.min(audio.currentTime || 0, audio.duration));
+    var duration = playableDuration();
+    if (!duration) return;
+    var position = Math.max(0, Math.min(audio.currentTime || 0, duration));
     try {
       navigator.mediaSession.setPositionState({
-        duration: audio.duration,
+        duration: duration,
         playbackRate: audio.playbackRate || 1,
         position: position,
       });
@@ -521,6 +573,10 @@
       console.error('Radio load failed:', error);
     }
     els.trackTitle.textContent = '加载失败';
+    if (els.trackMeta) {
+      els.trackMeta.textContent = '';
+      els.trackMeta.classList.remove('has-meta');
+    }
     els.upcomingPreview.innerHTML = '<li></li>';
   }
 
@@ -550,17 +606,112 @@
   }
 
   function formatTime(seconds) {
-    if (!seconds || isNaN(seconds)) return '0:00';
+    if (!seconds || !isFinite(seconds)) return '0:00';
     var minutes = Math.floor(seconds / 60);
     var rest = String(Math.floor(seconds % 60)).padStart(2, '0');
     return minutes + ':' + rest;
   }
 
-  function setTrackTitle(title) {
-    els.trackTitle.classList.remove('is-changing');
+  function setTrackInfo(title, meta) {
     els.trackTitle.textContent = title;
-    void els.trackTitle.offsetWidth;
-    els.trackTitle.classList.add('is-changing');
+    if (!els.trackMeta) return;
+    els.trackMeta.textContent = meta || '';
+    els.trackMeta.classList.toggle('has-meta', Boolean(meta));
+  }
+
+  function queueTrackInfo(title, meta) {
+    if (els.radioPage.classList.contains('is-changing-track')) {
+      pendingTrackTitle = title;
+      pendingTrackMeta = meta || '';
+      return;
+    }
+    setTrackInfo(title, meta);
+  }
+
+  function buildTrackMeta(track) {
+    if (!track) return '';
+    var parts = [];
+    if (track.artist) parts.push(track.artist);
+    if (track.album) parts.push(track.album);
+    return parts.join(' · ');
+  }
+
+  function transitionTrackInfo(title, meta) {
+    clearTrackInfoTimers();
+    trackInfoTransitionId += 1;
+    var transitionId = trackInfoTransitionId;
+    pendingTrackTitle = title;
+    pendingTrackMeta = meta || '';
+    els.radioPage.classList.remove('is-changing-track');
+    void els.radioPage.offsetWidth;
+    els.radioPage.classList.add('is-changing-track');
+    trackInfoTimers.push(window.setTimeout(function () {
+      if (transitionId !== trackInfoTransitionId) return;
+      setTrackInfo(pendingTrackTitle, pendingTrackMeta);
+    }, 540));
+    trackInfoTimers.push(window.setTimeout(function () {
+      window.requestAnimationFrame(function () {
+        if (transitionId !== trackInfoTransitionId) return;
+        els.radioPage.classList.remove('is-changing-track');
+        trackInfoTimers = [];
+      });
+    }, 590));
+  }
+
+  function clearTrackInfoTimers() {
+    trackInfoTransitionId += 1;
+    trackInfoTimers.forEach(function (timer) {
+      window.clearTimeout(timer);
+    });
+    trackInfoTimers = [];
+  }
+
+  function reportTrackPlay() {
+    if (!currentTrack || trackPlayReportedFor === currentTrack.name) return;
+    trackPlayReportedFor = currentTrack.name;
+    reportFeedback('play', currentTrack, playbackRatio());
+  }
+
+  function reportPlaybackExit(event) {
+    if (!currentTrack || trackExitReportedFor === currentTrack.name + ':' + event) return;
+    var ratio = playbackRatio();
+    var finalEvent = event;
+    if (event === 'skip' && ratio >= 0.82) {
+      finalEvent = 'complete';
+    }
+    trackExitReportedFor = currentTrack.name + ':' + finalEvent;
+    reportFeedback(finalEvent, currentTrack, ratio);
+  }
+
+  function playbackRatio() {
+    var duration = playableDuration();
+    if (!duration) return null;
+    return Math.max(0, Math.min((audio.currentTime || 0) / duration, 1));
+  }
+
+  function playableDuration() {
+    return audio.duration && isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+  }
+
+  function reportFeedback(event, track, ratio) {
+    if (!track || !track.name) return;
+    var payload = JSON.stringify({
+      name: track.name,
+      event: event,
+      ratio: ratio,
+    });
+    if (navigator.sendBeacon) {
+      try {
+        var blob = new Blob([payload], { type: 'application/json' });
+        if (navigator.sendBeacon('/api/radio/feedback', blob)) return;
+      } catch (error) {}
+    }
+    fetch('/api/radio/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(function () {});
   }
 
   function settleControl(element) {

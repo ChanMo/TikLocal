@@ -51,7 +51,7 @@ from tiklocal.services.downloader import (
 )
 from tiklocal.services.collections import CollectionStore
 from tiklocal.services.embedded_metadata import read_embedded_generation
-from tiklocal.services.radio import RadioCandidate, RadioService
+from tiklocal.services.radio import RadioCandidate, RadioProfileStore, RadioService
 from tiklocal.paths import (
     get_metadata_path,
     get_favorites_path,
@@ -63,6 +63,7 @@ from tiklocal.paths import (
     get_download_jobs_path,
     get_download_sources_path,
     get_collections_path,
+    get_radio_profile_path,
 )
 from tiklocal import view_builders
 
@@ -125,7 +126,8 @@ def create_app(test_config=None):
     app.config['MEDIA_ROOT'] = default_media_root
     favorite_service = FavoriteService(media_root_str, db_path=get_favorites_path(), library_service=library_service)
     recommend_service = RecommendService(library_service, favorite_service)
-    radio_service = RadioService(library_service, favorite_service)
+    radio_profile_store = RadioProfileStore(get_radio_profile_path())
+    radio_service = RadioService(library_service, favorite_service, radio_profile_store)
     thumbnail_service = ThumbnailService(Path(media_root_str), library_service=library_service)
     metadata_store = ImageMetadataStore(get_metadata_path())
     prompt_config_store = PromptConfigStore(get_prompt_config_path())
@@ -318,6 +320,13 @@ def create_app(test_config=None):
     def _read_choice_arg(name: str, default: str, allowed: set[str]) -> str:
         value = str(request.args.get(name, default)).strip()
         return value if value in allowed else default
+
+    def _positive_ratio(value) -> float | None:
+        try:
+            ratio = float(value)
+        except (TypeError, ValueError):
+            return None
+        return max(0.0, min(ratio, 1.0))
 
     def _read_exclude_arg(name: str = 'exclude') -> set[str]:
         values: list[str] = []
@@ -793,6 +802,32 @@ def create_app(test_config=None):
             serialize_track=_serialize_radio_track,
         )
         return {'success': True, 'data': payload}
+
+    @app.route('/api/radio/metadata')
+    def api_radio_metadata():
+        uri = library_service.find_existing_uri(unquote(request.args.get('uri') or ''))
+        path = library_service.resolve_path(uri)
+        if not uri or not path or not path.exists() or not path.is_file():
+            return {'success': False, 'error': 'Audio not found'}, 404
+        metadata = radio_service.metadata_for(path)
+        return {'success': True, 'data': {
+            'name': library_service.get_relative_path(path),
+            'title': metadata.title or path.stem,
+            'artist': metadata.artist,
+            'album': metadata.album,
+            'duration': metadata.duration,
+        }}
+
+    @app.route('/api/radio/feedback', methods=['POST'])
+    def api_radio_feedback():
+        payload = request.get_json(silent=True) or {}
+        event = str(payload.get('event') or '').strip()
+        uri = str(payload.get('name') or payload.get('uri') or '').strip()
+        if event not in {'play', 'complete', 'skip', 'favorite', 'error'}:
+            return {'success': False, 'error': 'Invalid feedback event'}, 400
+        ratio = _positive_ratio(payload.get('ratio'))
+        entry = radio_service.record_feedback(uri, event, ratio=ratio)
+        return {'success': True, 'data': {'profile': entry}}
 
     @app.route('/api/feed/mix')
     def api_feed_mix():

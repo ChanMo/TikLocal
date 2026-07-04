@@ -4,7 +4,7 @@ import random
 import subprocess as sp
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from tiklocal.services import FavoriteService, LibraryService
 
@@ -45,6 +45,70 @@ class AudioMetadata:
     duration: float | None = None
 
 
+class RadioProfileStore:
+    """Persist light listening feedback for local radio selection."""
+
+    event_weights = {
+        "play": 0.02,
+        "complete": 0.16,
+        "favorite": 0.12,
+        "skip": -0.09,
+        "error": -0.18,
+    }
+
+    def __init__(self, path: Path):
+        self.path = path
+
+    def load(self) -> dict[str, dict[str, Any]]:
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+        tracks = payload.get("tracks") if isinstance(payload, dict) else None
+        return tracks if isinstance(tracks, dict) else {}
+
+    def record(self, uri: str, event: str, *, ratio: float | None = None) -> dict[str, Any]:
+        if not uri:
+            return {}
+        event = event if event in self.event_weights else "play"
+        tracks = self.load()
+        entry = tracks.get(uri) if isinstance(tracks.get(uri), dict) else {}
+
+        entry["plays"] = int(entry.get("plays") or 0) + (1 if event == "play" else 0)
+        entry["completes"] = int(entry.get("completes") or 0) + (1 if event == "complete" else 0)
+        entry["skips"] = int(entry.get("skips") or 0) + (1 if event == "skip" else 0)
+        entry["errors"] = int(entry.get("errors") or 0) + (1 if event == "error" else 0)
+        if ratio is not None:
+            entry["last_ratio"] = max(0.0, min(float(ratio), 1.0))
+        entry["last_event"] = event
+        entry["last_played_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        entry["score"] = self._next_score(float(entry.get("score") or 0.0), event, ratio)
+
+        tracks[uri] = entry
+        self._save(tracks)
+        return entry
+
+    def _next_score(self, current: float, event: str, ratio: float | None) -> float:
+        delta = self.event_weights[event]
+        if event == "complete" and ratio is not None:
+            delta += max(0.0, min(ratio, 1.0)) * 0.08
+        if event == "skip" and ratio is not None and ratio < 0.18:
+            delta -= 0.05
+        return max(-0.8, min(current + delta, 1.4))
+
+    def _save(self, tracks: dict[str, dict[str, Any]]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        trimmed = dict(sorted(
+            tracks.items(),
+            key=lambda item: str(item[1].get("last_played_at") or ""),
+            reverse=True,
+        )[:1200])
+        self.path.write_text(
+            json.dumps({"tracks": trimmed}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+
 class RadioService:
     """Build low-decision radio batches from local audio files."""
 
@@ -54,9 +118,15 @@ class RadioService:
         RadioStation("favorites", "收藏电台", "优先播放已收藏的音频"),
     ]
 
-    def __init__(self, library_service: LibraryService, favorite_service: FavoriteService):
+    def __init__(
+        self,
+        library_service: LibraryService,
+        favorite_service: FavoriteService,
+        profile_store: RadioProfileStore | None = None,
+    ):
         self.library = library_service
         self.favorites = favorite_service
+        self.profile_store = profile_store
         self._metadata_cache: dict[str, tuple[float, AudioMetadata]] = {}
 
     def list_stations(self) -> list[dict]:
@@ -64,6 +134,12 @@ class RadioService:
             {"id": station.id, "name": station.name, "description": station.description}
             for station in self.stations
         ]
+
+    def record_feedback(self, uri: str, event: str, *, ratio: float | None = None) -> dict[str, Any]:
+        if not self.profile_store:
+            return {}
+        canonical = self.library.canonicalize_uri(uri)
+        return self.profile_store.record(canonical, event, ratio=ratio)
 
     def tune(
         self,
@@ -82,12 +158,13 @@ class RadioService:
             available = candidates
 
         rng = random.Random(seed) if seed else random.Random()
+        profile = self.profile_store.load() if self.profile_store else {}
         if station_id == "recent":
             selected = self._select_recent(available, limit, rng)
         elif station_id == "favorites":
-            selected = self._select_favorites(available, candidates, excluded, limit, rng)
+            selected = self._select_favorites(available, candidates, excluded, limit, rng, profile)
         else:
-            selected = self._select_weighted(available, limit, rng)
+            selected = self._select_weighted(available, limit, rng, profile)
 
         station_meta = next(item for item in self.list_stations() if item["id"] == station_id)
         return {
@@ -104,15 +181,14 @@ class RadioService:
             try:
                 name = self.library.get_relative_path(path)
                 parent = self.library.relative_path_for_uri(name).rsplit("/", 1)[0]
-                metadata = self.metadata_for(path)
                 candidates.append(
                     RadioCandidate(
                         path=path,
                         name=name,
-                        title=metadata.title or path.stem,
-                        artist=metadata.artist,
-                        album=metadata.album,
-                        duration=metadata.duration,
+                        title=path.stem,
+                        artist="",
+                        album="",
+                        duration=None,
                         parent_key=parent,
                         is_favorite=self.library.is_uri_in_set(name, favs),
                         mtime=path.stat().st_mtime,
@@ -121,6 +197,12 @@ class RadioService:
             except Exception:
                 continue
         return candidates
+
+    def metadata_for_uri(self, uri: str) -> AudioMetadata:
+        path = self.library.resolve_path(uri)
+        if not path or not path.exists() or not path.is_file():
+            return AudioMetadata()
+        return self.metadata_for(path)
 
     def metadata_for(self, path: Path) -> AudioMetadata:
         try:
@@ -184,6 +266,7 @@ class RadioService:
         excluded: set[str],
         limit: int,
         rng: random.Random,
+        profile: dict[str, dict[str, Any]],
     ) -> list[RadioCandidate]:
         favorites = [item for item in available if item.is_favorite]
         selected = self._spread_by_parent(favorites, limit, rng)
@@ -204,7 +287,7 @@ class RadioService:
             item for item in all_candidates
             if item.name not in excluded and item.name not in {chosen.name for chosen in selected}
         ]
-        selected.extend(self._select_weighted(fallback, limit - len(selected), rng))
+        selected.extend(self._select_weighted(fallback, limit - len(selected), rng, profile))
         return selected
 
     def _select_weighted(
@@ -212,14 +295,17 @@ class RadioService:
         candidates: list[RadioCandidate],
         limit: int,
         rng: random.Random,
+        profile: dict[str, dict[str, Any]] | None = None,
     ) -> list[RadioCandidate]:
         now = datetime.datetime.now().timestamp()
+        profile = profile or {}
         weighted: list[tuple[RadioCandidate, float]] = []
         for item in candidates:
             age_days = max((now - item.mtime) / 86400, 0.0)
             recency = 2.0 if age_days <= 30 else max(0.2, 1.0 - min(age_days, 365) / 365)
             favorite = 3.0 if item.is_favorite else 1.0
-            weighted.append((item, favorite * recency))
+            learned = self._profile_weight(profile.get(item.name))
+            weighted.append((item, favorite * recency * learned))
 
         selected: list[RadioCandidate] = []
         recent_parents: list[str] = []
@@ -237,6 +323,15 @@ class RadioService:
             recent_parents = (recent_parents + [picked.parent_key])[-2:]
             pool = [(item, weight) for item, weight in pool if item.name != picked.name]
         return selected
+
+    def _profile_weight(self, entry: dict[str, Any] | None) -> float:
+        if not entry:
+            return 1.0
+        score = float(entry.get("score") or 0.0)
+        skips = int(entry.get("skips") or 0)
+        completes = int(entry.get("completes") or 0)
+        confidence = min(skips + completes, 8) / 8
+        return max(0.25, min(2.2, 1.0 + score * (0.45 + confidence * 0.55)))
 
     def _spread_by_parent(
         self,

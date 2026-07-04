@@ -63,3 +63,7 @@ def get_download_sources_path() -> Path:
 
 def get_collections_path() -> Path:
     return get_data_dir() / 'collections.json'
+
+
+def get_radio_profile_path() -> Path:
+    return get_data_dir() / 'radio_profile.json'

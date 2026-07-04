@@ -4,6 +4,7 @@ import os
 import pytest
 
 from tiklocal.app import create_app
+from tiklocal.services.radio import RadioProfileStore
 
 
 @pytest.fixture
@@ -128,11 +129,50 @@ def test_radio_uses_embedded_audio_metadata(tmp_path, monkeypatch):
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
     monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
-    res = app.test_client().get("/api/radio/tune?station=default&limit=1&seed=fixed")
+    res = app.test_client().get("/api/radio/metadata?uri=@default/song.mp3")
 
     assert res.status_code == 200
-    item = res.get_json()["data"]["items"][0]
+    item = res.get_json()["data"]
     assert item["title"] == "真实标题"
     assert item["artist"] == "真实艺人"
     assert item["album"] == "真实专辑"
     assert item["duration"] == 123.45
+
+
+def test_radio_tune_does_not_probe_audio_metadata(client, monkeypatch):
+    def fail_probe(*args, **kwargs):
+        raise AssertionError("tune should not call ffprobe")
+
+    monkeypatch.setattr("tiklocal.services.radio.sp.run", fail_probe)
+    res = client.get("/api/radio/tune?station=default&limit=3&seed=fixed")
+
+    assert res.status_code == 200
+    items = res.get_json()["data"]["items"]
+    assert len(items) == 3
+    assert all(item["duration"] is None for item in items)
+
+
+def test_radio_feedback_records_local_profile(client, tmp_path, monkeypatch):
+    res = client.post(
+        "/api/radio/feedback",
+        json={"name": "@default/a01.mp3", "event": "complete", "ratio": 0.96},
+    )
+
+    assert res.status_code == 200
+    profile_path = tmp_path / "tiklocal-data" / "radio_profile.json"
+    payload = json.loads(profile_path.read_text(encoding="utf-8"))
+    entry = payload["tracks"]["@default/a01.mp3"]
+    assert entry["completes"] == 1
+    assert entry["last_event"] == "complete"
+    assert entry["score"] > 0
+
+
+def test_radio_profile_scores_completion_above_skip(tmp_path):
+    store = RadioProfileStore(tmp_path / "radio_profile.json")
+
+    complete = store.record("@default/a01.mp3", "complete", ratio=0.98)
+    skip = store.record("@default/a02.mp3", "skip", ratio=0.05)
+
+    assert complete["score"] > 0
+    assert skip["score"] < 0
+    assert complete["score"] > skip["score"]
