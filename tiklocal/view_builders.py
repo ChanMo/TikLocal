@@ -445,6 +445,7 @@ def build_library_page(
     min_mb: int = 50,
     seed: str = '',
     collection_id: str = '',
+    search: str = '',
     collect_collection_records_fn: Callable[[str], tuple[dict | None, list[dict]]],
     collect_library_records_fn: Callable[..., list[dict]],
     apply_library_mode_fn: Callable[..., list[dict]] = apply_library_mode,
@@ -454,7 +455,7 @@ def build_library_page(
     if collection_id:
         _, records = collect_collection_records_fn(collection_id)
     else:
-        records = collect_library_records_fn(favorites_only=favorites_only)
+        records = collect_library_records_fn(favorites_only=favorites_only, search=search)
         records = apply_library_mode_fn(records, mode=mode, min_mb=min_mb, seed=seed)
     total = len(records)
     start = max(0, int(offset))
@@ -606,6 +607,11 @@ def build_mix_feed_page(
         mixed_entries.insert(insert_at, candidate)
 
     page_items = mixed_entries[start:end]
+    recommendation_reasons = recommend_service.reasons_for([
+        str(entry.get('name') or '')
+        for entry in page_items
+        if entry.get('type') in {'video', 'image'}
+    ])
     items = []
     for entry in page_items:
         item_type = str(entry.get('type') or '')
@@ -655,7 +661,9 @@ def build_mix_feed_page(
         name = str(entry.get('name') or '')
         if not name or item_type not in {'video', 'image'}:
             continue
-        items.append(build_feed_media_item_fn(name, item_type))
+        item = build_feed_media_item_fn(name, item_type)
+        item['recommendation_reason'] = recommendation_reasons.get(name, '')
+        items.append(item)
 
     return {
         'items': items,

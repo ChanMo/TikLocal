@@ -8,7 +8,7 @@ import subprocess as sp
 import threading
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 
@@ -433,12 +433,14 @@ class DownloadManager:
         history_store: DownloadHistoryStore,
         source_store: DownloadSourceStore | None = None,
         output_source_id: str = "default",
+        on_outputs: Callable[[list[str]], int] | None = None,
     ):
         self.media_root = media_root.resolve()
         self.output_source_id = str(output_source_id or "default").strip() or "default"
         self.config_store = config_store
         self.history_store = history_store
         self.source_store = source_store
+        self.on_outputs = on_outputs
 
         self._lock = threading.Lock()
         self._shutdown = threading.Event()
@@ -883,6 +885,11 @@ class DownloadManager:
 
             if source_context:
                 self._record_job_sources_on_success(source_context)
+            if return_code == 0 and output_rel_list and self.on_outputs:
+                try:
+                    self.on_outputs(output_rel_list)
+                except Exception:
+                    pass
         except FileNotFoundError as exc:
             with self._lock:
                 job = self._jobs.get(job_id)

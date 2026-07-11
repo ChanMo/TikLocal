@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 
 import pytest
 
@@ -27,7 +28,7 @@ def client(tmp_path, monkeypatch):
 
 
 def test_mix_feed_returns_typed_items(client):
-    res = client.get("/api/feed/mix?page=1&size=12&seed=fixed-seed")
+    res = client.get("/api/feed/mix?page=1&size=12&seed=fixed-seed&snapshot=1")
     assert res.status_code == 200
     data = res.get_json()
 
@@ -35,6 +36,7 @@ def test_mix_feed_returns_typed_items(client):
     assert "items" in data
     assert "seed" in data
     assert "has_more" in data
+    assert data["has_more"] is False
 
     items = data["items"]
     assert isinstance(items, list)
@@ -52,6 +54,7 @@ def test_mix_feed_returns_typed_items(client):
             continue
         assert "media_url" in item
         assert "detail_url" in item
+        assert item["recommendation_reason"]
         assert item["type"] in {"video", "image"}
         if item["type"] == "video":
             assert item["detail_url"].startswith("/detail/")
@@ -183,3 +186,50 @@ def test_mix_feed_prefers_original_post_group_when_source_has_multiple_media(tmp
     assert "@default/set-1.jpg" in names
     assert "@default/set-2.jpg" in names
     assert all(child["media_url"] for child in group["items"])
+
+
+def test_flow_activity_builds_and_clears_local_profile(client, tmp_path):
+    events = [
+        {
+            "session_id": "session-1",
+            "uri": "@default/nested/v 3.mp4",
+            "media_type": "video",
+            "surface": "flow",
+            "event": "impression",
+        },
+        {
+            "session_id": "session-1",
+            "uri": "@default/nested/v 3.mp4",
+            "media_type": "video",
+            "surface": "flow",
+            "event": "complete",
+            "ratio": 0.94,
+            "visible_ms": 12000,
+        },
+    ]
+    res = client.post("/api/activity", json={"events": events})
+
+    assert res.status_code == 200
+    assert res.get_json()["data"]["accepted"] == 2
+    db_path = tmp_path / "tiklocal-data" / "tiklocal.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT impressions, completes, affinity_score FROM media_affinity WHERE uri = ?",
+            ("@default/nested/v 3.mp4",),
+        ).fetchone()
+        dimensions = dict(conn.execute(
+            """
+            SELECT dimension_type, positive_score
+            FROM preference_dimensions
+            WHERE dimension_value IN ('video', 'default', 'default/nested')
+            """
+        ).fetchall())
+    assert row[0:2] == (1, 1)
+    assert row[2] > 0
+    assert set(dimensions) == {"media_type", "source", "directory"}
+    assert all(score > 0 for score in dimensions.values())
+
+    assert client.delete("/api/activity").get_json()["success"] is True
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM media_affinity").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM preference_dimensions").fetchone()[0] == 0

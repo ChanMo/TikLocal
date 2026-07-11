@@ -32,6 +32,7 @@
     const captionPanel = document.getElementById('caption-panel');
     const captionTitle = document.getElementById('caption-title');
     const captionTags = document.getElementById('caption-tags');
+    const recommendationReason = document.getElementById('recommendation-reason');
     const uiShared = window.FlowUIShared || {};
     const actionsShared = window.FlowActionsShared || {};
 
@@ -45,6 +46,77 @@
     });
     const feedItems = flowSession.items;
     let seed = '';
+    const activitySessionId = globalThis.crypto?.randomUUID?.()
+      || `flow-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    let activeActivity = null;
+
+    function postActivity(events, useBeacon = false) {
+      const valid = events.filter(Boolean);
+      if (!valid.length) return;
+      const body = JSON.stringify({ events: valid });
+      if (useBeacon && navigator.sendBeacon) {
+        navigator.sendBeacon('/api/activity', new Blob([body], { type: 'application/json' }));
+        return;
+      }
+      fetch('/api/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    }
+
+    function activityTarget(item) {
+      if (!item) return null;
+      if (item.type === 'image_group') {
+        const entries = Array.isArray(item.items) ? item.items : [];
+        const index = Math.max(0, Math.min(Number(item.activeChildIndex) || 0, entries.length - 1));
+        const entry = entries[index];
+        return entry?.name ? { uri: entry.name, type: 'image', el: item.el } : null;
+      }
+      if (!['video', 'image'].includes(item.type) || !item.name) return null;
+      return { uri: item.name, type: item.type, el: item.el };
+    }
+
+    function beginActivity(item) {
+      const target = activityTarget(item);
+      if (!target) return null;
+      if (target.type === 'video' && target.el) target.el._completedInView = false;
+      activeActivity = { target, startedAt: performance.now() };
+      return {
+        session_id: activitySessionId,
+        uri: target.uri,
+        media_type: target.type,
+        surface: 'flow',
+        event: 'impression',
+      };
+    }
+
+    function finishActivity() {
+      if (!activeActivity) return null;
+      const { target, startedAt } = activeActivity;
+      activeActivity = null;
+      const visibleMs = Math.max(0, Math.round(performance.now() - startedAt));
+      let ratio = null;
+      if (target.type === 'video' && Number.isFinite(target.el?.duration) && target.el.duration > 0) {
+        ratio = Math.max(0, Math.min(Number(target.el.currentTime || 0) / target.el.duration, 1));
+      }
+      const completed = target.type === 'video'
+        ? (target.el?._completedInView || (ratio !== null && ratio >= 0.85))
+        : visibleMs >= 5000;
+      const skipped = target.type === 'video'
+        ? visibleMs < 2200 && (ratio === null || ratio < 0.12)
+        : visibleMs < 1600;
+      return {
+        session_id: activitySessionId,
+        uri: target.uri,
+        media_type: target.type,
+        surface: 'flow',
+        event: completed ? 'complete' : (skipped ? 'skip' : 'consumed'),
+        ratio,
+        visible_ms: visibleMs,
+      };
+    }
 
     let currentSpeedIndex = 1;
     let isImmersive = false;
@@ -412,7 +484,9 @@
       const entries = Array.isArray(item.items) ? item.items : [];
       const nextIndex = (Number(item.activeChildIndex) || 0) + 1;
       if (nextIndex >= entries.length) return false;
+      const previousActivity = finishActivity();
       item.activeChildIndex = item.renderChild(nextIndex);
+      postActivity([previousActivity, beginActivity(item)]);
       return true;
     }
 
@@ -421,7 +495,9 @@
       if (!item || item.type !== 'image_group' || typeof item.renderChild !== 'function') return false;
       const nextIndex = (Number(item.activeChildIndex) || 0) - 1;
       if (nextIndex < 0) return false;
+      const previousActivity = finishActivity();
       item.activeChildIndex = item.renderChild(nextIndex);
+      postActivity([previousActivity, beginActivity(item)]);
       return true;
     }
 
@@ -435,6 +511,7 @@
       const isThemeStrip = item.type === 'theme_strip';
       const isImageGroup = item.type === 'image_group';
       const displayEntry = currentDisplayEntry();
+      recommendationReason.textContent = String(item.recommendation_reason || '');
       infoBtn.hidden = isThemeStrip;
       favoriteBtn.hidden = isThemeStrip;
       collectionBtn.hidden = isThemeStrip;
@@ -700,11 +777,13 @@
       if (!feedItems.length) return;
       const safeIndex = Math.max(0, Math.min(nextIndex, feedItems.length - 1));
       const prevItem = currentItem();
+      const previousActivity = finishActivity();
       clearPreviousState(prevItem);
 
       setCurrentIndex(safeIndex);
       const item = currentItem();
       if (!item) return;
+      postActivity([previousActivity, beginActivity(item)]);
       flowState.onMediaChanged();
 
       item.el.style.display = item.type === 'theme_strip' ? '' : 'block';
@@ -852,7 +931,23 @@
         video.poster = item.thumb_url || '';
         video.dataset.src = item.media_url;
         video.dataset.name = item.name;
-        video.addEventListener('timeupdate', () => updateVideoProgress(video));
+        video._lastActivityTime = 0;
+        video.addEventListener('timeupdate', () => {
+          updateVideoProgress(video);
+          const duration = Number(video.duration || 0);
+          const current = Number(video.currentTime || 0);
+          if (duration > 0 && video._lastActivityTime > duration * 0.85 && current < 1.5) {
+            video._completedInView = true;
+            postActivity([{
+              session_id: activitySessionId,
+              uri: item.name,
+              media_type: 'video',
+              surface: 'flow',
+              event: 'replay',
+            }]);
+          }
+          video._lastActivityTime = current;
+        });
         const updateDuration = () => {
           if (currentItem()?.el !== video) return;
           const duration = video.duration;
@@ -892,7 +987,8 @@
           const page = Number(cursor?.page || 1);
           const query = new URLSearchParams({
             page: String(page),
-            size: '24',
+            size: '96',
+            snapshot: '1',
           });
           if (seed) query.set('seed', seed);
 
@@ -916,6 +1012,7 @@
               subtitle: item.subtitle || '',
               target_url: item.target_url || '',
               target_label: item.target_label || '',
+              recommendation_reason: item.recommendation_reason || '',
               items: Array.isArray(item.items) ? item.items : [],
               renderChild: typeof mediaEl._renderImageGroup === 'function' ? (index) => {
                 mediaEl._renderImageGroup(index);
@@ -1033,10 +1130,30 @@
       const name = favoriteBtn.dataset.value || '';
       if (!name) return;
       try {
-        await mediaActions.toggleFavorite(name);
+        const isFavorite = await mediaActions.toggleFavorite(name);
+        const item = currentItem();
+        postActivity([{
+          session_id: activitySessionId,
+          uri: name,
+          media_type: item?.type === 'video' ? 'video' : 'image',
+          surface: 'flow',
+          event: isFavorite ? 'favorite' : 'unfavorite',
+        }]);
       } catch (error) {
         updateFavoriteState(name);
       }
+    });
+
+    infoBtn.addEventListener('click', () => {
+      const target = activityTarget(currentItem());
+      if (!target) return;
+      postActivity([{
+        session_id: activitySessionId,
+        uri: target.uri,
+        media_type: target.type,
+        surface: 'flow',
+        event: 'open_detail',
+      }]);
     });
 
     collectionBtn.addEventListener('click', async (event) => {
@@ -1179,6 +1296,10 @@
 
     window.addEventListener('resize', () => {
       if (isMagnifying) updateMagnifierContent();
+    });
+
+    window.addEventListener('pagehide', () => {
+      postActivity([finishActivity()], true);
     });
 
     applyZoom(2.5);

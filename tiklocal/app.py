@@ -39,7 +39,8 @@ from tiklocal.services.embedding import (
     validate_embedding_config,
 )
 from tiklocal.services.similarity import SQLiteSimilarityGroupStore
-from tiklocal.services.database import AppDatabase
+from tiklocal.services.database import AppDatabase, MediaActivityStore
+from tiklocal.services.library_index import LibraryIndexer, MediaIndexStore
 from tiklocal.services.downloader import (
     DEFAULT_DOWNLOAD_CONFIG,
     DownloadConfigStore,
@@ -125,9 +126,6 @@ def create_app(test_config=None):
     media_root_str = str(default_media_root)
     app.config['MEDIA_ROOT'] = default_media_root
     favorite_service = FavoriteService(media_root_str, db_path=get_favorites_path(), library_service=library_service)
-    recommend_service = RecommendService(library_service, favorite_service)
-    radio_profile_store = RadioProfileStore(get_radio_profile_path())
-    radio_service = RadioService(library_service, favorite_service, radio_profile_store)
     thumbnail_service = ThumbnailService(Path(media_root_str), library_service=library_service)
     metadata_store = ImageMetadataStore(get_metadata_path())
     prompt_config_store = PromptConfigStore(get_prompt_config_path())
@@ -135,6 +133,24 @@ def create_app(test_config=None):
     embedding_config_store = EmbeddingConfigStore(get_embedding_config_path())
     app_database = app.config.get('APP_DATABASE') or AppDatabase(get_database_path())
     app_database.migrate()
+    media_index = MediaIndexStore(app_database)
+    library_indexer = LibraryIndexer(library_service, media_index)
+    if media_index.stats()['total'] == 0:
+        library_indexer.sync()
+    activity_store = MediaActivityStore(app_database)
+    recommend_service = RecommendService(
+        library_service,
+        favorite_service,
+        activity_store,
+        media_index=media_index,
+    )
+    radio_profile_store = RadioProfileStore(get_radio_profile_path())
+    radio_service = RadioService(
+        library_service,
+        favorite_service,
+        radio_profile_store,
+        activity_store=activity_store,
+    )
     vector_index = app.config.get('VECTOR_INDEX') or SQLiteImageVectorStore(app_database)
     image_vector_service = ImageVectorService(library_service, vector_index)
     similarity_group_store = app.config.get('SIMILARITY_GROUP_STORE') or SQLiteSimilarityGroupStore(app_database)
@@ -150,6 +166,7 @@ def create_app(test_config=None):
         download_history_store,
         source_store=download_source_store,
         output_source_id=download_source.id,
+        on_outputs=library_indexer.register_uris,
     )
 
     def build_prompt_config_payload(custom_config=None):
@@ -343,13 +360,12 @@ def create_app(test_config=None):
     def _collect_source_media_groups(records: list[dict]) -> list[dict]:
         return view_builders.collect_source_media_groups(records, download_source_store)
 
-    def _collect_library_records(*, favorites_only: bool = False) -> list[dict]:
-        return view_builders.collect_library_records(
-            library_service,
-            favorite_service,
-            IMAGE_EXTENSIONS,
-            favorites_only=favorites_only,
-        )
+    def _collect_library_records(*, favorites_only: bool = False, search: str = '') -> list[dict]:
+        favorites = favorite_service.load()
+        records = media_index.records(search=search)
+        for record in records:
+            record['is_favorite'] = library_service.is_uri_in_set(record['name'], favorites)
+        return [record for record in records if record['is_favorite']] if favorites_only else records
 
     def _build_theme_strip_candidates(records: list[dict]) -> list[dict]:
         return view_builders.build_theme_strip_candidates(records, download_history_store)
@@ -404,13 +420,14 @@ def create_app(test_config=None):
         }
 
     def _collect_collection_records(collection_id: str) -> tuple[dict | None, list[dict]]:
-        return view_builders.collect_collection_records(
-            collection_id,
-            collection_store,
-            favorite_service,
-            library_service,
-            IMAGE_EXTENSIONS,
-        )
+        collection = collection_store.get(collection_id)
+        if not collection:
+            return None, []
+        favorites = favorite_service.load()
+        records = media_index.records_for_uris(collection_store.list_item_uris(collection_id, newest_first=True))
+        for record in records:
+            record['is_favorite'] = library_service.is_uri_in_set(record['name'], favorites)
+        return collection, records
 
     def _serialize_collection_summary(collection: dict) -> dict:
         return view_builders.serialize_collection_summary(
@@ -429,7 +446,24 @@ def create_app(test_config=None):
         min_mb: int = 50,
         seed: str = '',
         collection_id: str = '',
+        search: str = '',
     ) -> dict:
+        if not favorites_only and not collection_id and mode != 'image_random':
+            indexed_page = media_index.page(
+                search=search,
+                media_type='video' if mode in {'video_latest', 'big_files'} else '',
+                min_size=min_mb * 1024 * 1024 if mode == 'big_files' else 0,
+                offset=offset,
+                limit=limit,
+            )
+            favorites = favorite_service.load()
+            for record in indexed_page['records']:
+                record['is_favorite'] = library_service.is_uri_in_set(record['name'], favorites)
+            return {
+                'items': [_serialize_library_item(record) for record in indexed_page.pop('records')],
+                **indexed_page,
+                'seed': seed,
+            }
         return view_builders.build_library_page(
             favorites_only=favorites_only,
             mode=mode,
@@ -438,6 +472,7 @@ def create_app(test_config=None):
             min_mb=min_mb,
             seed=seed,
             collection_id=collection_id,
+            search=search,
             collect_collection_records_fn=_collect_collection_records,
             collect_library_records_fn=_collect_library_records,
             serialize_library_item_fn=_serialize_library_item,
@@ -474,8 +509,9 @@ def create_app(test_config=None):
         from tiklocal.paths import get_thumbnails_dir
 
         # 获取各类统计
-        video_count = len(library_service.scan_videos())
-        image_count = len(library_service.scan_images())
+        index_stats = media_index.stats()
+        video_count = index_stats['videos']
+        image_count = index_stats['images']
         favorite_count = len(favorite_service.load())
 
         # 缩略图缓存信息
@@ -502,6 +538,9 @@ def create_app(test_config=None):
         min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
         limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
         seed = str(request.args.get('seed', '')).strip()
+        search = str(request.args.get('q', '')).strip()[:200]
+        if search:
+            mode = 'all'
         if mode == 'image_random' and not seed:
             seed = str(random.randint(1, 999999))
 
@@ -515,6 +554,7 @@ def create_app(test_config=None):
                 limit=limit,
                 min_mb=min_mb,
                 seed=seed,
+                search=search,
             )
         return render_template(
             'library.html',
@@ -605,9 +645,12 @@ def create_app(test_config=None):
                 try:
                     target.unlink()
                     download_manager.delete_source_for_file(name)
+                    media_index.delete(name)
                     # Thumbnails are handled by OS or periodic cleanup, but ideally Service should handle it
                 except Exception as e:
                     return f"Error deleting file: {e}", 500
+            else:
+                media_index.delete(name)
             return redirect('/library')
 
         return render_template('delete_confirm.html', file=name)
@@ -829,12 +872,23 @@ def create_app(test_config=None):
         entry = radio_service.record_feedback(uri, event, ratio=ratio)
         return {'success': True, 'data': {'profile': entry}}
 
+    @app.route('/api/activity', methods=['POST', 'DELETE'])
+    def api_activity():
+        if request.method == 'DELETE':
+            activity_store.clear()
+            return {'success': True}
+
+        payload = request.get_json(silent=True) or {}
+        events = payload.get('events') if isinstance(payload.get('events'), list) else [payload]
+        accepted = activity_store.record_many(events)
+        return {'success': True, 'data': {'accepted': accepted}}
+
     @app.route('/api/feed/mix')
     def api_feed_mix():
         page = _read_int_arg('page', 1, minimum=1)
-        size = _read_int_arg('size', 24, minimum=8, maximum=60)
+        size = _read_int_arg('size', 24, minimum=8, maximum=200)
         seed = request.args.get('seed') or str(random.randint(1, 999999))
-        return view_builders.build_mix_feed_page(
+        result = view_builders.build_mix_feed_page(
             page=page,
             size=size,
             seed=seed,
@@ -844,6 +898,9 @@ def create_app(test_config=None):
             collect_source_media_groups_fn=_collect_source_media_groups,
             build_feed_media_item_fn=_build_feed_media_item,
         )
+        if request.args.get('snapshot') == '1':
+            result['has_more'] = False
+        return result
 
     @app.route('/api/download/probe', methods=['GET', 'POST'])
     def api_download_probe():
@@ -1358,8 +1415,7 @@ def create_app(test_config=None):
         """获取媒体库统计信息"""
         from tiklocal.paths import get_thumbnails_dir
 
-        videos = library_service.scan_videos()
-        images = library_service.scan_images()
+        index_stats = media_index.stats()
         favorites = favorite_service.load()
 
         # 计算缩略图缓存信息
@@ -1368,12 +1424,20 @@ def create_app(test_config=None):
         thumb_size = sum(f.stat().st_size for f in thumb_files if f.exists())
 
         return {
-            'videos': len(videos),
-            'images': len(images),
+            'videos': index_stats['videos'],
+            'images': index_stats['images'],
+            'audios': index_stats['audios'],
+            'indexed_total': index_stats['total'],
+            'last_synced_at': index_stats['last_synced_at'],
             'favorites': len(favorites),
             'cache_count': len(thumb_files),
             'cache_mb': round(thumb_size / (1024 * 1024), 2)
         }
+
+    @app.route('/api/library/sync', methods=['POST'])
+    def api_library_sync():
+        result = library_indexer.sync()
+        return {'success': True, 'data': result}
 
     @app.route('/api/library/items')
     def api_library_items():
@@ -1392,6 +1456,9 @@ def create_app(test_config=None):
         limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
         min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
         seed = str(request.args.get('seed', '')).strip()
+        search = str(request.args.get('q', '')).strip()[:200] if scope == 'all' else ''
+        if search:
+            mode = 'all'
         if mode == 'image_random' and not seed:
             seed = str(random.randint(1, 999999))
 
@@ -1403,6 +1470,7 @@ def create_app(test_config=None):
             min_mb=min_mb,
             seed=seed,
             collection_id=collection_id,
+            search=search,
         )
         return {
             'success': True,

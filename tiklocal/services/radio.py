@@ -123,10 +123,12 @@ class RadioService:
         library_service: LibraryService,
         favorite_service: FavoriteService,
         profile_store: RadioProfileStore | None = None,
+        activity_store=None,
     ):
         self.library = library_service
         self.favorites = favorite_service
         self.profile_store = profile_store
+        self.activity_store = activity_store
         self._metadata_cache: dict[str, tuple[float, AudioMetadata]] = {}
 
     def list_stations(self) -> list[dict]:
@@ -136,9 +138,18 @@ class RadioService:
         ]
 
     def record_feedback(self, uri: str, event: str, *, ratio: float | None = None) -> dict[str, Any]:
+        canonical = self.library.canonicalize_uri(uri)
+        if self.activity_store:
+            unified_event = "impression" if event == "play" else event
+            self.activity_store.record_many([{
+                "uri": canonical,
+                "media_type": "audio",
+                "surface": "radio",
+                "event": unified_event,
+                "ratio": ratio,
+            }])
         if not self.profile_store:
             return {}
-        canonical = self.library.canonicalize_uri(uri)
         return self.profile_store.record(canonical, event, ratio=ratio)
 
     def tune(

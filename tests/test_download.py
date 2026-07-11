@@ -21,6 +21,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("TIKLOCAL_COOKIE_DIR", str(cookie_root))
 
     def fake_execute_download(self, job_id):  # noqa: ARG001
+        (self.media_root / "mock-output.mp4").write_bytes(b"video")
         return 0, "", "mock-output.mp4"
 
     monkeypatch.setattr("tiklocal.services.downloader.DownloadManager._execute_download", fake_execute_download)
@@ -96,6 +97,10 @@ def test_create_download_job_success(client):
     assert final_job["file_count"] == 1
     assert final_job["engine"] == "yt-dlp"
     assert final_job["cookie_match_mode"] == "none"
+    indexed = client.get("/api/library/items?scope=all&q=mock-output&offset=0&limit=20")
+    assert [item["name"] for item in indexed.get_json()["data"]["items"]] == [
+        "@default/mock-output.mp4"
+    ]
 
 
 def test_create_download_job_with_gallery_engine(client):

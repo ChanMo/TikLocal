@@ -631,6 +631,17 @@ body.immersive-mode #quick-theme-toggle {
   gap: 8px;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
+.recommendation-reason {
+  position: fixed;
+  left: 20px;
+  bottom: 72px;
+  z-index: 214;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+.recommendation-reason:empty { display: none; }
 .caption-title {
   font-size: 14px;
   line-height: 1.4;
@@ -961,6 +972,7 @@ em.coll-count {
     <div class="caption-title hidden" id="caption-title"></div>
     <div class="caption-tags" id="caption-tags"></div>
   </div>
+  <div class="recommendation-reason" id="recommendation-reason"></div>
 
   <div class="magnifier" id="magnifier">
     <div class="mag-badge" id="mag-badge">2.5x</div>
