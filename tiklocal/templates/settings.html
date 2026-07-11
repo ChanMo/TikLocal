@@ -39,6 +39,15 @@
                   <p class="text-sm text-gray-500 dark:text-gray-400">Rescan media files.</p>
                 </div>
               </button>
+              <button onclick="clearActivity()" class="group flex items-center gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 text-left">
+                <div class="flex-shrink-0 w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                  <i data-feather="rotate-ccw" class="w-6 h-6 text-purple-600 dark:text-purple-400"></i>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-gray-800 dark:text-gray-200">Reset Recommendations</h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Clear local viewing history and preferences.</p>
+                </div>
+              </button>
             </div>
           </section>
 
@@ -163,6 +172,7 @@
               </h2>
             </header>
             <div class="p-6 space-y-4">
+              <p id="index-sync-state" class="px-4 text-xs text-gray-400">读取索引状态...</p>
               <div class="flex items-center justify-between p-4 rounded-lg">
                 <div class="flex items-center gap-4">
                   <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
@@ -284,6 +294,11 @@ async function loadStats() {
     document.getElementById('favorites-count').textContent = data.favorites;
     document.getElementById('cache-count').textContent = data.cache_count;
     document.getElementById('cache-size').textContent = `${data.cache_mb} MB`;
+    const syncState = document.getElementById('index-sync-state');
+    if (syncState) {
+      const syncedAt = data.last_synced_at ? new Date(data.last_synced_at).toLocaleString() : '尚未同步';
+      syncState.textContent = `已索引 ${data.indexed_total || 0} 个媒体 · ${syncedAt}`;
+    }
   } catch (err) {
     console.error('Failed to load stats:', err);
   }
@@ -311,14 +326,25 @@ async function refreshLibrary() {
   showModal('确定要刷新媒体库吗？', '这将重新扫描所有媒体文件，可能需要一些时间。', async () => {
     try {
       showNotification('正在刷新媒体库...', 'info');
-      const res = await fetch('/api/library/stats');
+      const res = await fetch('/api/library/sync', { method: 'POST' });
       const data = await res.json();
-
-      // 更新所有统计数据
+      if (!data.success) throw new Error(data.error || 'sync failed');
       loadStats();
-      showNotification('媒体库刷新成功！', 'success');
+      showNotification(`媒体库已刷新，共索引 ${data.data.indexed} 个文件`, 'success');
     } catch (err) {
       showNotification('刷新失败，请重试', 'error');
+    }
+  });
+}
+
+async function clearActivity() {
+  showModal('重置推荐记录？', '这会清除本地保存的浏览、跳过和完成记录。收藏与集合不会受到影响。', async () => {
+    try {
+      const res = await fetch('/api/activity', { method: 'DELETE' });
+      const data = await res.json();
+      showNotification(data.success ? '推荐记录已清除' : '清除失败', data.success ? 'success' : 'error');
+    } catch (err) {
+      showNotification('清除失败，请重试', 'error');
     }
   });
 }

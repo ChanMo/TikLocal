@@ -13,10 +13,12 @@
   const minMb = Number(boot.minMb || 0);
   const emptyMessage = String(boot.emptyMessage || '');
   const focusName = new URLSearchParams(window.location.search).get('focus') || '';
+  let searchQuery = new URLSearchParams(window.location.search).get('q') || '';
 
   const grid = document.getElementById('library-grid');
   const loadingEl = document.getElementById('library-loading');
   const sentinel = document.getElementById('library-sentinel');
+  const searchInput = document.getElementById('library-search-input');
 
   const quickView = document.getElementById('quick-view');
   const quickOverlay = document.getElementById('quick-overlay');
@@ -164,6 +166,7 @@
     return {
       mode: allowed.has(nextMode) ? nextMode : 'all',
       seed: params.get('seed') || '',
+      search: params.get('q') || '',
     };
   }
 
@@ -181,6 +184,8 @@
     }
     if (mode === 'big_files' && minMb) params.set('min_mb', String(minMb));
     else params.delete('min_mb');
+    if (searchQuery) params.set('q', searchQuery);
+    else params.delete('q');
     const query = params.toString();
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
     const method = replace ? 'replaceState' : 'pushState';
@@ -439,6 +444,7 @@
       if (!seed) seed = makeRandomSeed();
       params.set('seed', seed);
     }
+    if (searchQuery) params.set('q', searchQuery);
     return params;
   }
 
@@ -546,6 +552,8 @@
 
   async function reloadMode(nextMode) {
     mode = nextMode;
+    searchQuery = '';
+    if (searchInput) searchInput.value = '';
     if (mode === 'image_random') seed = makeRandomSeed();
     else seed = '';
     syncLibraryUrl(false);
@@ -557,6 +565,8 @@
     const state = readLibraryStateFromUrl();
     mode = state.mode;
     seed = state.seed;
+    searchQuery = state.search;
+    if (searchInput) searchInput.value = searchQuery;
     if (mode === 'image_random' && !seed) seed = makeRandomSeed();
     syncLibraryUrl(true);
     await reloadCurrentMode();
@@ -1460,6 +1470,19 @@
     syncLibraryUrl(true);
     window.addEventListener('popstate', () => {
       reloadModeFromUrl();
+    });
+    let searchTimer = null;
+    searchInput?.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(async () => {
+        searchQuery = String(searchInput.value || '').trim();
+        if (searchQuery && mode !== 'all') {
+          mode = 'all';
+          seed = '';
+        }
+        syncLibraryUrl(true);
+        await reloadCurrentMode();
+      }, 300);
     });
   }
 

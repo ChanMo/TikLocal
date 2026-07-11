@@ -39,6 +39,7 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert "data-mode=\"image_random\"" in body
     assert "data-mode=\"video_latest\"" in body
     assert "data-mode=\"big_files\"" in body
+    assert "id=\"library-search-input\"" in body
     assert "Masonry" not in body
     assert "id=\"quick-source\"" in body
     assert "id=\"quick-close-top\"" in body
@@ -74,7 +75,7 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert "image-focus-mode" not in body
 
 
-def test_api_library_items_supports_modes_and_seed(client):
+def test_api_library_items_supports_modes_search_and_sync(client, tmp_path):
     all_res = client.get("/api/library/items?scope=all&mode=all&offset=0&limit=20")
     assert all_res.status_code == 200
     all_data = all_res.get_json()
@@ -100,6 +101,19 @@ def test_api_library_items_supports_modes_and_seed(client):
     assert len(big_items) >= 1
     assert all(item["type"] == "video" for item in big_items)
     assert any(item["name"] == "@default/big.mp4" for item in big_items)
+
+    new_image = tmp_path / "media" / "search-target.jpg"
+    new_image.write_bytes(b"image")
+    before_sync = client.get("/api/library/items?scope=all&q=search-target&offset=0&limit=20")
+    assert before_sync.get_json()["data"]["items"] == []
+
+    sync_res = client.post("/api/library/sync")
+    assert sync_res.status_code == 200
+    assert sync_res.get_json()["data"]["indexed"] == 14
+    search_res = client.get("/api/library/items?scope=all&q=search-target&offset=0&limit=20")
+    assert [item["name"] for item in search_res.get_json()["data"]["items"]] == [
+        "@default/search-target.jpg"
+    ]
 
 
 def test_api_library_items_no_duplicates_across_offsets(client):

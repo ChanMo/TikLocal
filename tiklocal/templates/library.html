@@ -40,6 +40,25 @@
     color: #0f172a;
     border-color: rgba(248, 250, 252, 0.95);
   }
+  .library-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.82);
+  }
+  [data-theme="dark"] .library-search { background: rgba(30, 41, 59, 0.72); }
+  .library-search input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 14px;
+  }
   .collection-nav {
     display: flex;
     align-items: center;
@@ -827,6 +846,10 @@
 <main class="container mx-auto px-2 pt-2 pb-1 md:px-3">
   {% if scope == 'all' %}
   <section class="mb-2">
+    <label class="library-search" for="library-search-input">
+      <i data-feather="search" class="w-4 h-4 text-gray-400"></i>
+      <input id="library-search-input" type="search" maxlength="200" autocomplete="off" placeholder="搜索文件名或路径" value="{{ request.args.get('q', '') }}">
+    </label>
     <div class="mode-tabs" id="mode-tabs">
       <button type="button" class="mode-tab" data-mode="all">全部</button>
       <button type="button" class="mode-tab" data-mode="image_random">图片随机</button>
