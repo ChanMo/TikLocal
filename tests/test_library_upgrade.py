@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 
 from tiklocal.app import create_app
+from tiklocal.services import LibraryService
 from tiklocal.services.database import AppDatabase
 from tiklocal.services.library_index import MediaIndexStore
 
@@ -44,6 +45,11 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert "data-mode=\"video_latest\"" in body
     assert "data-mode=\"big_files\"" in body
     assert "id=\"library-search-input\"" in body
+    assert 'id="library-toolbar"' in body
+    assert 'id="library-search-toggle"' in body
+    assert 'id="library-search-clear"' in body
+    assert 'role="search"' in body
+    assert 'aria-label="媒体库浏览模式"' in body
     assert "Masonry" not in body
     assert "id=\"quick-source\"" in body
     assert "id=\"quick-close-top\"" in body
@@ -61,6 +67,13 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert "flow_actions_shared.js" in body
     assert "flow_media_actions_controller.js" in body
     assert "pageSize: 24" in body
+    assert 'id="library-status-text"' in body
+    assert 'id="library-retry"' in body
+    assert 'id="library-clear-search"' in body
+
+    controller = client.get("/static/library_page_controller.js").data.decode("utf-8")
+    assert "syncSearchUI" in controller
+    assert "aria-pressed" in controller
 
 
 def test_home_feed_uses_unified_immersive_model(client):
@@ -80,6 +93,9 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert 'id="more-menu-trigger"' in body
     assert 'id="more-menu"' in body
     assert 'id="more-theme-toggle"' in body
+    assert 'id="flow-state"' in body
+    assert 'id="flow-state-retry"' in body
+    assert 'id="flow-state-next"' in body
     assert 'href="/favorite"' in body
     assert 'href="/collections"' in body
     assert 'href="/download"' in body
@@ -288,6 +304,28 @@ def test_library_images_use_bounded_cached_thumbnails(tmp_path, monkeypatch):
     assert second.data == first.data
     with Image.open(BytesIO(first.data)) as thumbnail:
         assert max(thumbnail.size) == 640
+
+    thumb_path = next((data_root / "thumbnails").glob("*.jpg"))
+    Image.new("RGB", (900, 1400), (180, 80, 60)).save(image_path)
+    newer = thumb_path.stat().st_mtime + 2
+    os.utime(image_path, (newer, newer))
+    refreshed = local_client.get(item["thumb_url"])
+    assert refreshed.data != first.data
+    with Image.open(BytesIO(refreshed.data)) as thumbnail:
+        assert thumbnail.size == (411, 640)
+
+    delete_res = local_client.post("/delete/%40default/large%20image.png")
+    assert delete_res.status_code in {301, 302, 308}
+    assert not thumb_path.exists()
+
+
+def test_video_detail_navigation_uses_media_index(client, monkeypatch):
+    def fail_scan(*args, **kwargs):
+        raise AssertionError("video detail should not scan the filesystem")
+
+    monkeypatch.setattr(LibraryService, "scan_videos", fail_scan)
+    res = client.get("/detail/%40default/v03.mp4")
+    assert res.status_code == 200
 
 
 def test_removed_legacy_routes_and_apis_return_404(client):

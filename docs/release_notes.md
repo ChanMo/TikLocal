@@ -1,5 +1,19 @@
 # Release Notes
 
+## Unreleased
+
+- 新增 SQLite 媒体查询索引：支持文件名/路径搜索、分页查询和多媒体源统一 URI，并接入下载入库与删除链路。
+- 应用启动时自动扫描并校正媒体索引；部分媒体源不可访问时保留其既有索引，避免外接磁盘临时离线造成误删。
+- Home Flow 增加本地行为反馈、轻量偏好排序、探索与多样性控制，并把首批加载从 96 条收敛为 24 条分页。
+- Library 首批加载从 48 条收敛为 24 条，图片列表使用最长边 640px 的按需缩略图，原始媒体仅在查看器与详情页加载。
+- 缩略图增加源文件 mtime 失效判断；同名媒体替换后自动重建，删除媒体时同步清理缓存。
+- 视频详情页的上一条/下一条导航改用媒体索引，不再重复扫描文件系统。
+- 底部导航收敛为推荐、电台、媒体库与更多，增加页面感知材质、专用激活图标、主题切换和键盘交互。
+- Flow 增加延迟加载提示、空媒体库、请求失败重试与媒体失败恢复；Library 增加显式分页重试和搜索无结果清除入口。
+- 精修 Library 顶部浏览区：搜索降级为按需展开的小入口，模式切换采用轻量悬停材质，并补充输入框内清除入口与无障碍状态。
+- Flow 移除常驻的推荐原因文案，让媒体内容保持视觉优先。
+- 新增推荐记录重置、媒体索引状态与手动刷新入口。
+
 ## v0.8.26 (2026-07-04)
 - Radio 启动性能优化：`/api/radio/tune` 改为轻量选曲，不再首次进入时逐首读取音频元数据，适配数百首音频库。
 - 新增 `/api/radio/metadata` 单曲元数据接口，前端播放当前曲目后再懒加载 title、artist、album 与 duration，并同步系统播放面板。
@@ -31,9 +45,6 @@
 - Release v0.8.13: fix 'function' object is not subscriptable on Python 3.12
 - fix: add __future__ annotations to resolve 'function' object is not subscriptable
 
-
-## Unreleased
-- 暂无。
 
 ## v0.8.12 (2026-02-23)
 - 架构收敛：新增 `flow_session.js`、`flow_actions_shared.js`、`flow_media_actions_controller.js`，统一 Home / Library / Favorites 的会话状态与媒体动作编排。

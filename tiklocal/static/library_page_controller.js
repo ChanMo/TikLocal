@@ -16,9 +16,15 @@
   let searchQuery = new URLSearchParams(window.location.search).get('q') || '';
 
   const grid = document.getElementById('library-grid');
-  const loadingEl = document.getElementById('library-loading');
+  const statusText = document.getElementById('library-status-text');
+  const statusActions = document.getElementById('library-status-actions');
+  const retryButton = document.getElementById('library-retry');
+  const clearSearchButton = document.getElementById('library-clear-search');
   const sentinel = document.getElementById('library-sentinel');
   const searchInput = document.getElementById('library-search-input');
+  const searchClearButton = document.getElementById('library-search-clear');
+  const searchToggleButton = document.getElementById('library-search-toggle');
+  const libraryToolbar = document.getElementById('library-toolbar');
 
   const quickView = document.getElementById('quick-view');
   const quickOverlay = document.getElementById('quick-overlay');
@@ -151,8 +157,23 @@
 
   function activeTab() {
     document.querySelectorAll('.mode-tab').forEach((tab) => {
-      tab.classList.toggle('is-active', tab.dataset.mode === mode);
+      const isActive = tab.dataset.mode === mode;
+      tab.classList.toggle('is-active', isActive);
+      tab.setAttribute('aria-pressed', String(isActive));
     });
+  }
+
+  function syncSearchUI() {
+    const hasQuery = !!String(searchInput?.value || '').trim();
+    libraryToolbar?.classList.toggle('is-searching', hasQuery);
+    if (searchClearButton) searchClearButton.hidden = !hasQuery;
+  }
+
+  function setSearchOpen(open, { focus = false } = {}) {
+    const isOpen = !!open;
+    libraryToolbar?.classList.toggle('is-search-open', isOpen);
+    searchToggleButton?.setAttribute('aria-expanded', String(isOpen));
+    if (isOpen && focus) requestAnimationFrame(() => searchInput?.focus());
   }
 
   function isSimilarMode() {
@@ -414,8 +435,11 @@
     }, 180);
   }
 
-  function setLoadingText(text) {
-    loadingEl.textContent = text;
+  function setLoadingText(text, actions = {}) {
+    statusText.textContent = text;
+    retryButton.hidden = actions.retry !== true;
+    clearSearchButton.hidden = actions.clearSearch !== true;
+    statusActions.hidden = actions.retry !== true && actions.clearSearch !== true;
   }
 
   function findItemIndexByName(name) {
@@ -494,14 +518,18 @@
       });
 
       if (!items.length) {
-        setLoadingText(emptyMessage);
+        if (searchQuery) {
+          setLoadingText(`没有找到“${searchQuery}”`, { clearSearch: true });
+        } else {
+          setLoadingText(emptyMessage);
+        }
       } else if (!flowSession.hasMore()) {
         setLoadingText('到底了');
       } else {
         setLoadingText('继续下滑加载更多');
       }
     } catch (error) {
-      setLoadingText('加载失败，下滑重试');
+      setLoadingText('加载失败', { retry: true });
     }
   }
 
@@ -554,6 +582,8 @@
     mode = nextMode;
     searchQuery = '';
     if (searchInput) searchInput.value = '';
+    syncSearchUI();
+    setSearchOpen(false);
     if (mode === 'image_random') seed = makeRandomSeed();
     else seed = '';
     syncLibraryUrl(false);
@@ -567,6 +597,8 @@
     seed = state.seed;
     searchQuery = state.search;
     if (searchInput) searchInput.value = searchQuery;
+    syncSearchUI();
+    setSearchOpen(!!searchQuery);
     if (mode === 'image_random' && !seed) seed = makeRandomSeed();
     syncLibraryUrl(true);
     await reloadCurrentMode();
@@ -1474,6 +1506,7 @@
     let searchTimer = null;
     searchInput?.addEventListener('input', () => {
       clearTimeout(searchTimer);
+      syncSearchUI();
       searchTimer = setTimeout(async () => {
         searchQuery = String(searchInput.value || '').trim();
         if (searchQuery && mode !== 'all') {
@@ -1484,18 +1517,56 @@
         await reloadCurrentMode();
       }, 300);
     });
+    searchClearButton?.addEventListener('click', async () => {
+      clearTimeout(searchTimer);
+      searchQuery = '';
+      searchInput.value = '';
+      syncSearchUI();
+      syncLibraryUrl(true);
+      await reloadCurrentMode();
+      searchInput.focus();
+    });
+    searchToggleButton?.addEventListener('click', () => {
+      const isOpen = libraryToolbar?.classList.contains('is-search-open');
+      setSearchOpen(!isOpen, { focus: !isOpen });
+    });
+    searchInput?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || String(searchInput.value || '').trim()) return;
+      event.preventDefault();
+      setSearchOpen(false);
+      searchToggleButton?.focus();
+    });
   }
+
+  retryButton.addEventListener('click', async () => {
+    setLoadingText('正在重新加载...');
+    await loadNextPage();
+  });
+
+  clearSearchButton.addEventListener('click', async () => {
+    searchQuery = '';
+    if (searchInput) searchInput.value = '';
+    syncSearchUI();
+    syncLibraryUrl(true);
+    await reloadCurrentMode();
+    searchInput?.focus();
+  });
 
   quickSpeed.textContent = `${speedOptions[currentSpeedIndex]}x`;
   applyZoom(2.5);
   relayoutWaterfall();
   if (!items.length && !flowSession.hasMore()) {
-    setLoadingText(emptyMessage);
+    if (searchQuery) {
+      setLoadingText(`没有找到“${searchQuery}”`, { clearSearch: true });
+    } else {
+      setLoadingText(emptyMessage);
+    }
   } else if (!flowSession.hasMore()) {
     setLoadingText('到底了');
   } else {
     setLoadingText('继续下滑加载更多');
   }
   feather.replace();
+  syncSearchUI();
   maybeOpenFocusedItem();
 })();
