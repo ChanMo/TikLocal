@@ -43,6 +43,34 @@ def _wait_for_job(client, job_id, timeout=2.0):
     return job
 
 
+def test_download_page_uses_lightweight_inbox_layout(client):
+    res = client.get("/download")
+    body = res.get_data(as_text=True)
+
+    assert res.status_code == 200
+    assert 'id="download-form"' in body
+    assert '<input id="download-url"' in body
+    assert '<textarea id="download-url"' not in body
+    assert 'id="media-switch"' in body
+    assert 'id="active-section"' in body
+    assert 'id="history-list"' in body
+    assert 'id="download-confirm"' in body
+    assert "download_page_controller.js" in body
+    assert "自动凭据" not in body
+    assert "更多选项" not in body
+
+
+def test_settings_page_hosts_download_credentials(client):
+    res = client.get("/settings", follow_redirects=True)
+    body = res.get_data(as_text=True)
+
+    assert res.status_code == 200
+    assert 'id="download"' in body
+    assert 'id="manage-credentials"' in body
+    assert 'id="credential-mask"' in body
+    assert 'id="download-levels"' in body
+
+
 def test_download_config_api(client):
     res = client.get("/api/download/config")
     data = res.get_json()

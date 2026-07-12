@@ -163,6 +163,13 @@
   .library-sync-state { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--settings-muted); font-size: 11px; }
   .library-sync-dot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: #668b7d; box-shadow: 0 0 0 3px rgba(102, 139, 125, 0.11); }
   .library-sync-state.is-error .library-sync-dot { background: #bd6259; box-shadow: 0 0 0 3px rgba(189, 98, 89, 0.11); }
+  .download-levels { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: var(--settings-soft); }
+  .download-level {
+    width: 31px; height: 29px; border: 0; border-radius: 999px; color: var(--settings-muted);
+    background: transparent; font-size: 11px; font-weight: 650; cursor: pointer;
+  }
+  .download-level.is-active { color: var(--settings-ink); background: var(--settings-card); box-shadow: 0 1px 3px rgba(30,29,25,.09); }
+  .download-level:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 2px; }
   .setting-icon {
     width: 31px;
     height: 31px;
@@ -221,6 +228,26 @@
   .confirm-title { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
   .confirm-copy { margin: 7px 0 0; color: var(--settings-muted); font-size: 12px; line-height: 1.55; }
   .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .credential-mask[hidden] { display: none; }
+  .credential-mask { position: fixed; inset: 0; z-index: 275; display: grid; place-items: center; padding: 16px; background: rgba(18,18,16,.44); backdrop-filter: blur(9px); }
+  .credential-dialog { width: min(100%, 430px); max-height: min(620px, calc(100dvh - 32px)); overflow-y: auto; padding: 20px; border: 1px solid var(--settings-line); border-radius: 22px; color: var(--settings-ink); background: var(--settings-bg); box-shadow: 0 26px 80px rgba(20,19,16,.24); }
+  .credential-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .credential-title { margin: 0; font-size: 18px; font-weight: 660; letter-spacing: -.025em; }
+  .credential-copy { margin: 6px 0 0; color: var(--settings-muted); font-size: 11px; line-height: 1.55; }
+  .credential-close { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border: 0; border-radius: 50%; color: var(--settings-muted); background: var(--settings-soft); cursor: pointer; }
+  .credential-close svg { width: 15px; height: 15px; }
+  .credential-list { margin-top: 18px; overflow: hidden; border: 1px solid var(--settings-line); border-radius: 15px; background: var(--settings-card); }
+  .credential-item { display: flex; align-items: center; gap: 11px; min-height: 52px; padding: 10px 12px; }
+  .credential-item + .credential-item { border-top: 1px solid var(--settings-line); }
+  .credential-mark { width: 29px; height: 29px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; color: var(--settings-muted); background: var(--settings-soft); }
+  .credential-mark svg { width: 14px; height: 14px; }
+  .credential-name { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
+  .credential-empty { padding: 24px 14px; color: var(--settings-muted); font-size: 11px; text-align: center; }
+  .credential-upload { margin-top: 14px; padding: 14px; border: 1px dashed color-mix(in oklab, var(--settings-ink) 17%, transparent); border-radius: 15px; background: var(--settings-soft); }
+  .credential-upload-title { font-size: 12px; font-weight: 630; }
+  .credential-upload-copy { margin: 4px 0 10px; color: var(--settings-muted); font-size: 10px; line-height: 1.5; }
+  .credential-file { width: 100%; color: var(--settings-muted); font-size: 10px; }
+  .credential-upload-actions { display: flex; justify-content: flex-end; margin-top: 11px; }
   .toast-wrap { position: fixed; right: 14px; bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 280; width: min(330px, calc(100vw - 28px)); }
   .settings-toast { display: flex; align-items: center; gap: 9px; padding: 11px 13px; border: 1px solid var(--settings-line); border-radius: 13px; color: var(--settings-ink); background: color-mix(in oklab, var(--settings-bg) 92%, transparent); box-shadow: 0 12px 32px rgba(20, 19, 16, 0.14); font-size: 12px; backdrop-filter: blur(16px); animation: toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
   .settings-toast svg { width: 16px; height: 16px; color: #668b7d; }
@@ -302,6 +329,39 @@
       </div>
     </section>
 
+    <section id="download" aria-labelledby="download-title">
+      <h2 id="download-title" class="settings-section-title">下载</h2>
+      <div class="settings-card">
+        <div class="settings-row">
+          <span class="setting-icon"><i data-feather="activity"></i></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">下载组件</div>
+            <div id="download-dependency-copy" class="settings-row-copy">正在检查运行状态…</div>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="setting-icon"><i data-feather="layers"></i></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">同时下载</div>
+            <div class="settings-row-copy">控制并行任务数量，2 个适合大多数设备。</div>
+          </div>
+          <div id="download-levels" class="download-levels" role="group" aria-label="同时下载任务数">
+            <button class="download-level" type="button" data-concurrency="1">1</button>
+            <button class="download-level" type="button" data-concurrency="2">2</button>
+            <button class="download-level" type="button" data-concurrency="4">4</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="setting-icon"><i data-feather="shield"></i></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">网站登录信息</div>
+            <div id="credential-summary" class="settings-row-copy">正在读取…</div>
+          </div>
+          <button id="manage-credentials" class="settings-action" type="button">管理</button>
+        </div>
+      </div>
+    </section>
+
     <section aria-label="关于">
       <footer class="about-footer about-card">
         <div class="about-line">
@@ -314,6 +374,21 @@
     </section>
   </div>
 </main>
+<div id="credential-mask" class="credential-mask" hidden>
+  <section class="credential-dialog" role="dialog" aria-modal="true" aria-labelledby="credential-title">
+    <div class="credential-head">
+      <div><h2 id="credential-title" class="credential-title">网站登录信息</h2><p class="credential-copy">用于访问需要登录的内容，文件只保存在当前设备。</p></div>
+      <button id="close-credentials" class="credential-close" type="button" aria-label="关闭"><i data-feather="x"></i></button>
+    </div>
+    <div id="credential-list" class="credential-list"><div class="credential-empty">正在读取登录信息…</div></div>
+    <div class="credential-upload">
+      <div class="credential-upload-title">添加或更新</div>
+      <p class="credential-upload-copy">支持 .txt 和 .cookies；上传同名文件会自动替换。</p>
+      <input id="credential-file" class="credential-file" type="file" accept=".txt,.cookies,text/plain">
+      <div class="credential-upload-actions"><button id="upload-credential" class="settings-action is-primary" type="button">上传</button></div>
+    </div>
+  </section>
+</div>
 <div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
 {% endblock %}
 
@@ -324,6 +399,7 @@
     const refreshButton = document.getElementById('refresh-library');
     const clearCacheButton = document.getElementById('clear-cache');
     const resetButton = document.getElementById('reset-recommendations');
+    const credentialMask = document.getElementById('credential-mask');
     const toastWrap = document.getElementById('toast-wrap');
 
     function currentThemePreference() {
@@ -367,6 +443,13 @@
 
     async function requestJson(url, options = {}) {
       const response = await fetch(url, options);
+      const payload = await response.json();
+      if (!response.ok || payload.success === false) throw new Error(payload.error || '请求失败');
+      return payload;
+    }
+
+    async function requestForm(url, formData) {
+      const response = await fetch(url, { method: 'POST', body: formData });
       const payload = await response.json();
       if (!response.ok || payload.success === false) throw new Error(payload.error || '请求失败');
       return payload;
@@ -429,6 +512,51 @@
       try { await task(); } finally { button.disabled = false; button.textContent = original; }
     }
 
+    function renderCredentials(files = []) {
+      const list = document.getElementById('credential-list');
+      document.getElementById('credential-summary').textContent = files.length ? `已保存 ${files.length} 个凭证，下载时按网站自动匹配。` : '尚未添加，公开内容仍可正常下载。';
+      if (!files.length) {
+        list.innerHTML = '<div class="credential-empty">还没有保存登录信息</div>';
+      } else {
+        list.innerHTML = files.map((name) => `
+          <div class="credential-item"><span class="credential-mark"><i data-feather="key"></i></span><span class="credential-name"></span></div>`).join('');
+        list.querySelectorAll('.credential-name').forEach((element, index) => { element.textContent = files[index]; });
+      }
+      feather.replace();
+    }
+
+    async function loadDownloadSettings() {
+      try {
+        const [probePayload, configPayload, cookiePayload] = await Promise.all([
+          requestJson('/api/download/probe', { method: 'POST' }),
+          requestJson('/api/download/config'),
+          requestJson('/api/download/cookies'),
+        ]);
+        const probe = probePayload.data || {};
+        const missing = [!probe.yt_dlp_available ? '视频' : '', !probe.gallery_dl_available ? '图片' : '', !probe.ffmpeg_available ? '媒体合并' : ''].filter(Boolean);
+        document.getElementById('download-dependency-copy').textContent = missing.length ? `${missing.join('、')}组件尚未准备好。` : '图片与视频下载均已就绪。';
+        const configured = Number(configPayload.data?.effective?.max_concurrent ?? 2);
+        const shown = [1, 2, 4].includes(configured) ? configured : 2;
+        document.querySelectorAll('[data-concurrency]').forEach((button) => button.classList.toggle('is-active', Number(button.dataset.concurrency) === shown));
+        renderCredentials(cookiePayload.data?.files || []);
+      } catch (_) {
+        document.getElementById('download-dependency-copy').textContent = '暂时无法读取下载状态。';
+        document.getElementById('credential-summary').textContent = '暂时无法读取登录信息。';
+      }
+    }
+
+    function openCredentials() {
+      credentialMask.hidden = false;
+      document.body.style.overflow = 'hidden';
+      document.getElementById('close-credentials').focus();
+    }
+
+    function closeCredentials() {
+      credentialMask.hidden = true;
+      document.body.style.overflow = '';
+      document.getElementById('manage-credentials').focus();
+    }
+
     themeButtons.forEach((button) => button.addEventListener('click', () => setThemePreference(button.dataset.themePreference)));
     window.addEventListener('tiklocal:theme-changed', (event) => syncThemeButtons(event.detail?.preference));
     syncThemeButtons();
@@ -462,7 +590,42 @@
       });
     });
 
+    document.getElementById('download-levels').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-concurrency]');
+      if (!button) return;
+      const maxConcurrent = Number(button.dataset.concurrency);
+      try {
+        await requestJson('/api/download/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ max_concurrent: maxConcurrent }),
+        });
+        document.querySelectorAll('[data-concurrency]').forEach((item) => item.classList.toggle('is-active', item === button));
+        showToast(`同时下载已设为 ${maxConcurrent} 个任务`);
+      } catch (_) { showToast('下载设置保存失败', 'error'); }
+    });
+
+    document.getElementById('manage-credentials').addEventListener('click', openCredentials);
+    document.getElementById('close-credentials').addEventListener('click', closeCredentials);
+    credentialMask.addEventListener('click', (event) => { if (event.target === credentialMask) closeCredentials(); });
+    credentialMask.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCredentials(); });
+    document.getElementById('upload-credential').addEventListener('click', (event) => {
+      const input = document.getElementById('credential-file');
+      const file = input.files?.[0];
+      if (!file) { showToast('请先选择登录信息文件', 'error'); return; }
+      runButton(event.currentTarget, '上传中…', async () => {
+        const formData = new FormData();
+        formData.append('file', file);
+        await requestForm('/api/download/cookies/upload', formData);
+        input.value = '';
+        const payload = await requestJson('/api/download/cookies');
+        renderCredentials(payload.data?.files || []);
+        showToast('登录信息已更新');
+      }).catch(() => showToast('登录信息上传失败', 'error'));
+    });
+
     loadStats();
+    loadDownloadSettings();
   })();
 </script>
 {% endblock %}

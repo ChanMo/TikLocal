@@ -2,644 +2,358 @@
 
 {% block extra_head %}
 <style>
-  .download-card {
-    border-radius: 1rem;
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(4px);
+  :root {
+    --download-bg: #f4f3ef;
+    --download-card: rgba(255, 255, 252, 0.88);
+    --download-ink: #292822;
+    --download-muted: rgba(41, 40, 34, 0.48);
+    --download-faint: rgba(41, 40, 34, 0.34);
+    --download-line: rgba(41, 40, 34, 0.09);
+    --download-soft: rgba(41, 40, 34, 0.055);
+    --download-accent: #292822;
   }
-
-  [data-theme="dark"] .download-card {
-    background: rgba(17, 24, 39, 0.72);
-    border-color: rgba(148, 163, 184, 0.22);
+  [data-theme="dark"] {
+    --download-bg: #11110f;
+    --download-card: rgba(34, 34, 30, 0.9);
+    --download-ink: rgba(255, 255, 255, 0.92);
+    --download-muted: rgba(255, 255, 255, 0.45);
+    --download-faint: rgba(255, 255, 255, 0.3);
+    --download-line: rgba(255, 255, 255, 0.085);
+    --download-soft: rgba(255, 255, 255, 0.06);
+    --download-accent: #f3efe4;
   }
-
-  .dl-input,
-  .dl-select {
-    width: 100%;
-    border-radius: 0.75rem;
-    border: 1px solid rgba(148, 163, 184, 0.28);
-    background: rgba(255, 255, 255, 0.9);
-    padding: 0.62rem 0.8rem;
-    font-size: 0.9rem;
-    color: rgb(31 41 55);
-    outline: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  body[data-nav-context="download"] {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+    background:
+      radial-gradient(circle at 50% -15rem, rgba(169, 151, 113, 0.09), transparent 34rem),
+      var(--download-bg) !important;
   }
-
-  [data-theme="dark"] .dl-input,
-  [data-theme="dark"] .dl-select {
-    background: rgba(15, 23, 42, 0.82);
-    border-color: rgba(148, 163, 184, 0.32);
-    color: rgb(229 231 235);
+  .download-page {
+    width: min(100%, 760px);
+    min-height: calc(100dvh - 104px - env(safe-area-inset-bottom));
+    margin: 0 auto;
+    padding: 28px 14px 24px;
+    color: var(--download-ink);
   }
-
-  .dl-input:focus,
-  .dl-select:focus {
-    border-color: rgba(59, 130, 246, 0.55);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  .download-header { padding: 0 3px 25px; }
+  .download-eyebrow {
+    margin: 0 0 5px;
+    color: var(--download-muted);
+    font-size: 10px;
+    font-weight: 680;
+    letter-spacing: .14em;
+    text-transform: uppercase;
   }
-
-  .dl-primary-btn {
-    border-radius: 0.75rem;
-    background: rgb(30 64 175);
-    color: white;
-    font-weight: 600;
-    padding: 0.62rem 1rem;
-    transition: background-color 0.15s ease;
+  .download-title {
+    margin: 0;
+    font-size: clamp(27px, 6vw, 34px);
+    font-weight: 680;
+    letter-spacing: -.045em;
+    line-height: 1.06;
   }
-
-  .dl-primary-btn:hover { background: rgb(30 58 138); }
-  .dl-primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .dl-muted-btn {
-    border-radius: 0.7rem;
-    border: 1px solid rgba(148, 163, 184, 0.35);
+  .download-intro {
+    margin: 7px 0 0;
+    color: var(--download-muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .download-composer {
+    padding: 7px;
+    border: 1px solid var(--download-line);
+    border-radius: 21px;
+    background: var(--download-card);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(35,34,30,.035), 0 14px 36px rgba(35,34,30,.045);
+    transition: border-color 160ms ease, box-shadow 180ms ease;
+  }
+  [data-theme="dark"] .download-composer { box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
+  .download-composer:focus-within {
+    border-color: rgba(41,40,34,.2);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 0 0 3px rgba(41,40,34,.045), 0 18px 42px rgba(35,34,30,.07);
+  }
+  [data-theme="dark"] .download-composer:focus-within { border-color: rgba(255,255,255,.18); box-shadow: 0 0 0 3px rgba(255,255,255,.035); }
+  .download-input-row { display: flex; align-items: center; gap: 7px; }
+  .download-input {
+    min-width: 0;
+    flex: 1;
+    height: 48px;
+    padding: 0 10px;
+    border: 0;
+    outline: 0;
     background: transparent;
-    color: rgb(55 65 81);
-    font-weight: 600;
-    font-size: 0.82rem;
-    padding: 0.45rem 0.72rem;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    color: var(--download-ink);
+    font-size: 15px;
+    letter-spacing: -.01em;
+  }
+  .download-input::placeholder { color: var(--download-faint); }
+  .download-submit {
+    min-width: 92px;
+    height: 42px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--download-accent);
+    color: var(--download-bg);
+    font-size: 13px;
+    font-weight: 680;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(25,24,20,.12), 0 6px 16px rgba(25,24,20,.1);
+    transition: transform 120ms ease, opacity 150ms ease, box-shadow 160ms ease;
+  }
+  .download-submit:hover { box-shadow: 0 2px 3px rgba(25,24,20,.15), 0 9px 22px rgba(25,24,20,.13); }
+  .download-submit:active { transform: scale(.97); }
+  .download-submit:disabled { cursor: wait; opacity: .5; box-shadow: none; }
+  .download-submit:focus-visible, .download-action:focus-visible, .download-icon-btn:focus-visible {
+    outline: 2px solid var(--download-ink);
+    outline-offset: 2px;
+  }
+  .download-stack { display: grid; gap: 27px; margin-top: 30px; }
+  .download-section[hidden] { display: none; }
+  .download-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 4px 10px; }
+  .download-section-title { margin: 0; font-size: 12px; font-weight: 660; letter-spacing: .01em; }
+  .download-section-count { color: var(--download-muted); font-size: 10px; }
+  .download-list {
+    overflow: hidden;
+    border: 1px solid var(--download-line);
+    border-radius: 18px;
+    background: var(--download-card);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 8px 26px rgba(35,34,30,.025);
+  }
+  [data-theme="dark"] .download-list { box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
+  .download-job { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 11px; align-items: start; padding: 15px; }
+  .download-job + .download-job { border-top: 1px solid var(--download-line); }
+  .download-job-mark {
+    width: 38px; height: 38px; display: grid; place-items: center;
+    border-radius: 12px; background: var(--download-soft); color: var(--download-muted);
+    font-size: 11px; font-weight: 720; text-transform: uppercase;
+  }
+  .download-job.is-running .download-job-mark { color: #8a681e; background: rgba(190,145,45,.11); }
+  [data-theme="dark"] .download-job.is-running .download-job-mark { color: #e5c77e; background: rgba(211,170,73,.12); }
+  .download-job.is-failed .download-job-mark { color: #9f3d3d; background: rgba(188,75,75,.09); }
+  .download-job-main { min-width: 0; }
+  .download-job-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .download-job-identity { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+  .download-job-domain { overflow: hidden; color: var(--download-ink); font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+  .download-job-status { color: var(--download-muted); font-size: 10px; }
+  .download-job-time { flex: 0 0 auto; color: var(--download-faint); font-size: 10px; }
+  .download-job-copy { margin: 5px 0 0; color: var(--download-muted); font-size: 11px; line-height: 1.45; }
+  .download-progress { height: 3px; margin-top: 10px; overflow: hidden; border-radius: 99px; background: var(--download-soft); }
+  .download-progress-bar { height: 100%; border-radius: inherit; background: #b28b36; transition: width 300ms ease; }
+  .download-job-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 10px; margin-top: 6px; color: var(--download-faint); font-size: 10px; }
+  .download-job-actions { display: flex; align-items: center; gap: 6px; margin-top: 11px; }
+  .download-action, .download-icon-btn {
+    min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px;
+    border: 1px solid var(--download-line); border-radius: 11px; text-decoration: none;
+    background: transparent; color: var(--download-muted); font-size: 10px; font-weight: 650; cursor: pointer;
+  }
+  .download-action svg, .download-icon-btn svg { width: 13px; height: 13px; stroke-width: 1.9; }
+  .download-action:hover, .download-icon-btn:hover { color: var(--download-ink); background: var(--download-soft); }
+  [data-theme="dark"] .download-action:hover, [data-theme="dark"] .download-icon-btn:hover { background: rgba(255,255,255,.1); }
+  .download-action.is-retry { color: var(--download-ink); background: var(--download-soft); }
+  .download-action:disabled, .download-icon-btn:disabled { cursor: wait; opacity: .45; }
+  .download-icon-btn { width: 34px; padding: 0; margin-left: auto; border-color: transparent; }
+  .download-job-menu { position: relative; margin-left: auto; }
+  .download-job-menu-panel { position: absolute; right: 0; bottom: calc(100% + 5px); z-index: 15; min-width: 116px; padding: 5px; border: 1px solid var(--download-line); border-radius: 12px; background: var(--download-card); box-shadow: 0 14px 36px rgba(24,23,20,.14); }
+  .download-job-menu-panel[hidden] { display: none; }
+  .download-menu-action { width: 100%; min-height: 34px; padding: 0 9px; border: 0; border-radius: 8px; color: #a54a43; background: transparent; font-size: 10px; font-weight: 620; text-align: left; cursor: pointer; }
+  .download-menu-action:hover { background: rgba(165,74,67,.07); }
+  .download-error { margin: 8px 0 0; color: #9f3d3d; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+  [data-theme="dark"] .download-error { color: #e58a8a; }
+  .download-empty { padding: 30px 20px; color: var(--download-muted); text-align: center; }
+  .download-empty-icon { width: 38px; height: 38px; display: grid; place-items: center; margin: 0 auto 9px; border-radius: 13px; background: var(--download-soft); }
+  .download-empty-icon svg { width: 17px; height: 17px; stroke-width: 1.7; }
+  .download-empty-title { color: var(--download-ink); font-size: 12px; font-weight: 630; }
+  .download-empty-copy { margin-top: 4px; font-size: 10px; }
+  .download-history-footer { display: flex; justify-content: center; padding-top: 12px; }
+  .download-clear { border: 0; background: transparent; color: var(--download-faint); font-size: 10px; cursor: pointer; }
+  .download-clear:hover { color: var(--download-muted); }
+  .download-toast-wrap { position: fixed; top: 18px; right: 14px; z-index: 120; display: grid; gap: 7px; width: min(310px, calc(100vw - 28px)); }
+  .download-toast { padding: 11px 13px; border: 1px solid var(--download-line); border-radius: 13px; background: color-mix(in srgb, var(--download-card) 96%, transparent); color: var(--download-ink); font-size: 11px; box-shadow: 0 12px 34px rgba(25,24,20,.12); animation: downloadToastIn 160ms ease both; backdrop-filter: blur(16px); }
+  .download-toast.error { border-color: rgba(181,68,68,.25); }
+  @keyframes downloadToastIn { from { opacity: 0; transform: translateY(-5px); } }
+  @media (max-width: 560px) {
+    .download-page { padding-top: 22px; }
+    .download-input-row { align-items: stretch; flex-direction: column; }
+    .download-input { width: 100%; height: 46px; }
+    .download-submit { width: 100%; }
+    .download-job { grid-template-columns: 34px minmax(0, 1fr); padding: 14px 12px; }
+    .download-job-mark { width: 34px; height: 34px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .download-submit, .download-progress-bar, .download-toast { transition-duration: .01ms !important; animation-duration: .01ms !important; }
   }
 
-  [data-theme="dark"] .dl-muted-btn { color: rgb(226 232 240); }
-  .dl-muted-btn:hover { background: rgba(148, 163, 184, 0.12); }
-
-  .status-chip {
+  /* Single-link composer */
+  .download-header { padding-bottom: 22px; }
+  .download-title { font-size: clamp(29px, 6vw, 36px); }
+  .download-intro { max-width: 390px; margin-top: 9px; font-size: 13px; }
+  .download-composer { padding: 5px; overflow: hidden; border-radius: 21px; }
+  .download-editor { position: relative; display: flex; align-items: center; min-height: 46px; padding: 0 13px; }
+  .download-input {
+    display: block;
+    width: 100%;
+    height: 46px;
+    padding: 0;
+    line-height: 46px;
+  }
+  .download-detected {
+    position: absolute;
+    right: 13px;
+    bottom: 2px;
+    color: var(--download-muted);
+    font-size: 10px;
+    pointer-events: none;
+  }
+  .download-detected.is-error { color: #9f3d3d; }
+  .download-composer-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 4px 4px;
+    border-top: 0;
+    background: transparent;
+  }
+  .media-switch {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 164px;
+    padding: 3px;
+    border-radius: 13px;
+    background: var(--download-soft);
+  }
+  .media-switch::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc(50% - 3px);
+    border: 1px solid var(--download-line);
+    border-radius: 10px;
+    background: var(--download-card);
+    box-shadow: 0 1px 3px rgba(30, 29, 25, .08);
+    transform: translateX(0);
+    transition: transform 190ms cubic-bezier(.22, 1, .36, 1);
+  }
+  .media-switch[data-value="gallery-dl"]::before { transform: translateX(100%); }
+  .media-switch-option {
+    position: relative;
+    z-index: 1;
+    height: 32px;
     display: inline-flex;
     align-items: center;
-    border: 1px solid;
-    border-radius: 999px;
-    padding: 0.14rem 0.56rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-    line-height: 1.2;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--download-muted);
+    font-size: 11px;
+    font-weight: 650;
+    cursor: pointer;
   }
-
-  .chip-queued { border-color: rgba(148, 163, 184, 0.45); color: rgb(71, 85, 105); background: rgba(241, 245, 249, 0.9); }
-  .chip-running { border-color: rgba(125, 211, 252, 0.6); color: rgb(3, 105, 161); background: rgba(240, 249, 255, 0.85); }
-  .chip-success { border-color: rgba(110, 231, 183, 0.6); color: rgb(6, 95, 70); background: rgba(236, 253, 245, 0.88); }
-  .chip-failed { border-color: rgba(253, 164, 175, 0.65); color: rgb(159, 18, 57); background: rgba(255, 241, 242, 0.9); }
-  .chip-canceled { border-color: rgba(253, 186, 116, 0.7); color: rgb(154, 52, 18); background: rgba(255, 247, 237, 0.9); }
-
-  [data-theme="dark"] .chip-queued { color: rgb(203, 213, 225); background: rgba(30, 41, 59, 0.55); border-color: rgba(148, 163, 184, 0.42); }
-  [data-theme="dark"] .chip-running { color: rgb(125, 211, 252); background: rgba(7, 89, 133, 0.28); border-color: rgba(125, 211, 252, 0.45); }
-  [data-theme="dark"] .chip-success { color: rgb(110, 231, 183); background: rgba(6, 78, 59, 0.3); border-color: rgba(110, 231, 183, 0.45); }
-  [data-theme="dark"] .chip-failed { color: rgb(251, 113, 133); background: rgba(136, 19, 55, 0.25); border-color: rgba(251, 113, 133, 0.45); }
-  [data-theme="dark"] .chip-canceled { color: rgb(251, 191, 36); background: rgba(120, 53, 15, 0.25); border-color: rgba(251, 191, 36, 0.45); }
-
-  .job-row + .job-row {
-    border-top: 1px solid rgba(148, 163, 184, 0.2);
-  }
-
-  .toast-wrap {
-    position: fixed;
-    top: 72px;
-    right: 16px;
-    z-index: 120;
+  .media-switch-option[aria-pressed="true"] { color: var(--download-ink); }
+  .media-switch-option svg { width: 13px; height: 13px; stroke-width: 1.9; }
+  .media-switch-option:focus-visible { outline: 2px solid var(--download-ink); outline-offset: 2px; }
+  .download-submit { height: 36px; min-width: 78px; border-radius: 12px; box-shadow: 0 1px 2px rgba(25,24,20,.1), 0 4px 12px rgba(25,24,20,.08); }
+  .download-inline-alert {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: min(320px, calc(100vw - 24px));
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(159, 61, 61, .14);
+    border-radius: 13px;
+    color: #9f3d3d;
+    background: rgba(188, 75, 75, .055);
+    font-size: 10px;
   }
-
-  .toast {
-    border-radius: 0.75rem;
-    border: 1px solid rgba(148, 163, 184, 0.28);
-    background: rgba(255, 255, 255, 0.96);
-    color: rgb(31, 41, 55);
-    padding: 0.65rem 0.78rem;
-    font-size: 0.82rem;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
-    animation: fadeIn 0.15s ease;
-  }
-
-  [data-theme="dark"] .toast {
-    background: rgba(17, 24, 39, 0.95);
-    color: rgb(226, 232, 240);
-    border-color: rgba(148, 163, 184, 0.28);
-  }
-
-  .toast.error { border-left: 3px solid rgb(244, 63, 94); }
-  .toast.success { border-left: 3px solid rgb(34, 197, 94); }
-  .toast.info { border-left: 3px solid rgb(59, 130, 246); }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+  .download-inline-alert[hidden] { display: none; }
+  .download-inline-alert a { color: inherit; font-weight: 650; text-decoration: none; white-space: nowrap; }
+  .download-confirm[hidden] { display: none; }
+  .download-confirm { position: fixed; inset: 0; z-index: 280; display: grid; place-items: center; padding: 16px; background: rgba(18,18,16,.43); backdrop-filter: blur(9px); }
+  .download-confirm-card { width: min(100%, 370px); padding: 19px; border: 1px solid var(--download-line); border-radius: 20px; color: var(--download-ink); background: var(--download-bg); box-shadow: 0 24px 70px rgba(20,19,16,.23); }
+  .download-confirm-title { margin: 0; font-size: 17px; font-weight: 660; letter-spacing: -.02em; }
+  .download-confirm-copy { margin: 7px 0 0; color: var(--download-muted); font-size: 11px; line-height: 1.55; }
+  .download-confirm-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 18px; }
+  .download-action.is-danger { color: #a54a43; border-color: rgba(165,74,67,.15); background: rgba(165,74,67,.06); }
+  @media (max-width: 560px) {
+    .download-editor { min-height: 46px; padding: 0 11px; }
+    .download-input { height: 46px; line-height: 46px; }
+    .download-detected { right: 11px; }
+    .download-input-row { display: block; }
+    .download-submit { width: auto; }
+    .download-composer-footer { align-items: stretch; }
+    .media-switch { width: 158px; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="bg-gray-50 dark:bg-gray-900 min-h-screen">
-  <main class="container mx-auto px-4 py-8 lg:py-10">
-    <div class="max-w-6xl mx-auto space-y-6">
-      <header>
-        <h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">Download</h1>
-        <p class="mt-2 text-sm lg:text-base text-gray-500 dark:text-gray-400">粘贴链接，轻量下载到本地媒体库。需要登录的平台可选择登录凭据文件。</p>
-      </header>
+<main class="download-page">
+  <header class="download-header">
+    <h1 class="download-title">Download</h1>
+    <p class="download-intro">粘贴一个链接，将网络上的图片或视频保存到本地。</p>
+  </header>
 
-      <section class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div class="download-card p-5 xl:col-span-2">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white">新建任务</h2>
-          <form id="download-form" class="mt-4 space-y-3">
-            <div>
-              <label for="download-url" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">媒体链接</label>
-              <input id="download-url" type="url" required placeholder="https://..." class="dl-input">
-            </div>
-
-            <div>
-              <label for="engine-select" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">下载引擎</label>
-              <select id="engine-select" class="dl-select">
-                <option value="yt-dlp">yt-dlp（视频优先）</option>
-                <option value="gallery-dl">gallery-dl（图片/图集优先）</option>
-              </select>
-            </div>
-
-            <div>
-              <label for="cookie-select" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">登录凭据（可选）</label>
-              <select id="cookie-select" class="dl-select">
-                <option value="__auto__">自动选择（按域名）</option>
-                <option value="__none__">不使用登录凭据</option>
-              </select>
-              <p id="cookie-dir-hint" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">登录凭据目录：检测中...</p>
-            </div>
-
-            <div class="flex items-center gap-2 pt-1">
-              <button type="submit" id="download-submit" class="dl-primary-btn">开始下载</button>
-              <span class="text-xs text-gray-500 dark:text-gray-400">默认写入媒体根目录</span>
-            </div>
-          </form>
-        </div>
-
-        <aside class="download-card p-5 space-y-4">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">运行状态</h3>
-            <div id="probe-panel" class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
-              <p>检测中...</p>
-            </div>
-          </div>
-
-          <details class="group border border-gray-200/80 dark:border-gray-700 rounded-xl">
-            <summary class="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-between">
-              <span>管理登录凭据</span>
-              <span class="text-xs text-gray-500 group-open:rotate-180 transition-transform">⌄</span>
-            </summary>
-            <div class="px-3 pb-3 pt-1 space-y-2">
-              <p class="text-xs text-gray-500 dark:text-gray-400">上传 `.txt/.cookies`。同名文件将自动覆盖更新。</p>
-              <input id="cookie-upload-file" type="file" accept=".txt,.cookies,text/plain" class="text-xs text-gray-600 dark:text-gray-300 w-full">
-              <button type="button" id="cookie-upload-btn" class="dl-muted-btn">上传凭据文件</button>
-            </div>
-          </details>
-
-          <div class="pt-1">
-            <label for="max-concurrent" class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">并发数（0=不限）</label>
-            <input id="max-concurrent" type="number" min="0" max="16" value="2" class="dl-input">
-            <button id="save-config-btn" class="dl-muted-btn mt-2">保存设置</button>
-          </div>
-        </aside>
-      </section>
-
-      <section class="download-card p-5">
-        <div class="flex items-center justify-between gap-2">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white">任务记录</h2>
-          <div class="flex items-center gap-2">
-            <button id="clear-history-btn" class="dl-muted-btn">清理已完成</button>
-            <button id="refresh-jobs-btn" class="dl-muted-btn">刷新</button>
-          </div>
-        </div>
-
-        <div id="jobs-empty" class="text-sm text-gray-500 dark:text-gray-400 mt-4">暂无任务。</div>
-        <div id="jobs-list" class="mt-3"></div>
-      </section>
+  <form id="download-form" class="download-composer">
+    <div class="download-editor">
+      <input id="download-url" class="download-input" type="url" required autocomplete="url" inputmode="url" placeholder="粘贴图片或视频链接…" aria-label="媒体链接">
+      <div id="download-detected" class="download-detected" aria-live="polite"></div>
     </div>
-  </main>
+    <div class="download-composer-footer">
+      <div id="media-switch" class="media-switch" data-value="yt-dlp" role="group" aria-label="下载内容类型">
+        <button class="media-switch-option" type="button" data-engine="yt-dlp" aria-pressed="true"><i data-feather="play"></i><span>视频</span></button>
+        <button class="media-switch-option" type="button" data-engine="gallery-dl" aria-pressed="false"><i data-feather="image"></i><span>图片</span></button>
+      </div>
+      <button id="download-submit" class="download-submit" type="submit">下载</button>
+    </div>
+  </form>
+  <div id="download-inline-alert" class="download-inline-alert" hidden>
+    <span id="download-inline-alert-copy"></span><a href="/settings#download">前往设置</a>
+  </div>
+
+  <div class="download-stack">
+    <section id="active-section" class="download-section" hidden aria-labelledby="active-title">
+      <div class="download-section-head">
+        <h2 id="active-title" class="download-section-title">正在进行</h2>
+        <span id="active-count" class="download-section-count"></span>
+      </div>
+      <div id="active-list" class="download-list" aria-live="polite"></div>
+    </section>
+
+    <section class="download-section" aria-labelledby="history-title">
+      <div class="download-section-head">
+        <h2 id="history-title" class="download-section-title">最近下载</h2>
+        <span id="history-count" class="download-section-count"></span>
+      </div>
+      <div id="history-list" class="download-list" aria-live="polite">
+        <div class="download-empty"><div class="download-empty-icon"><i data-feather="loader"></i></div><div class="download-empty-title">正在读取</div></div>
+      </div>
+      <div id="history-footer" class="download-history-footer" hidden>
+        <button id="clear-history-btn" class="download-clear" type="button">清除下载记录</button>
+      </div>
+    </section>
+  </div>
+
+</main>
+
+<div id="download-confirm" class="download-confirm" hidden>
+  <section class="download-confirm-card" role="dialog" aria-modal="true" aria-labelledby="download-confirm-title">
+    <h2 id="download-confirm-title" class="download-confirm-title">清除下载记录？</h2>
+    <p id="download-confirm-copy" class="download-confirm-copy">本地媒体文件会继续保留。</p>
+    <div class="download-confirm-actions">
+      <button class="download-action" type="button" data-confirm-cancel>取消</button>
+      <button class="download-action is-danger" type="button" data-confirm-accept>清除记录</button>
+    </div>
+  </section>
 </div>
 
-<div id="toast-wrap" class="toast-wrap"></div>
+<div id="toast-wrap" class="download-toast-wrap" aria-live="polite"></div>
 {% endblock %}
 
 {% block extra_body %}
-<script>
-const statusMeta = {
-  queued: { label: '排队中', cls: 'chip-queued' },
-  running: { label: '下载中', cls: 'chip-running' },
-  success: { label: '成功', cls: 'chip-success' },
-  failed: { label: '失败', cls: 'chip-failed' },
-  canceled: { label: '已取消', cls: 'chip-canceled' }
-};
-
-let pollTimer = null;
-let cookieMeta = { files: [], cookie_dir: '', cookie_enabled: true };
-let dependencyMeta = { yt_dlp_available: false, gallery_dl_available: false, ffmpeg_available: false };
-const imageExts = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']);
-
-function escapeHtml(text) {
-  return String(text || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function notify(message, type = 'info') {
-  const wrap = document.getElementById('toast-wrap');
-  if (!wrap) return;
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = message;
-  wrap.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(-4px)';
-    setTimeout(() => toast.remove(), 160);
-  }, 2600);
-}
-
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
-  });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || `Request failed (${res.status})`);
-  }
-  return data.data || {};
-}
-
-async function apiForm(path, formData) {
-  const res = await fetch(path, { method: 'POST', body: formData });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || `Request failed (${res.status})`);
-  }
-  return data.data || {};
-}
-
-function formatDate(iso) {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
-}
-
-function statusBadge(status) {
-  const meta = statusMeta[status] || statusMeta.failed;
-  return `<span class="status-chip ${meta.cls}">${meta.label}</span>`;
-}
-
-function formatCookieUsage(job) {
-  const file = (job.cookie_file || '').trim();
-  const mode = (job.cookie_match_mode || 'none').trim();
-  if (!file || mode === 'none') return '未使用';
-  if (mode === 'auto') return `自动（${file}）`;
-  if (mode === 'manual') return `手动（${file}）`;
-  return file;
-}
-
-function buildMediaDetailHref(file) {
-  const safe = String(file || '').trim();
-  if (!safe) return '#';
-  const dot = safe.lastIndexOf('.');
-  const ext = dot >= 0 ? safe.slice(dot).toLowerCase() : '';
-  if (imageExts.has(ext)) {
-    return `/image?uri=${encodeURIComponent(safe)}`;
-  }
-  return `/detail/${encodeURIComponent(safe)}`;
-}
-
-function renderOutputLinks(job) {
-  const files = Array.isArray(job.output_files_rel)
-    ? job.output_files_rel.filter((item) => String(item || '').trim())
-    : [];
-  if (!files.length && job.output_path_rel) {
-    files.push(job.output_path_rel);
-  }
-  if (!files.length) return '';
-
-  const links = files.slice(0, 3).map((file) => {
-    const encoded = encodeURIComponent(file);
-    return `
-      <span class="inline-flex items-center gap-1.5 max-w-full">
-        <a class="text-xs text-blue-600 dark:text-blue-300 hover:underline break-all" href="${buildMediaDetailHref(file)}">${escapeHtml(file)}</a>
-        <a data-source-link data-file="${encoded}" class="hidden text-[11px] text-slate-600 dark:text-slate-300 hover:underline whitespace-nowrap" target="_blank" rel="noopener noreferrer"></a>
-      </span>
-    `;
-  });
-  if (files.length > 3) {
-    links.push(`<span class="text-xs text-gray-500 dark:text-gray-400">+${files.length - 3} 个文件</span>`);
-  }
-  return links.join(' · ');
-}
-
-async function hydrateSourceLinks(containerEl) {
-  if (!containerEl) return;
-  const nodes = Array.from(containerEl.querySelectorAll('[data-source-link]'));
-  if (!nodes.length) return;
-
-  const files = Array.from(new Set(
-    nodes.map((node) => decodeURIComponent(node.getAttribute('data-file') || ''))
-      .filter((item) => item)
-  ));
-  if (!files.length) return;
-
-  let items = {};
-  try {
-    const data = await api('/api/source/batch', {
-      method: 'POST',
-      body: JSON.stringify({ files }),
-    });
-    items = data.items || {};
-  } catch (error) {
-    return;
-  }
-
-  nodes.forEach((node) => {
-    const file = decodeURIComponent(node.getAttribute('data-file') || '');
-    const source = items[file];
-    if (!source || !source.url) return;
-
-    const domain = (source.source_domain || '').trim();
-    node.href = source.url;
-    node.textContent = domain ? `来源·${domain}` : '来源';
-    node.classList.remove('hidden');
-  });
-}
-
-function renderJobs(jobs) {
-  const listEl = document.getElementById('jobs-list');
-  const emptyEl = document.getElementById('jobs-empty');
-  if (!listEl || !emptyEl) return;
-
-  if (!jobs.length) {
-    emptyEl.classList.remove('hidden');
-    listEl.innerHTML = '';
-    return;
-  }
-
-  emptyEl.classList.add('hidden');
-  listEl.innerHTML = jobs.map((job) => {
-    const progress = typeof job.progress_percent === 'number' ? Math.max(0, Math.min(100, job.progress_percent)) : null;
-    const canCancel = (job.status === 'queued' || job.status === 'running');
-    const canRetry = (job.status === 'failed' || job.status === 'canceled');
-    const canDelete = (job.status === 'success' || job.status === 'failed' || job.status === 'canceled');
-    const cookieUsed = formatCookieUsage(job);
-    const outputLink = renderOutputLinks(job);
-    const engine = (job.engine || 'yt-dlp').trim();
-    const fileCount = Number.isInteger(job.file_count)
-      ? job.file_count
-      : (Array.isArray(job.output_files_rel) ? job.output_files_rel.length : (job.output_path_rel ? 1 : 0));
-
-    return `
-      <article class="job-row py-3 first:pt-0 last:pb-0">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0 flex-1 space-y-2">
-            <div class="flex items-center gap-2">${statusBadge(job.status)} <span class="text-xs text-gray-500 dark:text-gray-400">${formatDate(job.created_at)}</span></div>
-            <p class="text-sm text-gray-800 dark:text-gray-200 break-all">${job.url}</p>
-            ${progress !== null ? `
-              <div class="w-full h-1.5 rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                <div class="h-1.5 bg-blue-500/85" style="width:${progress.toFixed(1)}%"></div>
-              </div>
-            ` : ''}
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-              <span>引擎：${engine}</span>
-              <span>文件：${fileCount}</span>
-              <span>凭据：${cookieUsed}</span>
-              <span>开始：${formatDate(job.started_at)}</span>
-              <span>结束：${formatDate(job.finished_at)}</span>
-              ${outputLink ? `<span>${outputLink}</span>` : ''}
-            </div>
-            ${job.error_message ? `<details class="text-xs text-rose-600 dark:text-rose-300"><summary class="cursor-pointer">查看错误</summary><div class="pt-1 break-all">${job.error_message}</div></details>` : ''}
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            ${canCancel ? `<button data-action="cancel" data-job-id="${job.id}" class="dl-muted-btn">取消</button>` : ''}
-            ${canRetry ? `<button data-action="retry" data-job-id="${job.id}" class="dl-muted-btn">重试</button>` : ''}
-            ${canDelete ? `<button data-action="delete" data-job-id="${job.id}" class="dl-muted-btn">删除</button>` : ''}
-          </div>
-        </div>
-      </article>
-    `;
-  }).join('');
-
-  listEl.querySelectorAll('button[data-action]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const action = btn.getAttribute('data-action');
-      const jobId = btn.getAttribute('data-job-id');
-      if (!action || !jobId) return;
-      try {
-        if (action === 'cancel') {
-          await api(`/api/download/jobs/${jobId}/cancel`, { method: 'POST' });
-        } else if (action === 'retry') {
-          await api(`/api/download/jobs/${jobId}/retry`, { method: 'POST' });
-          notify('已创建重试任务', 'success');
-        } else if (action === 'delete') {
-          await api(`/api/download/jobs/${jobId}`, { method: 'DELETE' });
-        }
-        await refreshJobs();
-      } catch (error) {
-        notify(error.message, 'error');
-      }
-    });
-  });
-
-  hydrateSourceLinks(listEl);
-}
-
-async function refreshProbe() {
-  const panel = document.getElementById('probe-panel');
-  if (!panel) return;
-  try {
-    const data = await api('/api/download/probe', { method: 'POST' });
-    dependencyMeta = data || dependencyMeta;
-    panel.innerHTML = `
-      <p>yt-dlp：<strong>${data.yt_dlp_available ? '可用' : '不可用'}</strong> ${data.yt_dlp_version ? `(${data.yt_dlp_version})` : ''}</p>
-      <p>gallery-dl：<strong>${data.gallery_dl_available ? '可用' : '不可用'}</strong> ${data.gallery_dl_version ? `(${data.gallery_dl_version})` : ''}</p>
-      <p>ffmpeg：<strong>${data.ffmpeg_available ? '可用' : '不可用'}</strong></p>
-      <p class="text-gray-500 dark:text-gray-400">依赖缺失时请先安装后再重试下载。</p>
-    `;
-  } catch (error) {
-    panel.innerHTML = `<p class="text-rose-600 dark:text-rose-300">${error.message}</p>`;
-  }
-}
-
-async function refreshConfig() {
-  try {
-    const data = await api('/api/download/config');
-    const maxConcurrentEl = document.getElementById('max-concurrent');
-    const cookieDirHint = document.getElementById('cookie-dir-hint');
-    if (maxConcurrentEl && data.effective) {
-      maxConcurrentEl.value = String(data.effective.max_concurrent ?? 2);
-    }
-    if (cookieDirHint && data.effective) {
-      const dir = data.effective.cookie_dir || '~/.tiklocal/cookies';
-      const enabled = data.effective.cookie_enabled !== false;
-      cookieDirHint.textContent = `登录凭据目录：${dir}${enabled ? '' : '（已禁用）'}`;
-    }
-  } catch (error) {
-    notify(error.message, 'error');
-  }
-}
-
-function updateCookieSelect(preferred = '') {
-  const selectEl = document.getElementById('cookie-select');
-  if (!selectEl) return;
-
-  const previous = preferred || selectEl.value || '__auto__';
-  const options = [
-    { value: '__auto__', label: '自动选择（按域名）' },
-    { value: '__none__', label: '不使用登录凭据' },
-  ];
-  (cookieMeta.files || []).forEach((name) => {
-    options.push({ value: name, label: `使用文件：${name}` });
-  });
-
-  selectEl.innerHTML = options.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
-  const hasPrevious = options.some((item) => item.value === previous);
-  selectEl.value = hasPrevious ? previous : '__auto__';
-  selectEl.disabled = cookieMeta.cookie_enabled === false;
-}
-
-async function refreshCookies(preferred = '') {
-  try {
-    const data = await api('/api/download/cookies');
-    cookieMeta = data;
-    updateCookieSelect(preferred);
-  } catch (error) {
-    notify(error.message, 'error');
-  }
-}
-
-async function refreshJobs() {
-  try {
-    const data = await api('/api/download/jobs?limit=80');
-    renderJobs(data.jobs || []);
-  } catch (error) {
-    notify(error.message, 'error');
-  }
-}
-
-function restartPolling() {
-  if (pollTimer) clearInterval(pollTimer);
-  const delay = document.hidden ? 9000 : 2200;
-  pollTimer = setInterval(refreshJobs, delay);
-}
-
-document.addEventListener('visibilitychange', restartPolling);
-
-document.addEventListener('DOMContentLoaded', async () => {
-  const form = document.getElementById('download-form');
-  const saveConfigBtn = document.getElementById('save-config-btn');
-  const refreshBtn = document.getElementById('refresh-jobs-btn');
-  const clearHistoryBtn = document.getElementById('clear-history-btn');
-  const cookieUploadBtn = document.getElementById('cookie-upload-btn');
-
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const urlInput = document.getElementById('download-url');
-    const engineSelect = document.getElementById('engine-select');
-    const submitBtn = document.getElementById('download-submit');
-    const cookieSelect = document.getElementById('cookie-select');
-    const url = (urlInput?.value || '').trim();
-    const engine = (engineSelect?.value || 'yt-dlp').trim();
-    if (!url) {
-      notify('请输入链接', 'error');
-      return;
-    }
-    if (engine === 'gallery-dl' && !dependencyMeta.gallery_dl_available) {
-      notify('当前未安装 gallery-dl，请先安装后再使用该引擎', 'error');
-      return;
-    }
-
-    try {
-      if (submitBtn) submitBtn.disabled = true;
-      const selectedCookie = (cookieSelect?.value || '__auto__').trim();
-      const payload = { url, save_mode: 'root', engine };
-      if (selectedCookie === '__none__') {
-        payload.cookie_mode = 'none';
-      } else if (selectedCookie === '__auto__') {
-        payload.cookie_mode = 'auto';
-      } else {
-        payload.cookie_mode = 'manual';
-        payload.cookie_file = selectedCookie;
-      }
-      await api('/api/download/jobs', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      if (urlInput) urlInput.value = '';
-      notify('任务已创建', 'success');
-      await refreshJobs();
-    } catch (error) {
-      notify(error.message, 'error');
-    } finally {
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  });
-
-  saveConfigBtn?.addEventListener('click', async () => {
-    const maxConcurrentEl = document.getElementById('max-concurrent');
-    const maxConcurrent = Number.parseInt((maxConcurrentEl?.value || '2').trim(), 10);
-    if (Number.isNaN(maxConcurrent)) {
-      notify('并发配置必须是整数', 'error');
-      return;
-    }
-
-    try {
-      await api('/api/download/config', {
-        method: 'POST',
-        body: JSON.stringify({
-          enabled: true,
-          default_to_root: true,
-          allow_playlist: false,
-          max_concurrent: maxConcurrent,
-        })
-      });
-      notify('设置已保存', 'success');
-      await refreshConfig();
-    } catch (error) {
-      notify(error.message, 'error');
-    }
-  });
-
-  refreshBtn?.addEventListener('click', refreshJobs);
-
-  clearHistoryBtn?.addEventListener('click', async () => {
-    try {
-      const data = await api('/api/download/jobs/clear', { method: 'POST' });
-      notify(`已清理 ${data.deleted || 0} 条记录`, 'success');
-      await refreshJobs();
-    } catch (error) {
-      notify(error.message, 'error');
-    }
-  });
-
-  cookieUploadBtn?.addEventListener('click', async () => {
-    const fileInput = document.getElementById('cookie-upload-file');
-    const file = fileInput?.files?.[0];
-    if (!file) {
-      notify('请选择要上传的文件', 'error');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const data = await apiForm('/api/download/cookies/upload', formData);
-      notify('登录凭据已更新', 'success');
-      if (fileInput) fileInput.value = '';
-      await refreshCookies(data.filename || '');
-    } catch (error) {
-      notify(error.message, 'error');
-    }
-  });
-
-  await Promise.all([refreshProbe(), refreshConfig(), refreshCookies(), refreshJobs()]);
-  restartPolling();
-});
-</script>
+<script src="{{ url_for('static', filename='download_page_controller.js') }}"></script>
 {% endblock %}
