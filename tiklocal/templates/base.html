@@ -383,13 +383,6 @@
             <i data-feather="download"></i><span>下载</span>
           </a>
           <div class="more-menu-divider" aria-hidden="true"></div>
-          <button id="more-theme-toggle" type="button" class="more-menu-item" aria-pressed="false">
-            <i data-feather="sliders"></i>
-            <span>外观</span>
-            <span class="appearance-switch" aria-hidden="true">
-              <i data-feather="sun"></i><i data-feather="moon"></i>
-            </span>
-          </button>
           <a href="/settings" class="more-menu-item {% if menu == 'settings' %}is-active{% endif %}">
             <i data-feather="settings"></i><span>设置</span>
           </a>
@@ -403,27 +396,39 @@
       class ThemeManager {
         constructor() {
           this.init();
-          this.bindEvents();
         }
         init() {
+          this.mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
           const savedTheme = localStorage.getItem('theme');
-          const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          const initialTheme = savedTheme || systemTheme;
-          this.setTheme(initialTheme, false);
+          this.preference = ['light', 'dark', 'system'].includes(savedTheme) ? savedTheme : 'system';
+          this.apply();
+          const onSystemThemeChange = () => {
+            if (this.preference === 'system') this.apply();
+          };
+          if (this.mediaQuery.addEventListener) {
+            this.mediaQuery.addEventListener('change', onSystemThemeChange);
+          } else {
+            this.mediaQuery.addListener?.(onSystemThemeChange);
+          }
           feather.replace();
         }
-        setTheme(theme, animate = true) {
-          const body = document.body;
-          body.setAttribute('data-theme', theme);
-          localStorage.setItem('theme', theme);
-          document.getElementById('more-theme-toggle')?.setAttribute('aria-pressed', String(theme === 'dark'));
+        resolvedTheme() {
+          return this.preference === 'system'
+            ? (this.mediaQuery.matches ? 'dark' : 'light')
+            : this.preference;
         }
-        toggleTheme() {
-          const currentTheme = document.body.getAttribute('data-theme');
-          this.setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+        apply() {
+          const resolved = this.resolvedTheme();
+          document.body.setAttribute('data-theme', resolved);
+          window.dispatchEvent(new CustomEvent('tiklocal:theme-changed', {
+            detail: { preference: this.preference, resolved }
+          }));
         }
-        bindEvents() {
-          document.getElementById('more-theme-toggle')?.addEventListener('click', () => this.toggleTheme());
+        setPreference(preference) {
+          if (!['light', 'dark', 'system'].includes(preference)) return;
+          this.preference = preference;
+          localStorage.setItem('theme', preference);
+          this.apply();
         }
       }
 
@@ -464,7 +469,7 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
-        new ThemeManager();
+        window.themeManager = new ThemeManager();
         new MoreMenu();
       });
     </script>

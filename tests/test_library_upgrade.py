@@ -92,7 +92,8 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert 'id="collection-modal"' in body
     assert 'id="more-menu-trigger"' in body
     assert 'id="more-menu"' in body
-    assert 'id="more-theme-toggle"' in body
+    assert 'id="more-theme-toggle"' not in body
+    assert '<span>设置</span>' in body
     assert 'id="flow-state"' in body
     assert 'id="flow-state-retry"' in body
     assert 'id="flow-state-next"' in body

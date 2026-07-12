@@ -1,754 +1,468 @@
 {% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --settings-bg: #f4f3ef;
+    --settings-card: rgba(255, 255, 252, 0.9);
+    --settings-ink: #292822;
+    --settings-muted: rgba(41, 40, 34, 0.5);
+    --settings-line: rgba(41, 40, 34, 0.085);
+    --settings-soft: rgba(41, 40, 34, 0.055);
+  }
+  [data-theme="dark"] {
+    --settings-bg: #11110f;
+    --settings-card: rgba(34, 34, 30, 0.9);
+    --settings-ink: rgba(255, 255, 255, 0.92);
+    --settings-muted: rgba(255, 255, 255, 0.44);
+    --settings-line: rgba(255, 255, 255, 0.085);
+    --settings-soft: rgba(255, 255, 255, 0.06);
+  }
+  body[data-nav-context="settings"] {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+    background:
+      radial-gradient(circle at 50% -13rem, rgba(169, 151, 113, 0.08), transparent 31rem),
+      var(--settings-bg) !important;
+  }
+  .settings-page {
+    width: min(100%, 660px);
+    min-height: calc(100dvh - 104px - env(safe-area-inset-bottom));
+    margin: 0 auto;
+    padding: 27px 14px 10px;
+    color: var(--settings-ink);
+  }
+  .settings-header { padding: 0 3px 27px; }
+  .settings-eyebrow {
+    margin: 0 0 4px;
+    color: var(--settings-muted);
+    font-size: 10px;
+    font-weight: 680;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .settings-title {
+    margin: 0;
+    font-size: clamp(25px, 5vw, 31px);
+    font-weight: 680;
+    letter-spacing: -0.04em;
+    line-height: 1.08;
+  }
+  .settings-stack { display: grid; gap: 27px; }
+  .settings-section-title {
+    margin: 0 0 9px 4px;
+    color: var(--settings-muted);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+  }
+  .settings-card {
+    overflow: hidden;
+    border: 1px solid var(--settings-line);
+    border-radius: 18px;
+    background: var(--settings-card);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), 0 1px 2px rgba(35, 34, 30, 0.035), 0 9px 28px rgba(35, 34, 30, 0.025);
+  }
+  [data-theme="dark"] .settings-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035); }
+  .settings-row {
+    min-height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 13px 15px;
+  }
+  .settings-row + .settings-row { border-top: 1px solid var(--settings-line); }
+  .settings-row-main { min-width: 0; flex: 1; }
+  .settings-row-title { font-size: 14px; font-weight: 620; letter-spacing: -0.012em; line-height: 1.35; }
+  .settings-row-copy {
+    margin-top: 3px;
+    color: var(--settings-muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  .appearance-card { padding: 15px; }
+  .appearance-heading { margin-bottom: 13px; }
+  .theme-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .theme-option {
+    min-width: 0;
+    min-height: 104px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 8px;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    color: var(--settings-muted);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 610;
+    cursor: pointer;
+    transition: color 140ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 160ms ease, transform 120ms ease;
+  }
+  .theme-preview {
+    position: relative;
+    width: min(100%, 92px);
+    height: 52px;
+    overflow: hidden;
+    border: 1px solid rgba(36, 35, 30, 0.1);
+    border-radius: 9px;
+    background: #f4f2ec;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+  .theme-preview::before,
+  .theme-preview::after {
+    content: '';
+    position: absolute;
+    left: 11px;
+    height: 3px;
+    border-radius: 99px;
+    background: rgba(38, 37, 32, 0.58);
+  }
+  .theme-preview::before { top: 15px; width: 42%; }
+  .theme-preview::after { top: 24px; width: 62%; opacity: 0.34; }
+  .theme-preview-dark { border-color: rgba(255, 255, 255, 0.12); background: #1b1b18; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055); }
+  .theme-preview-dark::before, .theme-preview-dark::after { background: rgba(255, 255, 255, 0.78); }
+  .theme-preview-system { background: linear-gradient(90deg, #f4f2ec 0 50%, #1b1b18 50%); }
+  .theme-preview-system::before { background: linear-gradient(90deg, rgba(38, 37, 32, 0.58) 0 48%, rgba(255, 255, 255, 0.78) 52%); }
+  .theme-preview-system::after { background: linear-gradient(90deg, rgba(38, 37, 32, 0.35) 0 48%, rgba(255, 255, 255, 0.48) 52%); }
+  .theme-check {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 15px;
+    height: 15px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: white;
+    background: #4c6c62;
+    opacity: 0;
+    transform: scale(0.65);
+    transition: opacity 140ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .theme-check svg { width: 9px; height: 9px; stroke-width: 2.8; }
+  .theme-option:hover { color: var(--settings-ink); }
+  .theme-option:active { transform: scale(0.97); }
+  .theme-option:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 2px; }
+  .theme-option.is-active {
+    color: var(--settings-ink);
+    border-color: var(--settings-line);
+    background: rgba(255, 255, 255, 0.62);
+    box-shadow: 0 1px 2px rgba(32, 30, 24, 0.06), 0 7px 18px rgba(32, 30, 24, 0.045);
+  }
+  .theme-option.is-active .theme-check { opacity: 1; transform: scale(1); }
+  [data-theme="dark"] .theme-option.is-active { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055); }
+  .library-summary { padding: 18px 16px 16px; }
+  .library-total { font-size: 29px; font-weight: 670; letter-spacing: -0.045em; line-height: 1; }
+  .library-total-unit { margin-left: 5px; color: var(--settings-muted); font-size: 12px; font-weight: 560; letter-spacing: 0; }
+  .library-types { margin-top: 9px; color: var(--settings-muted); font-size: 11px; }
+  .library-sync-state { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--settings-muted); font-size: 11px; }
+  .library-sync-dot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: #668b7d; box-shadow: 0 0 0 3px rgba(102, 139, 125, 0.11); }
+  .library-sync-state.is-error .library-sync-dot { background: #bd6259; box-shadow: 0 0 0 3px rgba(189, 98, 89, 0.11); }
+  .setting-icon {
+    width: 31px;
+    height: 31px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    color: var(--settings-muted);
+    background: var(--settings-soft);
+  }
+  .setting-icon svg { width: 15px; height: 15px; stroke-width: 1.8; }
+  .settings-action {
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--settings-line);
+    border-radius: 999px;
+    color: var(--settings-ink);
+    background: var(--settings-soft);
+    font-size: 11px;
+    font-weight: 620;
+    cursor: pointer;
+    transition: background-color 140ms ease, transform 120ms ease, opacity 140ms ease;
+  }
+  .settings-action:hover { background: color-mix(in oklab, var(--settings-ink) 10%, transparent); }
+  .settings-action:active { transform: scale(0.97); }
+  .settings-action:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 2px; }
+  .settings-action:disabled { opacity: 0.45; cursor: wait; }
+  .settings-action.is-danger { color: #b4433b; background: rgba(180, 67, 59, 0.065); }
+  .settings-action.is-primary { color: #f7f6f1; border-color: #34332d; background: #34332d; }
+  .settings-action.is-warning { color: #8a622f; border-color: rgba(138, 98, 47, 0.16); background: rgba(138, 98, 47, 0.075); }
+  [data-theme="dark"] .settings-action.is-danger { color: #e69a93; background: rgba(230, 154, 147, 0.075); }
+  [data-theme="dark"] .settings-action.is-primary { color: #24231f; border-color: #e9e5da; background: #e9e5da; }
+  [data-theme="dark"] .settings-action.is-warning { color: #d8b57d; border-color: rgba(216, 181, 125, 0.16); background: rgba(216, 181, 125, 0.08); }
+  .about-footer { padding: 1px 4px 9px; color: var(--settings-muted); text-align: center; }
+  .about-card { padding: 0; }
+  .about-line { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 7px; }
+  .about-name { color: color-mix(in oklab, var(--settings-ink) 82%, transparent); font-size: 11px; font-weight: 620; }
+  .about-separator { color: color-mix(in oklab, var(--settings-muted) 44%, transparent); font-size: 9px; }
+  .about-version { color: var(--settings-muted); font-size: 10px; }
+  .about-link { color: var(--settings-muted); font-size: 10px; font-weight: 560; text-decoration: none; }
+  .about-link:hover { color: var(--settings-ink); }
+  .about-link:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 3px; border-radius: 3px; }
+  .confirm-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 270;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgba(18, 18, 16, 0.42);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .confirm-card { width: min(100%, 390px); padding: 19px; border: 1px solid var(--settings-line); border-radius: 20px; color: var(--settings-ink); background: var(--settings-bg); box-shadow: 0 24px 70px rgba(20, 19, 16, 0.22); }
+  .confirm-title { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
+  .confirm-copy { margin: 7px 0 0; color: var(--settings-muted); font-size: 12px; line-height: 1.55; }
+  .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .toast-wrap { position: fixed; right: 14px; bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 280; width: min(330px, calc(100vw - 28px)); }
+  .settings-toast { display: flex; align-items: center; gap: 9px; padding: 11px 13px; border: 1px solid var(--settings-line); border-radius: 13px; color: var(--settings-ink); background: color-mix(in oklab, var(--settings-bg) 92%, transparent); box-shadow: 0 12px 32px rgba(20, 19, 16, 0.14); font-size: 12px; backdrop-filter: blur(16px); animation: toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .settings-toast svg { width: 16px; height: 16px; color: #668b7d; }
+  .settings-toast.error svg { color: #bd6259; }
+  .settings-toast.error { border-color: rgba(180, 67, 59, 0.28); }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
+  @media (min-width: 640px) { .settings-page { padding: 34px 18px 14px; } }
+  @media (prefers-reduced-motion: reduce) {
+    .theme-option, .settings-action, .settings-toast { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="bg-gray-50 dark:bg-gray-900">
-  <main class="container mx-auto px-4 py-8 lg:py-12">
-    <div class="max-w-6xl mx-auto">
-      <!-- Header -->
-      <header class="mb-8 lg:mb-12">
-        <h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">Settings</h1>
-        <p class="mt-2 text-lg text-gray-500 dark:text-gray-400">Manage your TikLocal preferences and explore app details.</p>
-      </header>
+<main class="settings-page">
+  <header class="settings-header">
+    <p class="settings-eyebrow">TikLocal</p>
+    <h1 class="settings-title">设置</h1>
+  </header>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 lg:gap-12">
-        <!-- Left Column / Main Settings -->
-        <div class="lg:col-span-2 space-y-8">
-          <!-- Actions -->
-          <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
-            <header class="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <i data-feather="zap" class="w-6 h-6 text-green-500"></i>
-                <span>Actions</span>
-              </h2>
-            </header>
-            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button onclick="clearCache()" class="group flex items-center gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 text-left">
-                <div class="flex-shrink-0 w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
-                  <i data-feather="trash-2" class="w-6 h-6 text-orange-600 dark:text-orange-400"></i>
-                </div>
-                <div>
-                  <h3 class="font-semibold text-gray-800 dark:text-gray-200">Clear Cache</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">Free up storage space.</p>
-                </div>
-              </button>
-              <button onclick="refreshLibrary()" class="group flex items-center gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 text-left">
-                <div class="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                  <i data-feather="refresh-cw" class="w-6 h-6 text-blue-600 dark:text-blue-400"></i>
-                </div>
-                <div>
-                  <h3 class="font-semibold text-gray-800 dark:text-gray-200">Refresh Library</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">Rescan media files.</p>
-                </div>
-              </button>
-              <button onclick="clearActivity()" class="group flex items-center gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 text-left">
-                <div class="flex-shrink-0 w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
-                  <i data-feather="rotate-ccw" class="w-6 h-6 text-purple-600 dark:text-purple-400"></i>
-                </div>
-                <div>
-                  <h3 class="font-semibold text-gray-800 dark:text-gray-200">Reset Recommendations</h3>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">Clear local viewing history and preferences.</p>
-                </div>
-              </button>
-            </div>
-          </section>
-
-          <!-- LLM Provider -->
-          <section class="hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
-            <header class="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div class="flex items-center justify-between gap-4">
-                <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  <i data-feather="server" class="w-6 h-6 text-blue-500"></i>
-                  <span>LLM Provider</span>
-                </h2>
-                <span id="llm-config-state" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                  已保存
-                </span>
-              </div>
-            </header>
-            <div class="p-6 space-y-4">
-              <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                <div>
-                  <p class="text-sm font-semibold text-gray-900 dark:text-white">API Key 状态</p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">API Key 仍通过环境变量管理，不在页面内保存。</p>
-                </div>
-                <span id="llm-api-key-state" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">检测中...</span>
-              </div>
-              <div>
-                <label for="llm-model-name" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Model Name</label>
-                <input id="llm-model-name" type="text" maxlength="256" placeholder="例如 gpt-4.1-mini" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              </div>
-              <div>
-                <label for="llm-base-url" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Base URL</label>
-                <input id="llm-base-url" type="text" maxlength="512" placeholder="例如 https://api.openai.com/v1" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">留空将回退到环境变量配置。</p>
-              </div>
-              <div class="flex flex-wrap items-center gap-3 pt-2">
-                <button id="llm-save-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors">
-                  <i data-feather="save" class="w-4 h-4"></i>
-                  保存配置
-                </button>
-                <button id="llm-reset-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                  <i data-feather="rotate-ccw" class="w-4 h-4"></i>
-                  恢复默认
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <!-- AI Prompt -->
-          <section class="hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
-            <header class="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div class="flex items-center justify-between gap-4">
-                <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  <i data-feather="cpu" class="w-6 h-6 text-amber-500"></i>
-                  <span>AI Prompt</span>
-                </h2>
-                <span id="ai-prompt-state" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                  已保存
-                </span>
-              </div>
-            </header>
-            <div class="p-6 space-y-4">
-              <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                <div>
-                  <p class="text-sm font-semibold text-gray-900 dark:text-white">启用自定义提示词</p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">关闭后不会使用默认提示词。</p>
-                </div>
-                <input type="checkbox" id="ai-prompt-enabled" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-              </div>
-
-              <div>
-                <div class="flex items-center justify-between mb-2">
-                  <label for="ai-system-prompt" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">System Prompt</label>
-                  <span id="ai-system-count" class="text-xs text-gray-500 dark:text-gray-400">0/4000</span>
-                </div>
-                <textarea id="ai-system-prompt" rows="5" maxlength="4000" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-              </div>
-
-              <div>
-                <div class="flex items-center justify-between mb-2">
-                  <label for="ai-user-prompt" class="block text-sm font-semibold text-gray-800 dark:text-gray-200">User Prompt</label>
-                  <span id="ai-user-count" class="text-xs text-gray-500 dark:text-gray-400">0/8000</span>
-                </div>
-                <textarea id="ai-user-prompt" rows="7" maxlength="8000" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">支持占位符 <code>{tags_limit}</code> 或 <code>{% raw %}{{tags_limit}}{% endraw %}</code>。</p>
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                  <div class="flex items-center justify-between">
-                    <label for="ai-temperature" class="text-sm font-semibold text-gray-800 dark:text-gray-200">temperature</label>
-                    <span id="ai-temperature-value" class="text-xs text-gray-500 dark:text-gray-400">0.60</span>
-                  </div>
-                  <input id="ai-temperature" type="range" min="0" max="2" step="0.1" value="0.6" class="w-full mt-2">
-                </div>
-                <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                  <label for="ai-tags-limit" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">tags_limit (1-20)</label>
-                  <input id="ai-tags-limit" type="number" min="1" max="20" value="5" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-              </div>
-
-              <div class="flex flex-wrap items-center gap-3 pt-2">
-                <button id="ai-prompt-save-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors">
-                  <i data-feather="save" class="w-4 h-4"></i>
-                  保存配置
-                </button>
-                <button id="ai-prompt-reset-btn" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                  <i data-feather="rotate-ccw" class="w-4 h-4"></i>
-                  清空配置
-                </button>
-              </div>
-            </div>
-          </section>
+  <div class="settings-stack">
+    <section aria-labelledby="appearance-title">
+      <h2 id="appearance-title" class="settings-section-title">外观</h2>
+      <div class="settings-card appearance-card">
+        <div class="appearance-heading">
+          <div class="settings-row-title">显示模式</div>
+          <div class="settings-row-copy">选择后立即应用到所有页面。</div>
         </div>
-
-        <!-- Right Column / Info -->
-        <aside class="lg:col-span-1 space-y-8 mt-8 lg:mt-0">
-          <!-- Media Stats -->
-          <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
-            <header class="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <i data-feather="bar-chart-2" class="w-6 h-6 text-purple-500"></i>
-                <span>Statistics</span>
-              </h2>
-            </header>
-            <div class="p-6 space-y-4">
-              <p id="index-sync-state" class="px-4 text-xs text-gray-400">读取索引状态...</p>
-              <div class="flex items-center justify-between p-4 rounded-lg">
-                <div class="flex items-center gap-4">
-                  <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
-                    <i data-feather="play-circle" class="w-5 h-5 text-indigo-500"></i>
-                  </div>
-                  <div>
-                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">Total Videos</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">In your library</p>
-                  </div>
-                </div>
-                <span id="videos-count" class="text-2xl font-bold text-indigo-500">{{ videos }}</span>
-              </div>
-              <div class="flex items-center justify-between p-4 rounded-lg">
-                <div class="flex items-center gap-4">
-                  <div class="flex-shrink-0 w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-full flex items-center justify-center">
-                    <i data-feather="image" class="w-5 h-5 text-pink-500"></i>
-                  </div>
-                  <div>
-                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">Total Images</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">In your library</p>
-                  </div>
-                </div>
-                <span id="images-count" class="text-2xl font-bold text-pink-500">{{ images }}</span>
-              </div>
-              <a href="/favorite" class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <div class="flex items-center gap-4">
-                  <div class="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                    <i data-feather="heart" class="w-5 h-5 text-red-500"></i>
-                  </div>
-                  <div>
-                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">My Favorites</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">View saved media</p>
-                  </div>
-                </div>
-                <span id="favorites-count" class="text-2xl font-bold text-red-500">{{ favorites }}</span>
-              </a>
-              <div class="flex items-center justify-between p-4 rounded-lg">
-                <div class="flex items-center gap-4">
-                  <div class="flex-shrink-0 w-10 h-10 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center">
-                    <i data-feather="database" class="w-5 h-5 text-teal-500"></i>
-                  </div>
-                  <div>
-                    <h3 class="font-semibold text-gray-800 dark:text-gray-200">Cache Size</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400"><span id="cache-count">{{ cache_count }}</span> thumbnails</p>
-                  </div>
-                </div>
-                <span id="cache-size" class="text-2xl font-bold text-teal-500">{{ cache_size_mb }} MB</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- About -->
-          <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
-            <header class="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <i data-feather="info" class="w-6 h-6 text-teal-500"></i>
-                <span>About</span>
-              </h2>
-            </header>
-            <div class="p-6 space-y-2">
-              <a href="https://github.com/ChanMo/TikLocal" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <div class="flex items-center gap-4">
-                  <i data-feather="github" class="w-5 h-5 text-gray-500 dark:text-gray-400"></i>
-                  <span class="font-medium text-gray-700 dark:text-gray-300">GitHub Repository</span>
-                </div>
-                <i data-feather="external-link" class="w-5 h-5 text-gray-400"></i>
-              </a>
-              <a href="mailto:chan.mo@outlook.com" class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <div class="flex items-center gap-4">
-                  <i data-feather="mail" class="w-5 h-5 text-gray-500 dark:text-gray-400"></i>
-                  <span class="font-medium text-gray-700 dark:text-gray-300">Contact Email</span>
-                </div>
-                <i data-feather="external-link" class="w-5 h-5 text-gray-400"></i>
-              </a>
-              <div class="flex items-center justify-between p-4">
-                <div class="flex items-center gap-4">
-                  <i data-feather="tag" class="w-5 h-5 text-gray-500 dark:text-gray-400"></i>
-                  <span class="font-medium text-gray-700 dark:text-gray-300">App Version</span>
-                </div>
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
-                  v{{version}}
-                </span>
-              </div>
-            </div>
-          </section>
-        </aside>
+        <div class="theme-options" role="group" aria-label="显示模式">
+          <button class="theme-option" type="button" data-theme-preference="system" aria-pressed="false">
+            <span class="theme-preview theme-preview-system"><span class="theme-check"><i data-feather="check"></i></span></span><span>跟随系统</span>
+          </button>
+          <button class="theme-option" type="button" data-theme-preference="light" aria-pressed="false">
+            <span class="theme-preview theme-preview-light"><span class="theme-check"><i data-feather="check"></i></span></span><span>浅色</span>
+          </button>
+          <button class="theme-option" type="button" data-theme-preference="dark" aria-pressed="false">
+            <span class="theme-preview theme-preview-dark"><span class="theme-check"><i data-feather="check"></i></span></span><span>深色</span>
+          </button>
+        </div>
       </div>
-    </div>
-  </main>
-</div>
+    </section>
+
+    <section aria-labelledby="library-title">
+      <h2 id="library-title" class="settings-section-title">媒体库</h2>
+      <div class="settings-card">
+        <div class="library-summary">
+          <div class="library-total"><span id="media-total">{{ videos + images }}</span><span class="library-total-unit">个本地媒体</span></div>
+          <div class="library-types"><span id="videos-count">{{ videos }}</span> 个视频 · <span id="images-count">{{ images }}</span> 张图片</div>
+          <div id="index-sync-state" class="library-sync-state"><span class="library-sync-dot"></span><span id="index-sync-copy">正在读取索引状态…</span></div>
+        </div>
+        <div class="settings-row">
+          <span class="setting-icon"><i data-feather="refresh-cw"></i></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">重新扫描媒体库</div>
+            <div class="settings-row-copy">适用于应用运行期间从外部新增、移动或删除文件。</div>
+          </div>
+          <button id="refresh-library" class="settings-action" type="button">扫描</button>
+        </div>
+        <div class="settings-row">
+          <span class="setting-icon"><i data-feather="image"></i></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">缩略图缓存</div>
+            <div class="settings-row-copy"><span id="cache-size">{{ cache_size_mb }} MB</span>，清理后会在浏览时按需重新生成。</div>
+          </div>
+          <button id="clear-cache" class="settings-action" type="button">清理</button>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="privacy-title">
+      <h2 id="privacy-title" class="settings-section-title">隐私与推荐</h2>
+      <div class="settings-card settings-row">
+        <span class="setting-icon"><i data-feather="clock"></i></span>
+        <div class="settings-row-main">
+          <div class="settings-row-title">本地浏览记录</div>
+          <div class="settings-row-copy">重置浏览、跳过和完成记录，不影响收藏与集合。</div>
+        </div>
+        <button id="reset-recommendations" class="settings-action is-danger" type="button">重置</button>
+      </div>
+    </section>
+
+    <section aria-label="关于">
+      <footer class="about-footer about-card">
+        <div class="about-line">
+          <span class="about-name">TikLocal</span><span class="about-separator" aria-hidden="true">·</span><span class="about-version">v{{ version }}</span><span class="about-separator" aria-hidden="true">·</span>
+          <a class="about-link" href="https://github.com/ChanMo/TikLocal" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <span class="about-separator" aria-hidden="true">·</span>
+          <a class="about-link" href="mailto:chan.mo@outlook.com">联系作者</a>
+        </div>
+      </footer>
+    </section>
+  </div>
+</main>
+<div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
 {% endblock %}
 
 {% block extra_body %}
 <script>
-let promptConfigState = {
-  baseline: null,
-  dirty: false
-};
-let llmConfigState = {
-  baseline: null,
-  dirty: false
-};
+  (() => {
+    const themeButtons = Array.from(document.querySelectorAll('[data-theme-preference]'));
+    const refreshButton = document.getElementById('refresh-library');
+    const clearCacheButton = document.getElementById('clear-cache');
+    const resetButton = document.getElementById('reset-recommendations');
+    const toastWrap = document.getElementById('toast-wrap');
 
-document.addEventListener('DOMContentLoaded', () => {
-  // 页面加载时获取统计信息
-  loadStats();
-  initLLMConfig();
-  initPromptConfig();
-});
-
-async function loadStats() {
-  try {
-    const res = await fetch('/api/library/stats');
-    const data = await res.json();
-
-    // 更新统计显示
-    document.getElementById('videos-count').textContent = data.videos;
-    document.getElementById('images-count').textContent = data.images;
-    document.getElementById('favorites-count').textContent = data.favorites;
-    document.getElementById('cache-count').textContent = data.cache_count;
-    document.getElementById('cache-size').textContent = `${data.cache_mb} MB`;
-    const syncState = document.getElementById('index-sync-state');
-    if (syncState) {
-      const syncedAt = data.last_synced_at ? new Date(data.last_synced_at).toLocaleString() : '尚未同步';
-      syncState.textContent = `已索引 ${data.indexed_total || 0} 个媒体 · ${syncedAt}`;
+    function currentThemePreference() {
+      const saved = localStorage.getItem('theme');
+      return ['light', 'dark', 'system'].includes(saved) ? saved : 'system';
     }
-  } catch (err) {
-    console.error('Failed to load stats:', err);
-  }
-}
 
-async function clearCache() {
-  showModal('确定要清除缓存吗？', '这将删除所有缩略图文件，释放存储空间。缩略图会在访问时自动重新生成。', async () => {
-    try {
-      const res = await fetch('/api/cache/clear', { method: 'POST' });
-      const data = await res.json();
+    function syncThemeButtons(preference = currentThemePreference()) {
+      themeButtons.forEach((button) => {
+        const active = button.dataset.themePreference === preference;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+    }
 
-      if (data.success) {
-        showNotification(`缓存清理成功！删除了 ${data.deleted_count} 个文件，释放了 ${data.freed_mb} MB 空间。`, 'success');
-        loadStats(); // 刷新统计
+    function setThemePreference(preference) {
+      if (window.themeManager?.setPreference) {
+        window.themeManager.setPreference(preference);
       } else {
-        showNotification(`清理失败：${data.error}`, 'error');
+        localStorage.setItem('theme', preference);
+        const resolved = preference === 'system'
+          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : preference;
+        document.body.setAttribute('data-theme', resolved);
       }
-    } catch (err) {
-      showNotification('清理失败，请重试', 'error');
+      syncThemeButtons(preference);
     }
-  });
-}
 
-async function refreshLibrary() {
-  showModal('确定要刷新媒体库吗？', '这将重新扫描所有媒体文件，可能需要一些时间。', async () => {
-    try {
-      showNotification('正在刷新媒体库...', 'info');
-      const res = await fetch('/api/library/sync', { method: 'POST' });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'sync failed');
-      loadStats();
-      showNotification(`媒体库已刷新，共索引 ${data.data.indexed} 个文件`, 'success');
-    } catch (err) {
-      showNotification('刷新失败，请重试', 'error');
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `settings-toast ${type}`;
+      const icon = document.createElement('i');
+      icon.setAttribute('data-feather', type === 'error' ? 'alert-circle' : 'check-circle');
+      const copy = document.createElement('span');
+      copy.textContent = message;
+      toast.append(icon, copy);
+      toastWrap.replaceChildren(toast);
+      feather.replace();
+      window.setTimeout(() => toast.remove(), 3200);
     }
-  });
-}
 
-async function clearActivity() {
-  showModal('重置推荐记录？', '这会清除本地保存的浏览、跳过和完成记录。收藏与集合不会受到影响。', async () => {
-    try {
-      const res = await fetch('/api/activity', { method: 'DELETE' });
-      const data = await res.json();
-      showNotification(data.success ? '推荐记录已清除' : '清除失败', data.success ? 'success' : 'error');
-    } catch (err) {
-      showNotification('清除失败，请重试', 'error');
+    async function requestJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const payload = await response.json();
+      if (!response.ok || payload.success === false) throw new Error(payload.error || '请求失败');
+      return payload;
     }
-  });
-}
 
-function initLLMConfig() {
-  const modelInput = document.getElementById('llm-model-name');
-  const baseUrlInput = document.getElementById('llm-base-url');
-  const saveBtn = document.getElementById('llm-save-btn');
-  const resetBtn = document.getElementById('llm-reset-btn');
-
-  if (!modelInput || !baseUrlInput) return;
-
-  const onInput = () => {
-    setLLMDirty(isLLMFormChanged());
-  };
-
-  [modelInput, baseUrlInput].forEach((el) => {
-    el.addEventListener('input', onInput);
-    el.addEventListener('change', onInput);
-  });
-
-  saveBtn?.addEventListener('click', saveLLMConfig);
-  resetBtn?.addEventListener('click', resetLLMConfig);
-  loadLLMConfig();
-}
-
-function currentLLMFormValue() {
-  const modelInput = document.getElementById('llm-model-name');
-  const baseUrlInput = document.getElementById('llm-base-url');
-  return {
-    model_name: (modelInput?.value || '').trim(),
-    base_url: (baseUrlInput?.value || '').trim()
-  };
-}
-
-function setLLMDirty(dirty) {
-  llmConfigState.dirty = !!dirty;
-  const state = document.getElementById('llm-config-state');
-  if (!state) return;
-  if (llmConfigState.dirty) {
-    state.textContent = '未保存';
-    state.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300';
-  } else {
-    state.textContent = '已保存';
-    state.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200';
-  }
-}
-
-function isLLMFormChanged() {
-  if (!llmConfigState.baseline) return false;
-  return JSON.stringify(currentLLMFormValue()) !== JSON.stringify(llmConfigState.baseline);
-}
-
-function applyLLMConfig(data) {
-  const modelInput = document.getElementById('llm-model-name');
-  const baseUrlInput = document.getElementById('llm-base-url');
-  const apiKeyState = document.getElementById('llm-api-key-state');
-  const sourceConfig = data.custom || data.default || {};
-
-  if (!modelInput || !baseUrlInput) return;
-
-  modelInput.value = sourceConfig.model_name || '';
-  baseUrlInput.value = sourceConfig.base_url || '';
-  if (apiKeyState) {
-    apiKeyState.textContent = data.has_api_key ? '已配置（环境变量）' : '未配置';
-    apiKeyState.className = data.has_api_key
-      ? 'text-xs px-2 py-1 rounded bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
-      : 'text-xs px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300';
-  }
-
-  llmConfigState.baseline = currentLLMFormValue();
-  setLLMDirty(false);
-}
-
-async function loadLLMConfig() {
-  try {
-    const res = await fetch('/api/ai/llm-config');
-    const data = await res.json();
-    if (!data.success) {
-      showNotification(data.error || '读取 LLM 配置失败', 'error');
-      return;
+    function formatSyncTime(value) {
+      if (!value) return '尚未完成扫描';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '最近已完成扫描';
+      return `最近扫描：${date.toLocaleString()}`;
     }
-    applyLLMConfig(data.data);
-  } catch (err) {
-    showNotification('读取 LLM 配置失败', 'error');
-  }
-}
 
-async function saveLLMConfig() {
-  const payload = currentLLMFormValue();
-  if (payload.base_url && !/^https?:\/\//i.test(payload.base_url)) {
-    showNotification('base_url 必须以 http:// 或 https:// 开头', 'error');
-    return;
-  }
-
-  const saveBtn = document.getElementById('llm-save-btn');
-  if (saveBtn) saveBtn.disabled = true;
-  try {
-    const res = await fetch('/api/ai/llm-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (!data.success) {
-      showNotification(data.error || '保存 LLM 配置失败', 'error');
-      return;
-    }
-    applyLLMConfig(data.data);
-    showNotification('LLM 配置已保存', 'success');
-  } catch (err) {
-    showNotification('保存 LLM 配置失败', 'error');
-  } finally {
-    if (saveBtn) saveBtn.disabled = false;
-  }
-}
-
-async function resetLLMConfig() {
-  showModal('恢复默认 LLM 配置？', '这会清空你保存的 model_name/base_url，回退到环境变量。', async () => {
-    try {
-      const res = await fetch('/api/ai/llm-config/reset', { method: 'POST' });
-      const data = await res.json();
-      if (!data.success) {
-        showNotification(data.error || '恢复失败', 'error');
-        return;
+    async function loadStats() {
+      try {
+        const payload = await requestJson('/api/library/stats');
+        const videos = Number(payload.videos || 0);
+        const images = Number(payload.images || 0);
+        document.getElementById('media-total').textContent = Number(payload.indexed_total || videos + images);
+        document.getElementById('videos-count').textContent = videos;
+        document.getElementById('images-count').textContent = images;
+        document.getElementById('cache-size').textContent = `${Number(payload.cache_mb || 0)} MB`;
+        document.getElementById('index-sync-copy').textContent = formatSyncTime(payload.last_synced_at);
+        document.getElementById('index-sync-state').classList.remove('is-error');
+      } catch (error) {
+        document.getElementById('index-sync-copy').textContent = '暂时无法读取索引状态';
+        document.getElementById('index-sync-state').classList.add('is-error');
       }
-      applyLLMConfig(data.data);
-      showNotification('已恢复默认 LLM 配置', 'success');
-    } catch (err) {
-      showNotification('恢复失败，请重试', 'error');
     }
-  });
-}
 
-function initPromptConfig() {
-  const enabledInput = document.getElementById('ai-prompt-enabled');
-  const systemInput = document.getElementById('ai-system-prompt');
-  const userInput = document.getElementById('ai-user-prompt');
-  const temperatureInput = document.getElementById('ai-temperature');
-  const tagsLimitInput = document.getElementById('ai-tags-limit');
-  const saveBtn = document.getElementById('ai-prompt-save-btn');
-  const resetBtn = document.getElementById('ai-prompt-reset-btn');
-
-  if (!enabledInput || !systemInput || !userInput || !temperatureInput || !tagsLimitInput) {
-    return;
-  }
-
-  const onInput = () => {
-    updatePromptCounters();
-    setPromptDirty(isPromptFormChanged());
-  };
-
-  [enabledInput, systemInput, userInput, temperatureInput, tagsLimitInput].forEach((el) => {
-    el.addEventListener('input', onInput);
-    el.addEventListener('change', onInput);
-  });
-
-  saveBtn?.addEventListener('click', savePromptConfig);
-  resetBtn?.addEventListener('click', resetPromptConfig);
-
-  window.addEventListener('beforeunload', (event) => {
-    if (!promptConfigState.dirty && !llmConfigState.dirty) return;
-    event.preventDefault();
-    event.returnValue = '';
-  });
-
-  loadPromptConfig();
-}
-
-function updatePromptCounters() {
-  const systemInput = document.getElementById('ai-system-prompt');
-  const userInput = document.getElementById('ai-user-prompt');
-  const systemCount = document.getElementById('ai-system-count');
-  const userCount = document.getElementById('ai-user-count');
-  const temperatureInput = document.getElementById('ai-temperature');
-  const temperatureValue = document.getElementById('ai-temperature-value');
-
-  if (systemInput && systemCount) {
-    systemCount.textContent = `${systemInput.value.length}/4000`;
-  }
-  if (userInput && userCount) {
-    userCount.textContent = `${userInput.value.length}/8000`;
-  }
-  if (temperatureInput && temperatureValue) {
-    temperatureValue.textContent = Number(temperatureInput.value || 0).toFixed(2);
-  }
-}
-
-function currentPromptFormValue() {
-  const enabledInput = document.getElementById('ai-prompt-enabled');
-  const systemInput = document.getElementById('ai-system-prompt');
-  const userInput = document.getElementById('ai-user-prompt');
-  const temperatureInput = document.getElementById('ai-temperature');
-  const tagsLimitInput = document.getElementById('ai-tags-limit');
-  return {
-    enabled: !!enabledInput?.checked,
-    system_prompt: (systemInput?.value || '').trim(),
-    user_prompt: (userInput?.value || '').trim(),
-    temperature: Number(temperatureInput?.value || 0.6),
-    tags_limit: Number(tagsLimitInput?.value || 5)
-  };
-}
-
-function setPromptDirty(dirty) {
-  promptConfigState.dirty = !!dirty;
-  const state = document.getElementById('ai-prompt-state');
-  if (!state) return;
-  if (promptConfigState.dirty) {
-    state.textContent = '未保存';
-    state.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300';
-  } else {
-    state.textContent = '已保存';
-    state.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200';
-  }
-}
-
-function isPromptFormChanged() {
-  if (!promptConfigState.baseline) return false;
-  return JSON.stringify(currentPromptFormValue()) !== JSON.stringify(promptConfigState.baseline);
-}
-
-function applyPromptConfig(data) {
-  const enabledInput = document.getElementById('ai-prompt-enabled');
-  const systemInput = document.getElementById('ai-system-prompt');
-  const userInput = document.getElementById('ai-user-prompt');
-  const temperatureInput = document.getElementById('ai-temperature');
-  const tagsLimitInput = document.getElementById('ai-tags-limit');
-  const sourceConfig = data.custom || data.default;
-
-  if (!sourceConfig || !enabledInput || !systemInput || !userInput || !temperatureInput || !tagsLimitInput) {
-    return;
-  }
-
-  enabledInput.checked = Boolean(data.custom?.enabled);
-  systemInput.value = sourceConfig.system_prompt || '';
-  userInput.value = sourceConfig.user_prompt || '';
-  temperatureInput.value = Number(sourceConfig.temperature ?? 0.6).toFixed(1);
-  tagsLimitInput.value = Number(sourceConfig.tags_limit ?? 5);
-
-  promptConfigState.baseline = currentPromptFormValue();
-  setPromptDirty(false);
-  updatePromptCounters();
-}
-
-async function loadPromptConfig() {
-  try {
-    const res = await fetch('/api/ai/prompt-config');
-    const data = await res.json();
-    if (!data.success) {
-      showNotification(data.error || '读取提示词配置失败', 'error');
-      return;
-    }
-    applyPromptConfig(data.data);
-  } catch (err) {
-    showNotification('读取提示词配置失败', 'error');
-  }
-}
-
-async function savePromptConfig() {
-  const payload = currentPromptFormValue();
-  if (!payload.system_prompt || !payload.user_prompt) {
-    showNotification('System Prompt 和 User Prompt 不能为空', 'error');
-    return;
-  }
-  if (payload.temperature < 0 || payload.temperature > 2) {
-    showNotification('temperature 必须在 0 到 2 之间', 'error');
-    return;
-  }
-  if (!Number.isInteger(payload.tags_limit) || payload.tags_limit < 1 || payload.tags_limit > 20) {
-    showNotification('tags_limit 必须在 1 到 20 之间', 'error');
-    return;
-  }
-
-  const saveBtn = document.getElementById('ai-prompt-save-btn');
-  if (saveBtn) saveBtn.disabled = true;
-  try {
-    const res = await fetch('/api/ai/prompt-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (!data.success) {
-      showNotification(data.error || '保存失败', 'error');
-      return;
-    }
-    applyPromptConfig(data.data);
-    showNotification('AI 提示词已保存', 'success');
-  } catch (err) {
-    showNotification('保存失败，请重试', 'error');
-  } finally {
-    if (saveBtn) saveBtn.disabled = false;
-  }
-}
-
-async function resetPromptConfig() {
-  showModal('清空提示词配置？', '这会清空当前自定义提示词，之后生成图片标题前需要重新填写提示词。', async () => {
-    try {
-      const res = await fetch('/api/ai/prompt-config/reset', { method: 'POST' });
-      const data = await res.json();
-      if (!data.success) {
-        showNotification(data.error || '清空失败', 'error');
-        return;
-      }
-      applyPromptConfig(data.data);
-      showNotification('已清空提示词配置', 'success');
-    } catch (err) {
-      showNotification('清空失败，请重试', 'error');
-    }
-  });
-}
-
-// 可复用的模态框
-function showModal(title, text, onConfirm) {
-  // 先移除已存在的模态框
-  const existingModal = document.getElementById('confirmation-modal');
-  if (existingModal) existingModal.remove();
-
-  const modalHTML = `
-    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md m-4 transform transition-all" role="document">
-        <div class="p-6">
-          <div class="flex items-start gap-4">
-            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 sm:mx-0 sm:h-10 sm:w-10">
-              <i data-feather="alert-triangle" class="h-6 w-6 text-blue-600 dark:text-blue-400"></i>
-            </div>
-            <div class="mt-0 text-center sm:text-left">
-              <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">${title}</h3>
-              <div class="mt-2">
-                <p class="text-sm text-gray-500 dark:text-gray-400">${text}</p>
-              </div>
-            </div>
+    function confirmAction(title, copy, actionLabel, tone, onConfirm) {
+      const mask = document.createElement('div');
+      mask.className = 'confirm-mask';
+      mask.innerHTML = `
+        <section class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+          <h2 id="confirm-title" class="confirm-title"></h2>
+          <p class="confirm-copy"></p>
+          <div class="confirm-actions">
+            <button class="settings-action" type="button" data-confirm-cancel>取消</button>
+            <button class="settings-action" type="button" data-confirm-accept></button>
           </div>
-        </div>
-        <div class="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-2xl">
-          <button type="button" id="confirm-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
-            确认
-          </button>
-          <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
-            取消
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', modalHTML);
-  feather.replace();
-
-  const modal = document.getElementById('confirmation-modal');
-  const confirmBtn = document.getElementById('confirm-btn');
-  const cancelBtn = document.getElementById('cancel-btn');
-
-  function closeModal() {
-    modal.remove();
-  }
-
-  confirmBtn.onclick = () => {
-    onConfirm();
-    closeModal();
-  };
-  cancelBtn.onclick = closeModal;
-  modal.onclick = (e) => {
-    if (e.target === modal) {
-      closeModal();
+        </section>`;
+      mask.querySelector('.confirm-title').textContent = title;
+      mask.querySelector('.confirm-copy').textContent = copy;
+      const acceptButton = mask.querySelector('[data-confirm-accept]');
+      acceptButton.textContent = actionLabel;
+      acceptButton.classList.add(`is-${tone}`);
+      const close = () => mask.remove();
+      mask.querySelector('[data-confirm-cancel]').addEventListener('click', close);
+      acceptButton.addEventListener('click', () => { close(); onConfirm(); });
+      mask.addEventListener('click', (event) => { if (event.target === mask) close(); });
+      mask.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
+      document.body.appendChild(mask);
+      mask.querySelector('[data-confirm-cancel]').focus();
     }
-  }
-}
 
-// 可复用的通知
-function showNotification(message, type = 'info') {
-  const iconMap = {
-    success: 'check-circle',
-    info: 'info',
-    error: 'alert-circle'
-  };
-  const colorMap = {
-    success: 'bg-green-500',
-    info: 'bg-blue-500',
-    error: 'bg-red-500'
-  };
+    async function runButton(button, busyLabel, task) {
+      const original = button.textContent;
+      button.disabled = true;
+      button.textContent = busyLabel;
+      try { await task(); } finally { button.disabled = false; button.textContent = original; }
+    }
 
-  const notification = document.createElement('div');
-  notification.className = `fixed bottom-20 right-5 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white ${colorMap[type]} transform translate-y-20 opacity-0 transition-all duration-300 ease-out z-50`;
-  notification.innerHTML = `
-    <i data-feather="${iconMap[type]}" class="w-6 h-6"></i>
-    <span class="font-medium">${message}</span>
-  `;
-  
-  document.body.appendChild(notification);
-  feather.replace();
-  
-  // 动画入场
-  setTimeout(() => {
-    notification.classList.remove('translate-y-20', 'opacity-0');
-  }, 10);
+    themeButtons.forEach((button) => button.addEventListener('click', () => setThemePreference(button.dataset.themePreference)));
+    window.addEventListener('tiklocal:theme-changed', (event) => syncThemeButtons(event.detail?.preference));
+    syncThemeButtons();
 
-  // 动画离场
-  setTimeout(() => {
-    notification.classList.add('opacity-0');
-    setTimeout(() => {
-      notification.remove();
-    }, 300);
-  }, 3000);
-}
+    refreshButton.addEventListener('click', () => {
+      confirmAction('重新扫描媒体库？', '扫描会校正运行期间发生的文件新增、移动和删除。', '开始扫描', 'primary', () => {
+        runButton(refreshButton, '扫描中…', async () => {
+          const payload = await requestJson('/api/library/sync', { method: 'POST' });
+          await loadStats();
+          showToast(`扫描完成，共索引 ${Number(payload.data?.indexed || 0)} 个媒体`);
+        }).catch(() => showToast('扫描失败，请稍后重试', 'error'));
+      });
+    });
+
+    clearCacheButton.addEventListener('click', () => {
+      confirmAction('清理缩略图缓存？', '不会删除原始媒体；缩略图会在下次浏览时按需生成。', '确认清理', 'warning', () => {
+        runButton(clearCacheButton, '清理中…', async () => {
+          const payload = await requestJson('/api/cache/clear', { method: 'POST' });
+          await loadStats();
+          showToast(`已释放 ${Number(payload.freed_mb || 0)} MB`);
+        }).catch(() => showToast('清理失败，请稍后重试', 'error'));
+      });
+    });
+
+    resetButton.addEventListener('click', () => {
+      confirmAction('重置推荐记录？', '浏览、跳过和完成记录将被清除，收藏与集合保持不变。', '确认重置', 'danger', () => {
+        runButton(resetButton, '重置中…', async () => {
+          await requestJson('/api/activity', { method: 'DELETE' });
+          showToast('推荐记录已重置');
+        }).catch(() => showToast('重置失败，请稍后重试', 'error'));
+      });
+    });
+
+    loadStats();
+  })();
 </script>
 {% endblock %}
