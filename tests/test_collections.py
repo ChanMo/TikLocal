@@ -13,6 +13,8 @@ def client(tmp_path, monkeypatch):
     (media_root / "clip.mp4").write_bytes(b"video")
     (media_root / "cover.jpg").write_bytes(b"image")
     (media_root / "odd & hash#.jpg").write_bytes(b"image")
+    (media_root / "extra-a.jpg").write_bytes(b"image")
+    (media_root / "extra-b.jpg").write_bytes(b"image")
 
     data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
@@ -67,7 +69,13 @@ def test_collection_add_remove_and_by_media(client):
         json={"uris": ["clip.mp4", "odd & hash#.jpg"]},
     )
     assert added.status_code == 200
-    assert added.get_json()["data"]["item"]["item_count"] == 2
+    added_item = added.get_json()["data"]["item"]
+    assert added_item["item_count"] == 2
+    assert [entry["uri"] for entry in added_item["preview_items"]] == [
+        "@default/odd & hash#.jpg",
+        "@default/clip.mp4",
+    ]
+    assert all(entry["thumb_url"].startswith("/thumb?uri=") for entry in added_item["preview_items"])
 
     by_media = client.get(f"/api/collections/by-media?uri={quote('odd & hash#.jpg', safe='')}")
     assert by_media.status_code == 200
@@ -121,7 +129,7 @@ def test_collection_patch_cover_and_delete(client):
     collection_id = created["id"]
     client.post(
         f"/api/collections/{quote(collection_id, safe='')}/items",
-        json={"uris": ["cover.jpg"]},
+        json={"uris": ["cover.jpg", "clip.mp4", "odd & hash#.jpg", "extra-a.jpg", "extra-b.jpg"]},
     )
 
     renamed = client.patch(
@@ -132,10 +140,17 @@ def test_collection_patch_cover_and_delete(client):
     item = renamed.get_json()["data"]["item"]
     assert item["name"] == "新名字"
     assert item["cover_uri"] == "@default/cover.jpg"
+    assert item["preview_items"][0]["uri"] == "@default/cover.jpg"
+    assert len(item["preview_items"]) == 4
 
     detail = client.get(f"/api/collections/{quote(collection_id, safe='')}")
     assert detail.status_code == 200
     assert detail.get_json()["data"]["item"]["cover_uri"] == "@default/cover.jpg"
+
+    page = client.get("/collections").data.decode("utf-8")
+    assert "collection-cover-collage" in page
+    assert 'data-count="${previewItems.length}"' in page
+    assert "<video src=" not in page
 
     deleted = client.delete(f"/api/collections/{quote(collection_id, safe='')}")
     assert deleted.status_code == 200

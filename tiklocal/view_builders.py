@@ -382,29 +382,52 @@ def collect_collection_records(
     return collection, records
 
 
-def collection_cover_payload(collection: dict, collection_store, library_service, image_extensions: set[str]) -> tuple[str, str]:
+def collection_preview_payload(
+    collection: dict,
+    collection_store,
+    library_service,
+    image_extensions: set[str],
+    limit: int = 4,
+) -> list[dict]:
+    collection_id = str(collection.get('id') or '')
     cover_uri = str(collection.get('cover_uri') or '').strip()
-    if cover_uri:
-        cover_uri = library_service.find_existing_uri(cover_uri)
-        target = library_service.resolve_path(cover_uri)
-        if target and target.exists():
-            media_type = 'image' if target.suffix.lower() in image_extensions else 'video'
-            return cover_uri, media_type
-
-    uris = collection_store.list_item_uris(str(collection.get('id') or ''), newest_first=True)
-    for uri in uris:
-        uri = library_service.find_existing_uri(uri)
-        target = library_service.resolve_path(uri)
-        if not target or not target.exists():
+    candidates = [cover_uri, *collection_store.list_item_uris(collection_id, newest_first=True)]
+    previews: list[dict] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate:
             continue
+        uri = library_service.find_existing_uri(candidate)
+        if not uri or uri in seen:
+            continue
+        target = library_service.resolve_path(uri)
+        if not target or not target.exists() or not target.is_file():
+            continue
+        seen.add(uri)
         media_type = 'image' if target.suffix.lower() in image_extensions else 'video'
-        return uri, media_type
-    return '', ''
+        previews.append({
+            'uri': uri,
+            'type': media_type,
+            'thumb_url': f"/thumb?uri={quote(uri, safe='')}",
+        })
+        if len(previews) >= max(1, int(limit)):
+            break
+    return previews
 
 
 def serialize_collection_summary(collection: dict, collection_store, library_service, image_extensions: set[str]) -> dict:
     collection_id = str(collection.get('id') or '')
-    cover_uri, cover_type = collection_cover_payload(collection, collection_store, library_service, image_extensions)
+    preview_items = collection_preview_payload(
+        collection,
+        collection_store,
+        library_service,
+        image_extensions,
+    )
+    if preview_items:
+        cover_uri = str(preview_items[0]['uri'])
+        cover_type = str(preview_items[0]['type'])
+    else:
+        cover_uri, cover_type = '', ''
     cover_encoded = quote(cover_uri, safe='') if cover_uri else ''
     cover_media_url = f"/media?uri={cover_encoded}" if cover_uri else ''
     return {
@@ -415,6 +438,7 @@ def serialize_collection_summary(collection: dict, collection_store, library_ser
         'cover_uri': cover_uri,
         'cover_type': cover_type,
         'cover_media_url': cover_media_url,
+        'preview_items': preview_items,
         'detail_url': f"/collection/{quote(collection_id, safe='')}" if collection_id else '#',
         'created_at': str(collection.get('created_at') or ''),
         'updated_at': str(collection.get('updated_at') or ''),
@@ -702,12 +726,20 @@ def build_library_template_context(
     min_mb: int,
     empty_message: str,
     initial_page: dict,
+    collection_description: str = '',
+    collection_count: int = 0,
+    collection_cover_uri: str = '',
+    collection_preview_items: list[dict] | None = None,
 ) -> dict:
     return {
         'menu': menu,
         'scope': scope,
         'collection_id': collection_id,
         'collection_name': collection_name,
+        'collection_description': collection_description,
+        'collection_count': max(0, int(collection_count)),
+        'collection_cover_uri': collection_cover_uri,
+        'collection_preview_items': collection_preview_items or [],
         'active_mode': active_mode,
         'mode_seed': initial_page['seed'],
         'min_mb': min_mb,
