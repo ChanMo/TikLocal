@@ -4,6 +4,7 @@
 
   const scope = boot.scope;
   const collectionId = boot.collectionId;
+  let collectionCoverUri = String(boot.collectionCoverUri || '');
   const pageSize = Number(boot.pageSize || 0);
   const initialItems = Array.isArray(boot.initialItems) ? boot.initialItems : [];
   const initialHasMore = !!boot.initialHasMore;
@@ -25,6 +26,7 @@
   const searchClearButton = document.getElementById('library-search-clear');
   const searchToggleButton = document.getElementById('library-search-toggle');
   const libraryToolbar = document.getElementById('library-toolbar');
+  const collectionIdentityCover = document.getElementById('collection-identity-cover');
 
   const quickView = document.getElementById('quick-view');
   const quickOverlay = document.getElementById('quick-overlay');
@@ -708,6 +710,43 @@
   function updateCollectionCoverButton(item) {
     const shouldShow = scope === 'collection' && !!collectionId && !!item?.name;
     quickSetCover.classList.toggle('is-hidden', !shouldShow);
+    if (!shouldShow) {
+      quickSetCover.dataset.currentCover = 'false';
+      quickSetCover.disabled = false;
+      return;
+    }
+    const isCurrent = String(item.name) === collectionCoverUri;
+    quickSetCover.dataset.currentCover = isCurrent ? 'true' : 'false';
+    quickSetCover.title = isCurrent ? '当前主封面' : '设为主封面';
+    quickSetCover.setAttribute('aria-label', quickSetCover.title);
+    quickSetCover.disabled = isCurrent;
+  }
+
+  function updateCollectionIdentityCover(item) {
+    if (!collectionIdentityCover || !item?.thumb_url) return;
+    const collage = collectionIdentityCover.querySelector('.collection-identity-collage');
+    const firstTile = collage?.querySelector('.collection-identity-tile');
+    if (firstTile) {
+      firstTile.dataset.uri = item.name;
+      firstTile.dataset.type = item.type;
+      const image = firstTile.querySelector('img');
+      if (image) image.src = item.thumb_url;
+      return;
+    }
+    const nextCollage = document.createElement('div');
+    nextCollage.className = 'collection-identity-collage';
+    nextCollage.dataset.count = '1';
+    const tile = document.createElement('span');
+    tile.className = 'collection-identity-tile';
+    tile.dataset.uri = item.name;
+    tile.dataset.type = item.type;
+    const image = document.createElement('img');
+    image.src = item.thumb_url;
+    image.alt = '';
+    image.decoding = 'async';
+    tile.appendChild(image);
+    nextCollage.appendChild(tile);
+    collectionIdentityCover.replaceChildren(nextCollage);
   }
 
   function closeCollectionModal() {
@@ -1243,6 +1282,7 @@
   async function setCurrentAsCollectionCover() {
     const item = currentItem();
     if (!item || !item.name || scope !== 'collection' || !collectionId) return;
+    if (item.name === collectionCoverUri) return;
     quickSetCover.disabled = true;
     try {
       await collectionsRequest(`/api/collections/${encodeURIComponent(collectionId)}`, {
@@ -1250,12 +1290,13 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cover_uri: item.name }),
       });
-      flashActionButton(quickSetCover);
+      collectionCoverUri = String(item.name);
+      updateCollectionIdentityCover(item);
+      updateCollectionCoverButton(item);
     } catch (error) {
       quickSetCover.disabled = false;
       return;
     }
-    quickSetCover.disabled = false;
   }
 
   quickCollection.addEventListener('click', async (event) => {

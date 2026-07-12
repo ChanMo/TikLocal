@@ -210,9 +210,7 @@
   .collection-nav {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 2px 2px 4px;
+    padding: 0 0 10px;
   }
   .collection-nav-back {
     display: inline-flex;
@@ -230,24 +228,45 @@
     width: 14px;
     height: 14px;
   }
-  .collection-nav-title {
-    flex: 1;
-    min-width: 0;
-    text-align: right;
-    font-size: 14px;
-    font-weight: 700;
-    color: #0f172a;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   [data-theme="dark"] .collection-nav-back {
     color: #cbd5e1;
     border-color: rgba(148, 163, 184, 0.2);
     background: rgba(30, 41, 59, 0.8);
   }
-  [data-theme="dark"] .collection-nav-title {
-    color: #f8fafc;
+  .collection-identity { display: flex; align-items: center; gap: 14px; padding: 0 2px 16px; }
+  .collection-identity-cover {
+    position: relative;
+    flex: 0 0 72px;
+    width: 72px;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: 15px;
+    background: #dedbd1;
+    box-shadow: inset 0 0 0 1px rgba(35, 34, 30, 0.05), 0 5px 18px rgba(35, 34, 30, 0.08);
+  }
+  [data-theme="dark"] .collection-identity-cover { background: #292925; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 5px 18px rgba(0, 0, 0, 0.18); }
+  .collection-identity-collage { position: absolute; inset: 0; display: grid; gap: 1.5px; background: rgba(248, 247, 242, 0.9); }
+  [data-theme="dark"] .collection-identity-collage { background: rgba(25, 25, 22, 0.92); }
+  .collection-identity-collage[data-count="1"] { grid-template-columns: 1fr; }
+  .collection-identity-collage[data-count="2"] { grid-template-columns: 1.62fr 1fr; }
+  .collection-identity-collage[data-count="3"] { grid-template: repeat(2, 1fr) / 1.62fr 1fr; }
+  .collection-identity-collage[data-count="3"] .collection-identity-tile:first-child { grid-row: 1 / 3; }
+  .collection-identity-collage[data-count="4"] { grid-template: 1.12fr 1fr / 1.18fr 1fr; }
+  .collection-identity-tile { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+  .collection-identity-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .collection-identity-empty { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(35, 34, 30, 0.28); }
+  [data-theme="dark"] .collection-identity-empty { color: rgba(255, 255, 255, 0.28); }
+  .collection-identity-empty svg { width: 20px; height: 20px; stroke-width: 1.6; }
+  .collection-identity-copy { min-width: 0; flex: 1; }
+  .collection-identity-title { margin: 0; color: #292822; font-size: clamp(22px, 5vw, 30px); font-weight: 660; line-height: 1.08; letter-spacing: -0.035em; }
+  [data-theme="dark"] .collection-identity-title { color: rgba(255, 255, 255, 0.94); }
+  .collection-identity-count { margin-top: 6px; color: rgba(35, 34, 30, 0.42); font-size: 11px; }
+  [data-theme="dark"] .collection-identity-count { color: rgba(255, 255, 255, 0.4); }
+  .collection-identity-description { display: -webkit-box; max-width: 560px; margin-top: 5px; overflow: hidden; color: rgba(35, 34, 30, 0.58); font-size: 12px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  [data-theme="dark"] .collection-identity-description { color: rgba(255, 255, 255, 0.54); }
+  @media (min-width: 768px) {
+    .collection-identity { gap: 18px; padding-bottom: 20px; }
+    .collection-identity-cover { flex-basis: 84px; width: 84px; border-radius: 17px; }
   }
 
   .masonry-grid {
@@ -602,6 +621,14 @@
     background: rgba(255, 255, 255, 0.24);
     border-color: rgba(255, 255, 255, 0.78);
   }
+  .quick-btn[data-current-cover="true"] {
+    background: rgba(255, 255, 255, 0.24);
+    border-color: rgba(255, 255, 255, 0.78);
+    cursor: default;
+  }
+  .quick-btn .set-cover-current-icon { display: none; }
+  .quick-btn[data-current-cover="true"] .set-cover-default-icon { display: none; }
+  .quick-btn[data-current-cover="true"] .set-cover-current-icon { display: block; }
   .quick-btn.is-hidden {
     display: none;
   }
@@ -1043,13 +1070,32 @@
   {% set saved_active = 'favorite' %}
   {% include '_saved_header.html' %}
   {% elif scope == 'collection' %}
-  <section class="mb-2">
+  <section>
     <div class="collection-nav">
       <a class="collection-nav-back" href="/collections">
         <i data-feather="arrow-left"></i>
-        <span>已保存</span>
+        <span>所有集合</span>
       </a>
-      <div class="collection-nav-title">{{ collection_name }}</div>
+    </div>
+    <div class="collection-identity">
+      <div id="collection-identity-cover" class="collection-identity-cover">
+        {% if collection_preview_items %}
+        <div class="collection-identity-collage" data-count="{{ collection_preview_items | length }}">
+          {% for preview in collection_preview_items %}
+          <span class="collection-identity-tile" data-uri="{{ preview.uri }}" data-type="{{ preview.type }}">
+            <img src="{{ preview.thumb_url }}" alt="" loading="eager" decoding="async">
+          </span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="collection-identity-empty"><i data-feather="layers" aria-hidden="true"></i></div>
+        {% endif %}
+      </div>
+      <div class="collection-identity-copy">
+        <h1 class="collection-identity-title">{{ collection_name }}</h1>
+        <div class="collection-identity-count">{{ collection_count }} 个媒体</div>
+        {% if collection_description %}<p class="collection-identity-description">{{ collection_description }}</p>{% endif %}
+      </div>
     </div>
   </section>
   {% endif %}
@@ -1114,7 +1160,8 @@
       <span class="collection-count" id="quick-collection-count">0</span>
     </button>
     <button id="quick-set-cover" class="quick-btn is-hidden" type="button" title="设为集合封面">
-      <i data-feather="image"></i>
+      <i class="set-cover-default-icon" data-feather="image"></i>
+      <i class="set-cover-current-icon" data-feather="check"></i>
     </button>
     <a id="quick-source" class="quick-btn is-hidden" href="#" target="_blank" rel="noopener noreferrer" title="查看来源">
       <i data-feather="external-link"></i>
@@ -1166,6 +1213,7 @@
   window.__TIKLOCAL_LIBRARY_BOOT__ = {
     scope: {{ scope | tojson }},
     collectionId: {{ collection_id | tojson }},
+    collectionCoverUri: {{ collection_cover_uri | tojson }},
     pageSize: {{ page_size }},
     initialItems: {{ initial_items | tojson }},
     initialHasMore: {{ 'true' if initial_has_more else 'false' }},

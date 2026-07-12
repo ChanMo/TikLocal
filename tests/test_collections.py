@@ -109,6 +109,10 @@ def test_collection_scope_library_items_and_page(client):
     assert "library_page_controller.js" in body
     assert 'id="quick-set-cover"' in body
     assert 'id="quick-collection-count"' in body
+    assert 'id="collection-identity-cover"' in body
+    assert '<h1 class="collection-identity-title">媒体集</h1>' in body
+    assert '<div class="collection-identity-count">2 个媒体</div>' in body
+    assert 'collectionCoverUri: "@default/cover.jpg"' in body
 
     api_res = client.get(
         f"/api/library/items?scope=collection&collection_id={quote(collection_id, safe='')}&offset=0&limit=20"

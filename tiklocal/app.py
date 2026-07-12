@@ -701,6 +701,7 @@ def create_app(test_config=None):
         collection = collection_store.get(collection_id)
         if not collection:
             return "Collection not found", 404
+        collection_summary = _serialize_collection_summary(collection)
         limit = _read_int_arg('limit', 24, minimum=12, maximum=96)
         initial_page = _build_library_page(
             favorites_only=False,
@@ -722,6 +723,10 @@ def create_app(test_config=None):
                 min_mb=50,
                 empty_message='该集合暂无可展示媒体。',
                 initial_page=initial_page,
+                collection_description=str(collection_summary.get('description') or ''),
+                collection_count=int(collection_summary.get('item_count') or 0),
+                collection_cover_uri=str(collection_summary.get('cover_uri') or ''),
+                collection_preview_items=collection_summary.get('preview_items') or [],
             ),
         )
 
