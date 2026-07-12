@@ -1,0 +1,17 @@
+<section class="saved-header" aria-labelledby="saved-title">
+  <div class="saved-heading">
+    <div>
+      <p class="saved-eyebrow">TikLocal</p>
+      <h1 id="saved-title" class="saved-title">已保存</h1>
+    </div>
+    {% if saved_active == 'collections' %}
+    <button id="open-create-collection" class="create-collection-btn" type="button">
+      <i data-feather="plus" aria-hidden="true"></i><span>新建集合</span>
+    </button>
+    {% endif %}
+  </div>
+  <nav class="saved-tabs" aria-label="已保存内容">
+    <a class="saved-tab{% if saved_active == 'favorite' %} is-active{% endif %}" href="/favorite"{% if saved_active == 'favorite' %} aria-current="page"{% endif %}>收藏</a>
+    <a class="saved-tab{% if saved_active == 'collections' %} is-active{% endif %}" href="/collections"{% if saved_active == 'collections' %} aria-current="page"{% endif %}>集合</a>
+  </nav>
+</section>

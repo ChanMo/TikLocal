@@ -311,6 +311,115 @@
         background: var(--dock-border);
       }
 
+      /* Shared header for the lightweight Saved space. */
+      [data-nav-context="favorite"] {
+        --saved-bg: #f7f6f2;
+        --saved-ink: #24231f;
+        --saved-muted: rgba(35, 34, 30, 0.42);
+        background:
+          radial-gradient(circle at 50% -12rem, rgba(169, 151, 113, 0.075), transparent 30rem),
+          var(--saved-bg) !important;
+      }
+      [data-nav-context="favorite"][data-theme="dark"] {
+        --saved-bg: #11110f;
+        --saved-ink: rgba(255, 255, 255, 0.95);
+        --saved-muted: rgba(255, 255, 255, 0.38);
+        background:
+          radial-gradient(circle at 50% -12rem, rgba(179, 164, 126, 0.065), transparent 30rem),
+          var(--saved-bg) !important;
+      }
+      body[data-nav-context="favorite"] {
+        padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+      }
+      .saved-page {
+        width: min(100%, 1040px);
+        min-height: calc(100dvh - 104px - env(safe-area-inset-bottom));
+        margin: 0 auto;
+        padding: 10px 14px 8px;
+      }
+      .saved-content {
+        width: 100%;
+      }
+      .saved-header {
+        width: 100%;
+        margin: 0 0 12px;
+        padding: 12px 2px 0;
+      }
+      .saved-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+      .saved-eyebrow {
+        margin: 0 0 3px;
+        color: var(--saved-muted, rgba(35, 34, 30, 0.42));
+        font-size: 10px;
+        font-weight: 680;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .saved-title {
+        margin: 0;
+        color: var(--saved-ink, #24231f);
+        font-size: clamp(22px, 4vw, 28px);
+        font-weight: 680;
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+      }
+      .saved-tabs {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 4px;
+        border: 1px solid rgba(35, 34, 30, 0.055);
+        border-radius: 14px;
+        background: rgba(231, 230, 225, 0.64);
+      }
+      .saved-tab {
+        min-width: 72px;
+        padding: 7px 13px;
+        border-radius: 10px;
+        color: rgba(35, 34, 30, 0.56);
+        font-size: 12px;
+        font-weight: 590;
+        line-height: 18px;
+        text-align: center;
+        text-decoration: none;
+        transition: color 140ms ease, background-color 140ms ease, box-shadow 160ms ease, transform 120ms ease;
+      }
+      .saved-tab:hover { color: rgba(35, 34, 30, 0.9); }
+      .saved-tab:active { transform: scale(0.97); }
+      .saved-tab:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+      }
+      .saved-tab.is-active {
+        color: #24231f;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 1px 2px rgba(32, 30, 24, 0.09), 0 4px 12px rgba(32, 30, 24, 0.045);
+      }
+      [data-theme="dark"] .saved-eyebrow { color: rgba(255, 255, 255, 0.38); }
+      [data-theme="dark"] .saved-title { color: rgba(255, 255, 255, 0.95); }
+      [data-theme="dark"] .saved-tabs {
+        border-color: rgba(255, 255, 255, 0.055);
+        background: rgba(46, 46, 43, 0.72);
+      }
+      [data-theme="dark"] .saved-tab { color: rgba(255, 255, 255, 0.56); }
+      [data-theme="dark"] .saved-tab:hover { color: rgba(255, 255, 255, 0.92); }
+      [data-theme="dark"] .saved-tab.is-active {
+        color: rgba(255, 255, 255, 0.96);
+        background: rgba(255, 255, 255, 0.12);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 9px rgba(0, 0, 0, 0.12);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .saved-tab { transition-duration: 0.01ms !important; }
+      }
+      @media (min-width: 768px) {
+        .saved-page { padding-right: 18px; padding-left: 18px; }
+      }
+
       /* Base layout adjustments */
       body {
         padding-bottom: 84px !important;
@@ -373,11 +482,8 @@
     <div id="more-menu" class="more-menu" aria-hidden="true" inert>
       <nav class="more-menu-card" aria-label="更多导航">
         <div class="more-menu-list">
-          <a href="/favorite" class="more-menu-item {% if request.path == '/favorite' %}is-active{% endif %}">
-            <i data-feather="heart"></i><span>收藏</span>
-          </a>
-          <a href="/collections" class="more-menu-item {% if request.path == '/collections' or request.path.startswith('/collection/') %}is-active{% endif %}">
-            <i data-feather="layers"></i><span>集合</span>
+          <a href="/favorite" class="more-menu-item {% if request.path == '/favorite' or request.path == '/collections' or request.path.startswith('/collection/') %}is-active{% endif %}">
+            <i data-feather="bookmark"></i><span>已保存</span>
           </a>
           <a href="/download" class="more-menu-item {% if menu == 'download' %}is-active{% endif %}">
             <i data-feather="download"></i><span>下载</span>

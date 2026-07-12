@@ -2,7 +2,7 @@
 
 {% block extra_head %}
 <style>
-  body {
+  body:not([data-nav-context="favorite"]) {
     padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
   }
   .library-toolbar-wrap {
@@ -1013,7 +1013,7 @@
 {% endblock %}
 
 {% block content %}
-<main class="container mx-auto px-2 pt-2 pb-1 md:px-3">
+<main class="{% if scope in ['favorite', 'collection'] %}saved-page{% else %}container mx-auto px-2 pt-2 pb-1 md:px-3{% endif %}">
   {% if scope == 'all' %}
   <section class="library-toolbar-wrap">
     <div id="library-toolbar" class="library-toolbar{% if request.args.get('q', '') %} is-searching is-search-open{% endif %}">
@@ -1040,25 +1040,21 @@
     </div>
   </section>
   {% elif scope == 'favorite' %}
-  <section class="mb-2">
-    <div class="mode-tabs">
-      <a class="mode-tab is-active" href="/favorite">收藏媒体</a>
-      <a class="mode-tab" href="/collections">我的集合</a>
-    </div>
-  </section>
+  {% set saved_active = 'favorite' %}
+  {% include '_saved_header.html' %}
   {% elif scope == 'collection' %}
   <section class="mb-2">
     <div class="collection-nav">
       <a class="collection-nav-back" href="/collections">
         <i data-feather="arrow-left"></i>
-        <span>我的集合</span>
+        <span>已保存</span>
       </a>
       <div class="collection-nav-title">{{ collection_name }}</div>
     </div>
   </section>
   {% endif %}
 
-  <section id="library-grid" class="masonry-grid"></section>
+  <section id="library-grid" class="masonry-grid{% if scope in ['favorite', 'collection'] %} saved-content{% endif %}"></section>
   <div id="library-loading" class="library-loading" aria-live="polite">
     <div id="library-status-text">正在加载...</div>
     <div id="library-status-actions" class="library-status-actions" hidden>

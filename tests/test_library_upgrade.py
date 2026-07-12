@@ -98,7 +98,23 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert 'id="flow-state-retry"' in body
     assert 'id="flow-state-next"' in body
     assert 'href="/favorite"' in body
-    assert 'href="/collections"' in body
+    assert '<span>已保存</span>' in body
+    assert 'href="/collections"' not in body
+
+
+def test_settings_focuses_on_useful_local_controls(client):
+    res = client.get('/settings/')
+    assert res.status_code == 200
+    body = res.data.decode('utf-8')
+    assert '<h1 class="settings-title">设置</h1>' in body
+    assert 'data-theme-preference="system"' in body
+    assert 'data-theme-preference="light"' in body
+    assert 'data-theme-preference="dark"' in body
+    assert 'id="refresh-library"' in body
+    assert 'id="clear-cache"' in body
+    assert 'id="reset-recommendations"' in body
+    assert 'LLM Provider' not in body
+    assert 'AI Prompt' not in body
     assert 'href="/download"' in body
     assert 'href="/settings"' in body
     assert 'id="quick-theme-toggle"' not in body

@@ -40,6 +40,24 @@ def test_collection_create_and_list(client):
     assert items[0]["id"] == payload["id"]
 
 
+def test_saved_pages_share_navigation(client):
+    favorites = client.get("/favorite")
+    assert favorites.status_code == 200
+    favorites_body = favorites.data.decode("utf-8")
+    assert '<main class="saved-page">' in favorites_body
+    assert '<h1 id="saved-title" class="saved-title">已保存</h1>' in favorites_body
+    assert '<a class="saved-tab is-active" href="/favorite" aria-current="page">收藏</a>' in favorites_body
+    assert '<a class="saved-tab" href="/collections">集合</a>' in favorites_body
+
+    collections = client.get("/collections")
+    assert collections.status_code == 200
+    collections_body = collections.data.decode("utf-8")
+    assert '<main class="saved-page collections-shell">' in collections_body
+    assert '<h1 id="saved-title" class="saved-title">已保存</h1>' in collections_body
+    assert '<a class="saved-tab is-active" href="/collections" aria-current="page">集合</a>' in collections_body
+    assert '<span>已保存</span>' in collections_body
+
+
 def test_collection_add_remove_and_by_media(client):
     created = client.post("/api/collections", json={"name": "收藏一"}).get_json()["data"]["item"]
     collection_id = created["id"]

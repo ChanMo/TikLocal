@@ -2,13 +2,8 @@
 
 {% block extra_head %}
 <style>
-  body {
-    padding-bottom: calc(110px + env(safe-area-inset-bottom)) !important;
-  }
   .collections-shell {
-    max-width: 1040px;
-    margin: 0 auto;
-    padding: 16px 12px 6px;
+    display: block;
   }
   .collections-topbar {
     display: flex;
@@ -237,38 +232,167 @@
     gap: 8px;
     margin-top: 12px;
   }
+  .create-collection-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 38px;
+    padding: 0 14px;
+    border: 1px solid rgba(35, 34, 30, 0.09);
+    border-radius: 999px;
+    color: #f8f7f2;
+    background: #292822;
+    box-shadow: 0 1px 2px rgba(32, 30, 24, 0.16), 0 7px 18px rgba(32, 30, 24, 0.1);
+    font-size: 12px;
+    font-weight: 620;
+    transition: transform 120ms ease, background-color 140ms ease, box-shadow 160ms ease;
+  }
+  .create-collection-btn svg { width: 15px; height: 15px; }
+  .create-collection-btn:hover { background: #151512; box-shadow: 0 2px 3px rgba(32, 30, 24, 0.16), 0 9px 24px rgba(32, 30, 24, 0.14); }
+  .create-collection-btn:active { transform: scale(0.97); }
+  .create-collection-btn:focus-visible { outline: 2px solid #292822; outline-offset: 3px; }
+  [data-theme="dark"] .create-collection-btn {
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #22211d;
+    background: #e9e5da;
+    box-shadow: 0 7px 22px rgba(0, 0, 0, 0.22);
+  }
+  [data-theme="dark"] .create-collection-btn:hover { background: #fffdf5; }
+  [data-theme="dark"] .create-collection-btn:focus-visible { outline-color: #e9e5da; }
+  .collection-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 10px;
+  }
+  .collection-card {
+    border: 0;
+    border-radius: 19px;
+    background: transparent;
+    overflow: visible;
+    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  [data-theme="dark"] .collection-card { border: 0; background: transparent; }
+  .collection-card:hover { transform: translateY(-2px); }
+  .collection-card:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+  .collection-cover {
+    aspect-ratio: 4 / 5;
+    border-radius: 19px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.54), transparent 38%),
+      #dedbd1;
+    box-shadow: inset 0 0 0 1px rgba(35, 34, 30, 0.045), 0 1px 2px rgba(35, 34, 30, 0.04);
+  }
+  [data-theme="dark"] .collection-cover {
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.055), transparent 38%),
+      #292925;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.055), 0 1px 2px rgba(0, 0, 0, 0.14);
+  }
+  .collection-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(to top, rgba(16, 15, 12, 0.12), transparent 32%);
+  }
+  .collection-meta { padding: 9px 2px 0; gap: 1px; }
+  .collection-name { color: #292822; font-size: 14px; font-weight: 630; letter-spacing: -0.015em; }
+  [data-theme="dark"] .collection-name { color: rgba(255, 255, 255, 0.92); }
+  .collection-sub { color: rgba(35, 34, 30, 0.42); font-size: 11px; }
+  [data-theme="dark"] .collection-sub { color: rgba(255, 255, 255, 0.38); }
+  .collection-menu { top: 9px; right: 9px; }
+  .collection-menu-btn {
+    width: 34px;
+    height: 34px;
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(24, 23, 20, 0.5);
+    transition: background-color 140ms ease, transform 120ms ease;
+  }
+  .collection-menu-btn:hover, .collection-menu.open .collection-menu-btn { background: rgba(24, 23, 20, 0.76); }
+  .collection-menu-btn:active { transform: scale(0.94); }
+  .collection-menu-btn:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+  .collection-menu-panel { min-width: 132px; padding: 5px; border-radius: 13px; }
+  .collection-menu-item { min-height: 38px; padding: 8px 10px; border: 0; border-radius: 9px; }
+  .collections-state {
+    min-height: 38vh;
+    display: grid;
+    place-items: center;
+    padding: 48px 20px;
+    color: rgba(35, 34, 30, 0.44);
+    text-align: center;
+  }
+  .collections-state[hidden] { display: none; }
+  .collections-state-icon {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    margin: 0 auto 13px;
+    border: 1px solid rgba(35, 34, 30, 0.07);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.48);
+  }
+  .collections-state-icon svg { width: 21px; height: 21px; stroke-width: 1.7; }
+  .collections-state-title { color: #34332e; font-size: 14px; font-weight: 620; }
+  .collections-state-copy { max-width: 260px; margin: 4px auto 0; font-size: 12px; line-height: 1.55; }
+  .collections-state-action { margin-top: 14px; }
+  [data-theme="dark"] .collections-state { color: rgba(255, 255, 255, 0.4); }
+  [data-theme="dark"] .collections-state-icon { border-color: rgba(255, 255, 255, 0.07); background: rgba(255, 255, 255, 0.04); }
+  [data-theme="dark"] .collections-state-title { color: rgba(255, 255, 255, 0.86); }
+  .modal-mask { background: rgba(18, 18, 16, 0.42); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .modal-card { border-radius: 20px; padding: 18px; background: #f8f7f3; }
+  [data-theme="dark"] .modal-card { background: #22221f; }
+  .modal-title { margin: 0 0 14px; color: #292822; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
+  [data-theme="dark"] .modal-title { color: rgba(255, 255, 255, 0.94); }
+  .field { border-radius: 12px; background: rgba(255, 255, 255, 0.72); }
+  .modal-primary { color: white; background: #292822; border-color: #292822; }
+  [data-theme="dark"] .modal-primary { color: #22211d; background: #e9e5da; border-color: #e9e5da; }
+  @media (min-width: 640px) {
+    .collection-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 14px; }
+  }
+  @media (min-width: 900px) {
+    .collection-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .collection-card, .create-collection-btn, .collection-menu-btn { transition-duration: 0.01ms !important; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<main class="collections-shell">
-  <div class="collections-topbar">
-    <h1>我的集合</h1>
-    <button id="open-create-collection" class="ghost-chip" type="button">新建集合</button>
-  </div>
-  <section id="collections-grid" class="collection-grid"></section>
-  <p id="collections-empty" class="collections-empty" hidden>还没有集合，先建一个开始整理。</p>
+<main class="saved-page collections-shell">
+  {% set saved_active = 'collections' %}
+  {% include '_saved_header.html' %}
+  <section id="collections-grid" class="saved-content collection-grid"></section>
+  <section id="collections-state" class="collections-state" aria-live="polite">
+    <div>
+      <div class="collections-state-icon"><i data-feather="loader"></i></div>
+      <div id="collections-state-title" class="collections-state-title">正在读取集合</div>
+      <p id="collections-state-copy" class="collections-state-copy">你的整理会保留在这台设备上。</p>
+      <button id="collections-state-action" class="ghost-chip collections-state-action" type="button" hidden></button>
+    </div>
+  </section>
 </main>
 
 <div id="create-modal" class="modal-mask" aria-hidden="true">
-  <div class="modal-card">
-    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">新建集合</h3>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
+    <h2 id="create-modal-title" class="modal-title">新建集合</h2>
     <input id="create-name" class="field mb-2" type="text" maxlength="80" placeholder="例如：灵感片段" />
     <textarea id="create-description" class="field" rows="3" maxlength="280" placeholder="可选描述"></textarea>
     <div class="modal-actions">
       <button id="cancel-create" class="ghost-chip" type="button">取消</button>
-      <button id="submit-create" class="ghost-chip" type="button">创建</button>
+      <button id="submit-create" class="ghost-chip modal-primary" type="button">创建</button>
     </div>
   </div>
 </div>
 
 <div id="rename-modal" class="modal-mask" aria-hidden="true">
-  <div class="modal-card">
-    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">重命名集合</h3>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">
+    <h2 id="rename-modal-title" class="modal-title">重命名集合</h2>
     <input id="rename-name" class="field" type="text" maxlength="80" placeholder="输入新名称" />
     <div class="modal-actions">
       <button id="cancel-rename" class="ghost-chip" type="button">取消</button>
-      <button id="submit-rename" class="ghost-chip" type="button">保存</button>
+      <button id="submit-rename" class="ghost-chip modal-primary" type="button">保存</button>
     </div>
   </div>
 </div>
@@ -278,7 +402,10 @@
 <script>
   (() => {
     const grid = document.getElementById('collections-grid');
-    const emptyEl = document.getElementById('collections-empty');
+    const stateEl = document.getElementById('collections-state');
+    const stateTitle = document.getElementById('collections-state-title');
+    const stateCopy = document.getElementById('collections-state-copy');
+    const stateAction = document.getElementById('collections-state-action');
     const openBtn = document.getElementById('open-create-collection');
     const modal = document.getElementById('create-modal');
     const cancelBtn = document.getElementById('cancel-create');
@@ -291,6 +418,23 @@
     const renameInput = document.getElementById('rename-name');
     const collectionsById = new Map();
     let renamingCollectionId = '';
+
+    function showState(kind) {
+      const states = {
+        loading: ['正在读取集合', '你的整理会保留在这台设备上。', '', 'loader'],
+        empty: ['还没有集合', '建立一个集合，把想再次看到的媒体放在一起。', '新建第一个集合', 'layers'],
+        error: ['暂时无法读取集合', '请检查连接后重新尝试。', '重新加载', 'wifi-off'],
+      };
+      const [title, copy, action, icon] = states[kind] || states.loading;
+      stateTitle.textContent = title;
+      stateCopy.textContent = copy;
+      stateAction.textContent = action;
+      stateAction.hidden = !action;
+      const iconWrap = stateEl.querySelector('.collections-state-icon');
+      iconWrap.innerHTML = `<i data-feather="${icon}"></i>`;
+      stateEl.hidden = false;
+      feather.replace();
+    }
 
     async function api(url, options = {}) {
       const response = await fetch(url, options);
@@ -343,10 +487,10 @@
     function renderCards(items) {
       if (!Array.isArray(items) || !items.length) {
         grid.innerHTML = '';
-        emptyEl.hidden = false;
+        showState('empty');
         return;
       }
-      emptyEl.hidden = true;
+      stateEl.hidden = true;
       collectionsById.clear();
       grid.innerHTML = items.map((item) => {
         const id = String(item.id || '');
@@ -374,7 +518,7 @@
               </div>
             </a>
             <div class="collection-menu" data-menu-id="${id}">
-              <button class="collection-menu-btn" type="button" data-menu-toggle="1" data-id="${id}" aria-label="更多操作">
+              <button class="collection-menu-btn" type="button" data-menu-toggle="1" data-id="${id}" aria-label="${name}的更多操作" aria-expanded="false">
                 <i data-feather="more-horizontal"></i>
               </button>
               <div class="collection-menu-panel">
@@ -398,6 +542,7 @@
     }
 
     async function loadCollections() {
+      showState('loading');
       const data = await api('/api/collections');
       renderCards(data.items || []);
     }
@@ -406,6 +551,7 @@
       grid.querySelectorAll('.collection-menu.open').forEach((node) => {
         if (exceptId && node.getAttribute('data-menu-id') === exceptId) return;
         node.classList.remove('open');
+        node.querySelector('[data-menu-toggle]')?.setAttribute('aria-expanded', 'false');
       });
     }
 
@@ -417,6 +563,7 @@
       const shouldOpen = !target.classList.contains('open');
       closeMenus(id);
       target.classList.toggle('open', shouldOpen);
+      target.querySelector('[data-menu-toggle]')?.setAttribute('aria-expanded', String(shouldOpen));
     }
 
     async function createCollection() {
@@ -424,6 +571,7 @@
       const description = String(descInput.value || '').trim();
       if (!name) return;
       submitBtn.disabled = true;
+      submitBtn.textContent = '正在创建…';
       try {
         await api('/api/collections', {
           method: 'POST',
@@ -436,6 +584,7 @@
         alert(error.message || '创建失败');
       } finally {
         submitBtn.disabled = false;
+        submitBtn.textContent = '创建';
       }
     }
 
@@ -444,6 +593,7 @@
       const name = String(renameInput.value || '').trim();
       if (!collectionId || !name) return;
       renameSubmitBtn.disabled = true;
+      renameSubmitBtn.textContent = '正在保存…';
       try {
         await api(`/api/collections/${encodeURIComponent(collectionId)}`, {
           method: 'PATCH',
@@ -456,6 +606,7 @@
         alert(error.message || '重命名失败');
       } finally {
         renameSubmitBtn.disabled = false;
+        renameSubmitBtn.textContent = '保存';
       }
     }
 
@@ -473,6 +624,13 @@
     }
 
     openBtn.addEventListener('click', openCreateModal);
+    stateAction.addEventListener('click', () => {
+      if (stateTitle.textContent === '还没有集合') {
+        openCreateModal();
+        return;
+      }
+      loadCollections().catch(() => showState('error'));
+    });
     cancelBtn.addEventListener('click', closeCreateModal);
     modal.addEventListener('click', (event) => {
       if (event.target === modal) closeCreateModal();
@@ -538,9 +696,7 @@
       submitRenameCollection();
     });
 
-    loadCollections().catch(() => {
-      renderCards([]);
-    });
+    loadCollections().catch(() => showState('error'));
   })();
 </script>
 {% endblock %}
