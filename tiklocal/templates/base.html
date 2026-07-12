@@ -7,92 +7,313 @@
     <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='output.css')}}">
     <script src="{{url_for('static', filename='feather.min.js')}}"></script>
     <style>
-      /* Unified Floating Dock Styles */
+      /* A soft, content-first dock with page-aware material. */
       :root {
-        --dock-bg: rgba(20, 20, 20, 0.7);
-        --dock-border: rgba(255, 255, 255, 0.12);
-        --dock-active: #fff;
-        --dock-inactive: rgba(255, 255, 255, 0.5);
+        --dock-surface: rgba(29, 29, 27, 0.86);
+        --menu-surface: rgba(27, 27, 25, 0.94);
+        --dock-border: rgba(255, 255, 255, 0.085);
+        --dock-highlight: rgba(255, 255, 255, 0.055);
+        --dock-ink: rgba(255, 255, 255, 0.54);
+        --dock-active-ink: rgba(255, 255, 255, 0.96);
+        --dock-active-soft: rgba(255, 255, 255, 0.1);
+        --menu-hover: rgba(255, 255, 255, 0.075);
+        --dock-shadow: 0 1px 2px rgba(0, 0, 0, 0.16), 0 9px 26px rgba(0, 0, 0, 0.14), 0 20px 52px rgba(0, 0, 0, 0.08);
       }
 
       [data-theme="light"] {
-        --dock-bg: rgba(255, 255, 255, 0.8);
-        --dock-border: rgba(0, 0, 0, 0.08);
-        --dock-active: #000;
-        --dock-inactive: rgba(0, 0, 0, 0.4);
+        --dock-surface: rgba(247, 246, 242, 0.9);
+        --menu-surface: rgba(250, 249, 246, 0.96);
+        --dock-border: rgba(20, 20, 18, 0.07);
+        --dock-highlight: rgba(255, 255, 255, 0.72);
+        --dock-ink: rgba(28, 28, 25, 0.48);
+        --dock-active-ink: #1c1c19;
+        --dock-active-soft: rgba(28, 28, 25, 0.075);
+        --menu-hover: rgba(28, 28, 25, 0.055);
+        --dock-shadow: 0 1px 2px rgba(23, 22, 18, 0.08), 0 8px 24px rgba(23, 22, 18, 0.11), 0 20px 48px rgba(23, 22, 18, 0.055);
+      }
+
+      [data-nav-context="index"] {
+        --dock-surface: rgba(22, 22, 21, 0.72);
+        --menu-surface: rgba(24, 24, 23, 0.92);
+        --dock-border: rgba(255, 255, 255, 0.12);
+        --dock-highlight: rgba(255, 255, 255, 0.07);
+        --dock-ink: rgba(255, 255, 255, 0.58);
+        --dock-active-ink: #fff;
+        --dock-active-soft: rgba(255, 255, 255, 0.13);
+        --menu-hover: rgba(255, 255, 255, 0.09);
+      }
+
+      [data-nav-context="radio"][data-theme="light"] {
+        --dock-surface: rgba(238, 237, 231, 0.88);
+        --menu-surface: rgba(244, 242, 235, 0.96);
+        --dock-active-ink: #36594f;
+        --dock-active-soft: rgba(70, 107, 97, 0.11);
+      }
+
+      [data-nav-context="radio"][data-theme="dark"] {
+        --dock-surface: rgba(24, 26, 23, 0.86);
+        --menu-surface: rgba(25, 28, 24, 0.95);
+        --dock-active-ink: #b7cbbf;
+        --dock-active-soft: rgba(159, 185, 173, 0.12);
       }
 
       .floating-dock {
         position: fixed;
-        bottom: max(env(safe-area-inset-bottom), 24px);
+        bottom: max(12px, env(safe-area-inset-bottom));
         left: 50%;
         transform: translateX(-50%);
-        width: calc(100% - 32px);
-        max-width: 460px;
-        height: 64px;
-        background: var(--dock-bg);
-        backdrop-filter: blur(24px) saturate(180%);
-        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        width: auto;
+        height: 58px;
+        background: var(--dock-surface);
+        backdrop-filter: blur(22px) saturate(118%);
+        -webkit-backdrop-filter: blur(22px) saturate(118%);
         border: 1px solid var(--dock-border);
-        border-radius: 32px;
+        border-radius: 999px;
         display: flex;
         align-items: center;
-        justify-content: space-evenly;
-        z-index: 100;
-        box-shadow: 0 10px 40px -10px rgba(0,0,0,0.3);
-        padding: 0 12px;
-        transition: transform 0.3s ease;
+        gap: 1px;
+        z-index: 241;
+        box-shadow: var(--dock-shadow), inset 0 1px 0 var(--dock-highlight);
+        padding: 5px 7px;
+        transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
       }
 
       .dock-item {
         position: relative;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
         width: 48px;
         height: 48px;
-        color: var(--dock-inactive);
-        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        flex: 0 0 48px;
+        color: var(--dock-ink);
+        transition: color 160ms ease;
         background: transparent;
         border: none;
+        border-radius: 999px;
         cursor: pointer;
         text-decoration: none;
       }
 
-      .dock-item svg {
-        width: 22px;
-        height: 22px;
-        stroke-width: 2;
-        transition: all 0.3s ease;
-      }
-
-      .dock-item.active {
-        color: var(--dock-active);
-      }
-      .dock-item.active svg {
-        transform: translateY(-2px);
-        stroke-width: 2.5;
-      }
-      .dock-item.active::after {
+      .dock-item::before {
         content: '';
         position: absolute;
-        bottom: 6px;
-        width: 4px;
-        height: 4px;
-        background: currentColor;
+        width: 38px;
+        height: 38px;
         border-radius: 50%;
+        background: var(--dock-active-soft);
+        opacity: 0;
+        transform: scale(0.76);
+        transition: opacity 150ms ease, transform 210ms cubic-bezier(0.22, 1, 0.36, 1);
       }
 
-      .dock-divider {
-        width: 1px;
-        height: 20px;
+      .nav-icon {
+        position: relative;
+        z-index: 1;
+        width: 22px;
+        height: 22px;
+        overflow: visible;
+        transition: transform 210ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .nav-icon-outline,
+      .nav-icon-filled {
+        transform-origin: center;
+        transition: opacity 150ms ease, transform 210ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .nav-icon-filled {
+        opacity: 0;
+        transform: scale(0.82);
+      }
+      .nav-icon-radio { width: 22.5px; height: 22.5px; transform: translateY(0.4px); }
+      .nav-icon-library { width: 20.5px; height: 20.5px; }
+      .nav-icon-more { width: 23px; height: 23px; }
+
+      .dock-item.active,
+      .dock-item[aria-expanded="true"] {
+        color: var(--dock-active-ink);
+      }
+      .dock-item.active::before,
+      .dock-item[aria-expanded="true"]::before {
+        opacity: 1;
+        transform: scale(1);
+      }
+      .dock-item.active .nav-icon-outline,
+      .dock-item[aria-expanded="true"] .nav-icon-outline {
+        opacity: 0;
+        transform: scale(1.12);
+      }
+      .dock-item.active .nav-icon-filled,
+      .dock-item[aria-expanded="true"] .nav-icon-filled {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      @media (hover: hover) {
+        .dock-item:hover { color: var(--dock-active-ink); }
+        .dock-item:hover::before { opacity: 0.55; transform: scale(1); }
+        .dock-item::after {
+          content: attr(data-label);
+          position: absolute;
+          bottom: calc(100% + 10px);
+          left: 50%;
+          padding: 5px 8px;
+          border: 1px solid var(--dock-border);
+          border-radius: 8px;
+          color: var(--dock-active-ink);
+          background: var(--menu-surface);
+          box-shadow: 0 5px 16px rgba(0, 0, 0, 0.12);
+          font-size: 11px;
+          font-weight: 600;
+          line-height: 1;
+          white-space: nowrap;
+          opacity: 0;
+          pointer-events: none;
+          transform: translate(-50%, 3px);
+          transition: opacity 120ms ease, transform 150ms ease;
+        }
+        .dock-item:hover::after,
+        .dock-item:focus-visible::after {
+          opacity: 1;
+          transform: translate(-50%, 0);
+        }
+        .dock-item[aria-expanded="true"]::after { opacity: 0; }
+      }
+      .dock-item:active .nav-icon {
+        transform: scale(0.9);
+      }
+      .dock-item:focus-visible {
+        outline: 2px solid var(--dock-active-ink);
+        outline-offset: 2px;
+      }
+
+      .more-menu {
+        position: fixed;
+        inset: 0;
+        z-index: 240;
+        pointer-events: none;
+      }
+      .more-menu.is-open {
+        pointer-events: auto;
+      }
+      .more-menu-card {
+        position: absolute;
+        right: max(16px, calc(50% - 109px));
+        bottom: max(78px, calc(env(safe-area-inset-bottom) + 66px));
+        width: 244px;
+        padding: 7px;
+        border: 1px solid var(--dock-border);
+        border-radius: 18px;
+        background: var(--menu-surface);
+        color: var(--dock-active-ink);
+        box-shadow: 0 2px 7px rgba(0, 0, 0, 0.1), 0 18px 52px rgba(0, 0, 0, 0.18), inset 0 1px 0 var(--dock-highlight);
+        backdrop-filter: blur(24px) saturate(115%);
+        -webkit-backdrop-filter: blur(24px) saturate(115%);
+        opacity: 0;
+        transform: translateY(7px) scale(0.94);
+        transform-origin: bottom right;
+        transition: opacity 140ms ease, transform 210ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .more-menu.is-open .more-menu-card {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      .more-menu-item svg {
+        width: 19px;
+        height: 19px;
+        flex: 0 0 auto;
+        stroke-width: 2;
+      }
+      .more-menu-list {
+        display: flex;
+        flex-direction: column;
+      }
+      .more-menu-item {
+        width: 100%;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 11px;
+        color: var(--dock-ink);
+        background: transparent;
+        text-decoration: none;
+        cursor: pointer;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: color 140ms ease, background-color 140ms ease, opacity 140ms ease, transform 180ms ease;
+      }
+      .more-menu.is-open .more-menu-item {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .more-menu.is-open .more-menu-item:nth-child(1) { transition-delay: 15ms; }
+      .more-menu.is-open .more-menu-item:nth-child(2) { transition-delay: 30ms; }
+      .more-menu.is-open .more-menu-item:nth-child(3) { transition-delay: 45ms; }
+      .more-menu.is-open .more-menu-item:nth-child(5) { transition-delay: 60ms; }
+      .more-menu.is-open .more-menu-item:nth-child(6) { transition-delay: 75ms; }
+      @media (prefers-reduced-motion: reduce) {
+        .more-menu-card, .more-menu-item, .nav-icon, .dock-item::before { transition-duration: 0.01ms !important; }
+      }
+      .more-menu-item:hover,
+      .more-menu-item:focus-visible {
+        color: var(--dock-active-ink);
+        background: var(--menu-hover);
+        outline: none;
+      }
+      .more-menu-item.is-active {
+        color: var(--dock-active-ink);
+        background: var(--menu-hover);
+      }
+      .more-menu-item span {
+        font-size: 14.5px;
+        font-weight: 590;
+        letter-spacing: -0.01em;
+      }
+      .appearance-switch {
+        margin-left: auto;
+        position: relative;
+        width: 58px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        border: 1px solid var(--dock-border);
+        border-radius: 999px;
+        color: var(--dock-ink);
+        background: var(--menu-hover);
+      }
+      .appearance-switch::before {
+        content: '';
+        position: absolute;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--dock-active-soft);
+        transform: translateX(0);
+        transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      [data-theme="dark"] .appearance-switch::before {
+        transform: translateX(28px);
+      }
+      .appearance-switch svg {
+        position: relative;
+        z-index: 1;
+        width: 13px;
+        height: 13px;
+        stroke-width: 2;
+      }
+      .more-menu-divider {
+        height: 1px;
+        margin: 6px 12px;
         background: var(--dock-border);
       }
 
       /* Base layout adjustments */
       body {
-        padding-bottom: 110px !important; /* Space for dock */
+        padding-bottom: 84px !important;
       }
       /* Special case for TikTok page which handles its own padding */
       body.immersive {
@@ -101,42 +322,80 @@
     </style>
     {% block extra_head %}{% endblock %}
   </head>
-  <body data-theme="{{ theme if theme else 'light' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen transition-colors duration-300">
+  <body data-theme="{{ theme if theme else 'light' }}" data-nav-context="{{ menu or 'default' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen transition-colors duration-300">
     
-    <!-- Quick Theme Toggle (Optional, can be moved to settings) -->
-    <button id="quick-theme-toggle" class="fixed top-4 right-4 z-40 w-10 h-10 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center group" aria-label="切换主题">
-      <i data-feather="sun" class="w-5 h-5 text-gray-600 dark:text-gray-300 block dark:hidden transition-transform"></i>
-      <i data-feather="moon" class="w-5 h-5 text-gray-600 dark:text-gray-300 hidden dark:block transition-transform"></i>
-    </button>
-
     {% block content %}{% endblock %}
     
-    <!-- Unified Floating Dock -->
-    <nav class="floating-dock">
-      <a href="/" class="dock-item {% if menu == 'index' %}active{% endif %}" aria-label="Feed">
-        <i data-feather="film"></i>
+    <nav class="floating-dock" aria-label="主导航">
+      <a href="/" class="dock-item {% if menu == 'index' %}active{% endif %}" data-label="推荐" aria-label="推荐" {% if menu == 'index' %}aria-current="page"{% endif %}>
+        <svg class="nav-icon nav-icon-home" viewBox="0 0 24 24" aria-hidden="true">
+          <g class="nav-icon-outline" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3.5 10.5 12 3.6l8.5 6.9"></path><path d="M5.4 9.2v10.1h13.2V9.2"></path><path d="M9.3 19.3v-5.6h5.4v5.6"></path>
+          </g>
+          <path class="nav-icon-filled" fill="currentColor" d="M11.2 2.95a1.25 1.25 0 0 1 1.6 0l8.2 6.67a1.05 1.05 0 0 1-.66 1.87h-.56v7.72c0 .72-.58 1.3-1.3 1.3h-4.3v-6.12H9.82v6.12h-4.3c-.72 0-1.3-.58-1.3-1.3v-7.72h-.56A1.05 1.05 0 0 1 3 9.62l8.2-6.67Z"></path>
+        </svg>
       </a>
 
-      <a href="/radio" class="dock-item {% if menu == 'radio' %}active{% endif %}" aria-label="Radio">
-        <i data-feather="music"></i>
+      <a href="/radio" class="dock-item {% if menu == 'radio' %}active{% endif %}" data-label="电台" aria-label="电台" {% if menu == 'radio' %}aria-current="page"{% endif %}>
+        <svg class="nav-icon nav-icon-radio" viewBox="0 0 24 24" aria-hidden="true">
+          <g class="nav-icon-outline" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.2 13v-1.2a7.8 7.8 0 0 1 15.6 0V13"></path><path d="M4.2 13.2c0-1 .8-1.8 1.8-1.8h1.1v7.2H6c-1 0-1.8-.8-1.8-1.8v-3.6ZM19.8 13.2c0-1-.8-1.8-1.8-1.8h-1.1v7.2H18c1 0 1.8-.8 1.8-1.8v-3.6Z"></path>
+          </g>
+          <g class="nav-icon-filled" fill="currentColor">
+            <path d="M12 3a9 9 0 0 0-9 9v4.5A3.5 3.5 0 0 0 6.5 20h1.6V10.5H6.5c-.47 0-.92.1-1.32.27a6.9 6.9 0 0 1 13.64 0 3.5 3.5 0 0 0-1.32-.27h-1.6V20h1.6a3.5 3.5 0 0 0 3.5-3.5V12a9 9 0 0 0-9-9Z"></path>
+          </g>
+        </svg>
       </a>
 
-      <a href="/library" class="dock-item {% if menu == 'library' %}active{% endif %}" aria-label="Library">
-        <i data-feather="folder"></i>
+      <a href="/library" class="dock-item {% if menu == 'library' %}active{% endif %}" data-label="媒体库" aria-label="媒体库" {% if menu == 'library' %}aria-current="page"{% endif %}>
+        <svg class="nav-icon nav-icon-library" viewBox="0 0 24 24" aria-hidden="true">
+          <g class="nav-icon-outline" fill="none" stroke="currentColor" stroke-width="1.9">
+            <rect x="3.3" y="3.3" width="7.1" height="7.1" rx="1.7"></rect><rect x="13.6" y="3.3" width="7.1" height="7.1" rx="1.7"></rect><rect x="3.3" y="13.6" width="7.1" height="7.1" rx="1.7"></rect><rect x="13.6" y="13.6" width="7.1" height="7.1" rx="1.7"></rect>
+          </g>
+          <g class="nav-icon-filled" fill="currentColor">
+            <rect x="2.8" y="2.8" width="7.8" height="7.8" rx="2"></rect><rect x="13.4" y="2.8" width="7.8" height="7.8" rx="2"></rect><rect x="2.8" y="13.4" width="7.8" height="7.8" rx="2"></rect><rect x="13.4" y="13.4" width="7.8" height="7.8" rx="2"></rect>
+          </g>
+        </svg>
       </a>
 
-      <a href="/favorite" class="dock-item {% if menu == 'favorite' %}active{% endif %}" aria-label="Favorites">
-        <i data-feather="heart"></i>
-      </a>
-
-      <a href="/download" class="dock-item {% if menu == 'download' %}active{% endif %}" aria-label="Download">
-        <i data-feather="download-cloud"></i>
-      </a>
-
-      <a href="/settings" class="dock-item {% if menu == 'settings' %}active{% endif %}" aria-label="Settings">
-        <i data-feather="settings"></i>
-      </a>
+      <button id="more-menu-trigger" type="button" class="dock-item {% if menu in ['favorite', 'download', 'settings'] %}active{% endif %}" data-label="更多" aria-label="更多" aria-expanded="false" aria-controls="more-menu">
+        <svg class="nav-icon nav-icon-more" viewBox="0 0 24 24" aria-hidden="true">
+          <g class="nav-icon-outline" fill="currentColor">
+            <circle cx="5" cy="12" r="1.45"></circle><circle cx="12" cy="12" r="1.45"></circle><circle cx="19" cy="12" r="1.45"></circle>
+          </g>
+          <g class="nav-icon-filled" fill="currentColor">
+            <circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle>
+          </g>
+        </svg>
+      </button>
     </nav>
+
+    <div id="more-menu" class="more-menu" aria-hidden="true" inert>
+      <nav class="more-menu-card" aria-label="更多导航">
+        <div class="more-menu-list">
+          <a href="/favorite" class="more-menu-item {% if request.path == '/favorite' %}is-active{% endif %}">
+            <i data-feather="heart"></i><span>收藏</span>
+          </a>
+          <a href="/collections" class="more-menu-item {% if request.path == '/collections' or request.path.startswith('/collection/') %}is-active{% endif %}">
+            <i data-feather="layers"></i><span>集合</span>
+          </a>
+          <a href="/download" class="more-menu-item {% if menu == 'download' %}is-active{% endif %}">
+            <i data-feather="download"></i><span>下载</span>
+          </a>
+          <div class="more-menu-divider" aria-hidden="true"></div>
+          <button id="more-theme-toggle" type="button" class="more-menu-item" aria-pressed="false">
+            <i data-feather="sliders"></i>
+            <span>外观</span>
+            <span class="appearance-switch" aria-hidden="true">
+              <i data-feather="sun"></i><i data-feather="moon"></i>
+            </span>
+          </button>
+          <a href="/settings" class="more-menu-item {% if menu == 'settings' %}is-active{% endif %}">
+            <i data-feather="settings"></i><span>设置</span>
+          </a>
+        </div>
+      </nav>
+    </div>
     
     {% block extra_body %}{% endblock %}
     <script>
@@ -157,27 +416,56 @@
           const body = document.body;
           body.setAttribute('data-theme', theme);
           localStorage.setItem('theme', theme);
-          this.updateToggleButtons();
+          document.getElementById('more-theme-toggle')?.setAttribute('aria-pressed', String(theme === 'dark'));
         }
         toggleTheme() {
           const currentTheme = document.body.getAttribute('data-theme');
           this.setTheme(currentTheme === 'dark' ? 'light' : 'dark');
         }
-        updateToggleButtons() {
-          const isDark = document.body.getAttribute('data-theme') === 'dark';
-          const quickToggle = document.getElementById('quick-theme-toggle');
-          if (quickToggle) {
-            quickToggle.querySelector('.feather-sun')?.classList.toggle('hidden', isDark);
-            quickToggle.querySelector('.feather-moon')?.classList.toggle('hidden', !isDark);
-          }
+        bindEvents() {
+          document.getElementById('more-theme-toggle')?.addEventListener('click', () => this.toggleTheme());
+        }
+      }
+
+      class MoreMenu {
+        constructor() {
+          this.menu = document.getElementById('more-menu');
+          this.trigger = document.getElementById('more-menu-trigger');
+          this.bindEvents();
+        }
+        isOpen() {
+          return this.menu?.classList.contains('is-open');
+        }
+        open() {
+          if (!this.menu || !this.trigger) return;
+          this.menu.classList.add('is-open');
+          this.menu.removeAttribute('inert');
+          this.menu.setAttribute('aria-hidden', 'false');
+          this.trigger.setAttribute('aria-expanded', 'true');
+          this.menu.querySelector('a[href], button')?.focus();
+        }
+        close({ restoreFocus = true } = {}) {
+          if (!this.menu || !this.trigger) return;
+          this.menu.classList.remove('is-open');
+          this.menu.setAttribute('inert', '');
+          this.menu.setAttribute('aria-hidden', 'true');
+          this.trigger.setAttribute('aria-expanded', 'false');
+          if (restoreFocus) this.trigger.focus();
         }
         bindEvents() {
-          document.getElementById('quick-theme-toggle')?.addEventListener('click', () => this.toggleTheme());
+          this.trigger?.addEventListener('click', () => this.isOpen() ? this.close() : this.open());
+          this.menu?.addEventListener('click', (event) => {
+            if (event.target === this.menu) this.close();
+          });
+          document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.isOpen()) this.close();
+          });
         }
       }
 
       document.addEventListener('DOMContentLoaded', () => {
         new ThemeManager();
+        new MoreMenu();
       });
     </script>
   </body>
