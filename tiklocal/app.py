@@ -591,11 +591,10 @@ def create_app(test_config=None):
         file_path_encoded = quote(name, safe='/')
         file_query_encoded = quote(name, safe='')
         
-        # Context navigation (prev/next)
-        # Note: Re-scanning every request is inefficient for large libraries, 
-        # but keeps state stateless. Optimization: Cache this.
-        videos = library_service.scan_videos()
-        video_names = [library_service.get_relative_path(v) for v in videos]
+        video_names = [
+            str(record['name'])
+            for record in media_index.records(media_type='video')
+        ]
         
         try:
             index = video_names.index(name)
@@ -651,11 +650,12 @@ def create_app(test_config=None):
                     target.unlink()
                     download_manager.delete_source_for_file(name)
                     media_index.delete(name)
-                    # Thumbnails are handled by OS or periodic cleanup, but ideally Service should handle it
+                    thumbnail_service.delete_thumbnail(name)
                 except Exception as e:
                     return f"Error deleting file: {e}", 500
             else:
                 media_index.delete(name)
+                thumbnail_service.delete_thumbnail(name)
             return redirect('/library')
 
         return render_template('delete_confirm.html', file=name)

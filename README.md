@@ -11,6 +11,8 @@ TikLocal's main features include:
 * **A TikTok-like swipe-up browsing experience** with a mixed feed of local videos and images.
 * **A file manager-like directory browsing** feature that allows you to easily find and manage local video files.
 * **A Pinterest-like grid layout** feature that allows you to enjoy local images.
+* **Search, favorites, collections, and lightweight local recommendations** backed by a per-device media index.
+* **Multiple media sources and URL downloads** merged into one local library.
 * **Support for light and dark modes** to suit your personal preferences.
 
 ## Use cases
@@ -200,19 +202,17 @@ API keys are read from environment variables, preferring `TIKLOCAL_VISION_API_KE
 
 - Docs index: `docs/README.md`
 - Flow interaction unification: `docs/flow-interaction-unification.md`
+- Media index and local recommendation architecture: `docs/media-index-and-recommendation.md`
 - OpenRouter image-to-video research: `docs/openrouter-image-to-video-research.md`
 - Release notes: `docs/release_notes.md`
 
 
 ## TODO
 
-* [ ] Add search
 * [ ] Add more management operations, such as moving files and creating folders
 * [ ] Add basic login control
-* [ ] Add a bookmarking feature
 * [ ] Add a Docker image
 * [ ] Add a tagging feature
-* [ ] Use recommendation algorithms
 
 ## Contribution
 

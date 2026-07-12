@@ -25,18 +25,30 @@ class ThumbnailService:
     def get_thumbnail(self, rel_path: str) -> tuple[Path | bytes, str]:
         """Returns (file_path_or_bytes, mimetype)"""
         thumb_path = self._get_thumb_path(rel_path)
-        
-        # Return existing
-        if thumb_path.exists():
-            return thumb_path, 'image/jpeg'
-
-        # Generate new
         full_path = self.library_service.resolve_path(rel_path) if self.library_service else self.media_root / rel_path
+        if thumb_path.exists():
+            if not full_path or not full_path.exists():
+                return thumb_path, 'image/jpeg'
+            try:
+                if thumb_path.stat().st_mtime_ns >= full_path.stat().st_mtime_ns:
+                    return thumb_path, 'image/jpeg'
+            except OSError:
+                return thumb_path, 'image/jpeg'
+
         if full_path and full_path.exists():
             if self._generate(full_path, thumb_path):
                 return thumb_path, 'image/jpeg'
-        
+
         return self.placeholder, 'image/png'
+
+    def delete_thumbnail(self, rel_path: str) -> bool:
+        try:
+            self._get_thumb_path(rel_path).unlink()
+            return True
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return False
 
     def _generate(self, video_path: Path, output_path: Path, timestamp: float = None) -> bool:
         suffix = video_path.suffix.lower()
