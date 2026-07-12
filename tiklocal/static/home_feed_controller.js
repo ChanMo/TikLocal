@@ -87,7 +87,11 @@
     function beginActivity(item) {
       const target = activityTarget(item);
       if (!target) return null;
-      if (target.type === 'video' && target.el) target.el._completedInView = false;
+      if (target.type === 'video' && target.el) {
+        target.el._completedInView = false;
+        target.el._activityPlayedSeconds = 0;
+        target.el._activityLastPosition = null;
+      }
       activeActivity = { target, startedAt: performance.now() };
       return {
         session_id: activitySessionId,
@@ -105,10 +109,10 @@
       const visibleMs = Math.max(0, Math.round(performance.now() - startedAt));
       let ratio = null;
       if (target.type === 'video' && Number.isFinite(target.el?.duration) && target.el.duration > 0) {
-        ratio = Math.max(0, Math.min(Number(target.el.currentTime || 0) / target.el.duration, 1));
+        ratio = Math.max(0, Math.min(Number(target.el._activityPlayedSeconds || 0) / target.el.duration, 1));
       }
       const completed = target.type === 'video'
-        ? (target.el?._completedInView || (ratio !== null && ratio >= 0.85))
+        ? !!target.el?._completedInView
         : visibleMs >= 5000;
       const skipped = target.type === 'video'
         ? visibleMs < 2200 && (ratio === null || ratio < 0.12)
@@ -596,6 +600,32 @@
       }
     }
 
+    function stableUnitInterval(value) {
+      let hash = 2166136261;
+      const input = String(value || '');
+      for (let i = 0; i < input.length; i++) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0) / 4294967296;
+    }
+
+    function randomStartRatio(duration, name) {
+      if (!Number.isFinite(duration) || duration < 20) return 0;
+      const [minimum, maximum] = duration < 60 ? [0.05, 0.40] : [0.10, 0.60];
+      return minimum + stableUnitInterval(`${seed}:${name}`) * (maximum - minimum);
+    }
+
+    function applyRandomVideoStart(videoEl) {
+      if (!videoEl || videoEl._randomStartApplied) return;
+      const duration = Number(videoEl.duration || 0);
+      if (!Number.isFinite(duration) || duration <= 0) return;
+      videoEl._randomStartApplied = true;
+      const ratio = randomStartRatio(duration, videoEl.dataset.name || '');
+      if (ratio > 0) videoEl.currentTime = duration * ratio;
+      videoEl._activityLastPosition = videoEl.currentTime;
+    }
+
     function preloadNextVideo() {
       for (let i = getCurrentIndex() + 1; i < feedItems.length; i++) {
         const item = feedItems[i];
@@ -827,6 +857,7 @@
       if (item.type === 'video') {
         progressBar.disabled = false;
         ensureVideoSrc(item.el);
+        applyRandomVideoStart(item.el);
         if (item.el._loadFailed) handleMediaFailure(item.el);
         item.el.muted = false;
         item.el.playbackRate = speedOptions[currentSpeedIndex];
@@ -976,12 +1007,17 @@
         video.addEventListener('loadeddata', () => {
           video._loadFailed = false;
         });
-        video._lastActivityTime = 0;
         video.addEventListener('timeupdate', () => {
           updateVideoProgress(video);
           const duration = Number(video.duration || 0);
           const current = Number(video.currentTime || 0);
-          if (duration > 0 && video._lastActivityTime > duration * 0.85 && current < 1.5) {
+          const previous = video._activityLastPosition;
+          const playedDelta = current - previous;
+          if (Number.isFinite(previous) && playedDelta > 0 && playedDelta <= 2.5) {
+            video._activityPlayedSeconds = Number(video._activityPlayedSeconds || 0) + playedDelta;
+          }
+          video._activityLastPosition = current;
+          if (duration > 0 && previous > duration * 0.85 && current < 1.5) {
             video._completedInView = true;
             postActivity([{
               session_id: activitySessionId,
@@ -995,6 +1031,7 @@
         });
         const updateDuration = () => {
           if (currentItem()?.el !== video) return;
+          applyRandomVideoStart(video);
           const duration = video.duration;
           if (duration && !isNaN(duration) && duration !== Infinity) {
             timeTotal.textContent = formatTime(duration);

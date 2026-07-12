@@ -123,6 +123,12 @@ def test_settings_focuses_on_useful_local_controls(client):
     controller = client.get("/static/home_feed_controller.js").data.decode("utf-8")
     assert "size: '24'" in controller
     assert "snapshot: '1'" not in controller
+    assert "function randomStartRatio(duration, name)" in controller
+    assert "duration < 20" in controller
+    assert "[0.05, 0.40]" in controller
+    assert "[0.10, 0.60]" in controller
+    assert "_randomStartApplied" in controller
+    assert "_activityPlayedSeconds" in controller
 
 
 def test_api_library_items_supports_modes_search_and_sync(client, tmp_path):
