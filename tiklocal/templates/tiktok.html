@@ -26,6 +26,74 @@ html, body {
   inset: 0;
 }
 
+.flow-state {
+  position: fixed;
+  inset: 0;
+  z-index: 230;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.96);
+  background: rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.flow-state.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.flow-state-card {
+  width: min(100%, 310px);
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 20px;
+  text-align: center;
+  background: rgba(24, 24, 23, 0.9);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transform: translateY(7px) scale(0.98);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.flow-state.is-visible .flow-state-card { transform: translateY(0) scale(1); }
+.flow-state-spinner {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.86);
+  border-radius: 50%;
+  animation: flow-state-spin 0.8s linear infinite;
+}
+.flow-state:not([data-kind="loading"]) .flow-state-spinner { display: none; }
+.flow-state-title { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+.flow-state-detail { margin-top: 6px; color: rgba(255, 255, 255, 0.55); font-size: 12px; line-height: 1.55; }
+.flow-state-actions { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+.flow-state-actions[hidden] { display: none; }
+.flow-state-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+  font-weight: 620;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.flow-state-btn.primary { color: #181817; background: #f5f4ef; border-color: #f5f4ef; }
+.flow-state-btn[hidden] { display: none; }
+@keyframes flow-state-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .flow-state, .flow-state-card { transition-duration: 0.01ms; }
+  .flow-state-spinner { animation-duration: 1.6s; }
+}
+
 .feed-media {
   width: 100%;
   height: 100%;
@@ -625,17 +693,6 @@ body.immersive-mode .floating-dock {
   gap: 8px;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.recommendation-reason {
-  position: fixed;
-  left: 20px;
-  bottom: 72px;
-  z-index: 214;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
-}
-.recommendation-reason:empty { display: none; }
 .caption-title {
   font-size: 14px;
   line-height: 1.4;
@@ -912,6 +969,19 @@ em.coll-count {
 <div id="container">
   <div id="feed-container"></div>
 
+  <div id="flow-state" class="flow-state" data-kind="loading" aria-live="polite" aria-hidden="true">
+    <div class="flow-state-card">
+      <div class="flow-state-spinner" aria-hidden="true"></div>
+      <div id="flow-state-title" class="flow-state-title">正在准备内容</div>
+      <div id="flow-state-detail" class="flow-state-detail"></div>
+      <div id="flow-state-actions" class="flow-state-actions" hidden>
+        <button id="flow-state-retry" class="flow-state-btn primary" type="button" hidden>重试</button>
+        <button id="flow-state-next" class="flow-state-btn primary" type="button" hidden>下一条</button>
+        <a id="flow-state-library" class="flow-state-btn" href="/library" hidden>打开媒体库</a>
+      </div>
+    </div>
+  </div>
+
   <div id="overlay-layer"></div>
 
   <div id="play-status-icon">
@@ -966,7 +1036,6 @@ em.coll-count {
     <div class="caption-title hidden" id="caption-title"></div>
     <div class="caption-tags" id="caption-tags"></div>
   </div>
-  <div class="recommendation-reason" id="recommendation-reason"></div>
 
   <div class="magnifier" id="magnifier">
     <div class="mag-badge" id="mag-badge">2.5x</div>

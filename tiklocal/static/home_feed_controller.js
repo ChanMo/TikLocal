@@ -32,7 +32,13 @@
     const captionPanel = document.getElementById('caption-panel');
     const captionTitle = document.getElementById('caption-title');
     const captionTags = document.getElementById('caption-tags');
-    const recommendationReason = document.getElementById('recommendation-reason');
+    const flowStatus = document.getElementById('flow-state');
+    const flowStatusTitle = document.getElementById('flow-state-title');
+    const flowStatusDetail = document.getElementById('flow-state-detail');
+    const flowStatusActions = document.getElementById('flow-state-actions');
+    const flowStatusRetry = document.getElementById('flow-state-retry');
+    const flowStatusNext = document.getElementById('flow-state-next');
+    const flowStatusLibrary = document.getElementById('flow-state-library');
     const uiShared = window.FlowUIShared || {};
     const actionsShared = window.FlowActionsShared || {};
 
@@ -138,6 +144,35 @@
     let collectionSelectedNames = [];
     let collectionModalOpenedAt = 0;
     const collectionModalGuardMs = 520;
+    let flowLoadingTimer = null;
+
+    function showFlowStatus(kind, title, detail = '') {
+      clearTimeout(flowLoadingTimer);
+      flowLoadingTimer = null;
+      flowStatus.dataset.kind = kind;
+      flowStatusTitle.textContent = title;
+      flowStatusDetail.textContent = detail;
+      flowStatusRetry.hidden = !['error', 'media-error'].includes(kind);
+      flowStatusNext.hidden = kind !== 'media-error';
+      flowStatusLibrary.hidden = !['empty', 'error'].includes(kind);
+      flowStatusActions.hidden = !['empty', 'error', 'media-error'].includes(kind);
+      flowStatus.classList.add('is-visible');
+      flowStatus.setAttribute('aria-hidden', 'false');
+    }
+
+    function hideFlowStatus() {
+      clearTimeout(flowLoadingTimer);
+      flowLoadingTimer = null;
+      flowStatus.classList.remove('is-visible');
+      flowStatus.setAttribute('aria-hidden', 'true');
+    }
+
+    function scheduleFlowLoadingStatus() {
+      clearTimeout(flowLoadingTimer);
+      flowLoadingTimer = setTimeout(() => {
+        showFlowStatus('loading', '正在准备内容');
+      }, 250);
+    }
 
     function formatTime(seconds) {
       return uiShared.formatTime(seconds);
@@ -511,7 +546,6 @@
       const isThemeStrip = item.type === 'theme_strip';
       const isImageGroup = item.type === 'image_group';
       const displayEntry = currentDisplayEntry();
-      recommendationReason.textContent = String(item.recommendation_reason || '');
       infoBtn.hidden = isThemeStrip;
       favoriteBtn.hidden = isThemeStrip;
       collectionBtn.hidden = isThemeStrip;
@@ -793,6 +827,7 @@
       if (item.type === 'video') {
         progressBar.disabled = false;
         ensureVideoSrc(item.el);
+        if (item.el._loadFailed) handleMediaFailure(item.el);
         item.el.muted = false;
         item.el.playbackRate = speedOptions[currentSpeedIndex];
         progressBar.value = 0;
@@ -876,7 +911,7 @@
         const counterEl = panel.querySelector('.image-group-counter');
         const children = Array.isArray(item.items) ? item.items : [];
 
-        function renderImageGroup(index) {
+        function renderImageGroup(index, force = false) {
           if (!stage || !counterEl || !children.length) return;
           const safeIndex = Math.max(0, Math.min(index, children.length - 1));
           const entry = children[safeIndex];
@@ -886,7 +921,10 @@
           const previousMedia = stage.querySelector('.image-group-media');
           const img = document.createElement('img');
           img.className = 'image-group-media';
-          img.src = entry.media_url;
+          img.addEventListener('error', () => handleMediaFailure(panel));
+          img.src = force
+            ? `${entry.media_url}${entry.media_url.includes('?') ? '&' : '?'}retry=${Date.now()}`
+            : entry.media_url;
           img.alt = entry.name || '';
           img.loading = 'eager';
           img.decoding = 'async';
@@ -931,6 +969,13 @@
         video.poster = item.thumb_url || '';
         video.dataset.src = item.media_url;
         video.dataset.name = item.name;
+        video.addEventListener('error', () => {
+          video._loadFailed = true;
+          handleMediaFailure(video);
+        });
+        video.addEventListener('loadeddata', () => {
+          video._loadFailed = false;
+        });
         video._lastActivityTime = 0;
         video.addEventListener('timeupdate', () => {
           updateVideoProgress(video);
@@ -975,6 +1020,7 @@
       img.loading = 'lazy';
       img.decoding = 'async';
       img.alt = item.name;
+      img.addEventListener('error', () => handleMediaFailure(img));
       img.src = item.media_url;
       img.dataset.name = item.name;
       return img;
@@ -982,6 +1028,8 @@
 
     async function loadFeed() {
       if (flowSession.isLoading() || !flowSession.hasMore()) return;
+      const isInitialLoad = feedItems.length === 0;
+      if (isInitialLoad) scheduleFlowLoadingStatus();
       try {
         const result = await flowSession.loadMore(async (cursor) => {
           const page = Number(cursor?.page || 1);
@@ -1013,8 +1061,8 @@
               target_label: item.target_label || '',
               recommendation_reason: item.recommendation_reason || '',
               items: Array.isArray(item.items) ? item.items : [],
-              renderChild: typeof mediaEl._renderImageGroup === 'function' ? (index) => {
-                mediaEl._renderImageGroup(index);
+              renderChild: typeof mediaEl._renderImageGroup === 'function' ? (index, force = false) => {
+                mediaEl._renderImageGroup(index, force);
                 return Number(mediaEl._activeChildIndex) || 0;
               } : null,
               activeChildIndex: Number(mediaEl._activeChildIndex) || 0,
@@ -1039,8 +1087,52 @@
           const removed = flowSession.dropHead(removeCount);
           removed.forEach((entry) => entry.el.remove());
         }
+        if (feedItems.length) {
+          hideFlowStatus();
+        } else if (!flowSession.hasMore()) {
+          showFlowStatus('empty', '这里还没有可浏览的内容', '添加媒体后刷新索引，内容会出现在这里。');
+        }
+        return result;
       } catch (error) {
-        flowSession.setHasMore(false);
+        clearTimeout(flowLoadingTimer);
+        flowLoadingTimer = null;
+        const reachedEnd = getCurrentIndex() >= feedItems.length - 1;
+        if (isInitialLoad || reachedEnd) {
+          showFlowStatus('error', '内容暂时没有加载出来', '可以重试，或先去媒体库查看现有内容。');
+        }
+        return null;
+      }
+    }
+
+    function handleMediaFailure(mediaEl) {
+      if (currentItem()?.el !== mediaEl) return;
+      showFlowStatus('media-error', '这个媒体暂时无法打开', '文件可能已移动、离线或格式不可用。');
+    }
+
+    async function retryCurrentMedia() {
+      const item = currentItem();
+      if (!item) return;
+      hideFlowStatus();
+      const retryUrl = `${item.media_url}${item.media_url.includes('?') ? '&' : '?'}retry=${Date.now()}`;
+      if (item.type === 'video') {
+        item.el.pause();
+        item.el._loadFailed = false;
+        item.el.src = retryUrl;
+        item.el.load();
+        item.el.play().catch(() => {});
+      } else if (item.type === 'image') {
+        item.el.src = retryUrl;
+      } else if (item.type === 'image_group' && typeof item.renderChild === 'function') {
+        item.activeChildIndex = item.renderChild(Number(item.activeChildIndex) || 0, true);
+      }
+    }
+
+    async function retryFlowLoad() {
+      flowSession.setHasMore(true);
+      showFlowStatus('loading', '正在重新加载');
+      const result = await loadFeed();
+      if (result && feedItems.length && getCurrentIndex() < 0) {
+        await showItem(0);
       }
     }
 
@@ -1218,6 +1310,19 @@
         event.preventDefault();
         togglePlay();
       }
+    });
+
+    flowStatusRetry.addEventListener('click', async () => {
+      if (flowStatus.dataset.kind === 'media-error') {
+        await retryCurrentMedia();
+      } else {
+        await retryFlowLoad();
+      }
+    });
+
+    flowStatusNext.addEventListener('click', async () => {
+      hideFlowStatus();
+      await goNext();
     });
 
     progressBar.addEventListener('input', () => {
