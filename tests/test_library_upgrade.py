@@ -1,9 +1,13 @@
 import os
+from io import BytesIO
 from urllib.parse import quote
 
 import pytest
+from PIL import Image
 
 from tiklocal.app import create_app
+from tiklocal.services.database import AppDatabase
+from tiklocal.services.library_index import MediaIndexStore
 
 
 @pytest.fixture
@@ -56,6 +60,7 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert "flow_session.js" in body
     assert "flow_actions_shared.js" in body
     assert "flow_media_actions_controller.js" in body
+    assert "pageSize: 24" in body
 
 
 def test_home_feed_uses_unified_immersive_model(client):
@@ -72,7 +77,19 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert 'id="collection-btn"' in body
     assert 'id="collection-count"' in body
     assert 'id="collection-modal"' in body
+    assert 'id="more-menu-trigger"' in body
+    assert 'id="more-menu"' in body
+    assert 'id="more-theme-toggle"' in body
+    assert 'href="/favorite"' in body
+    assert 'href="/collections"' in body
+    assert 'href="/download"' in body
+    assert 'href="/settings"' in body
+    assert 'id="quick-theme-toggle"' not in body
     assert "image-focus-mode" not in body
+
+    controller = client.get("/static/home_feed_controller.js").data.decode("utf-8")
+    assert "size: '24'" in controller
+    assert "snapshot: '1'" not in controller
 
 
 def test_api_library_items_supports_modes_search_and_sync(client, tmp_path):
@@ -192,6 +209,85 @@ def test_api_library_items_merges_multiple_media_sources(tmp_path, monkeypatch):
     extra_media = local_client.get("/media?uri=%40photos/photo.jpg", follow_redirects=True)
     assert extra_media.status_code == 200
     assert extra_media.data == b"image"
+
+
+def test_startup_resyncs_existing_media_index(tmp_path, monkeypatch):
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    kept = media_root / "kept.mp4"
+    removed = media_root / "removed.jpg"
+    kept.write_bytes(b"old")
+    removed.write_bytes(b"removed")
+
+    database = AppDatabase(tmp_path / "tiklocal.sqlite3")
+    config = {"TESTING": True, "MEDIA_ROOT": media_root, "APP_DATABASE": database}
+    create_app(config)
+
+    kept.write_bytes(b"new-content")
+    removed.unlink()
+    (media_root / "added.jpg").write_bytes(b"added")
+    app = create_app(config)
+
+    records = {item["name"]: item for item in MediaIndexStore(database).records()}
+    assert set(records) == {"@default/kept.mp4", "@default/added.jpg"}
+    assert records["@default/kept.mp4"]["size_bytes"] == len(b"new-content")
+    assert app.extensions["media_index_sync"]["deleted"] == 1
+
+
+def test_startup_preserves_index_for_unavailable_media_source(tmp_path):
+    default_root = tmp_path / "default"
+    extra_root = tmp_path / "extra"
+    default_root.mkdir()
+    extra_root.mkdir()
+    main = default_root / "main.mp4"
+    main.write_bytes(b"video")
+    (extra_root / "photo.jpg").write_bytes(b"image")
+
+    database = AppDatabase(tmp_path / "tiklocal.sqlite3")
+    config = {
+        "TESTING": True,
+        "MEDIA_ROOT": default_root,
+        "APP_DATABASE": database,
+        "MEDIA_SOURCES": [
+            {"id": "default", "name": "Default", "path": str(default_root)},
+            {"id": "photos", "name": "Photos", "path": str(extra_root)},
+        ],
+    }
+    create_app(config)
+
+    main.unlink()
+    extra_root.rename(tmp_path / "extra-offline")
+    app = create_app(config)
+
+    names = {item["name"] for item in MediaIndexStore(database).records()}
+    assert names == {"@photos/photo.jpg"}
+    assert app.extensions["media_index_sync"]["unavailable_sources"] == ["photos"]
+
+
+def test_library_images_use_bounded_cached_thumbnails(tmp_path, monkeypatch):
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    image_path = media_root / "large image.png"
+    Image.new("RGB", (1400, 900), (90, 130, 170)).save(image_path)
+
+    data_root = tmp_path / "tiklocal-data"
+    monkeypatch.setenv("MEDIA_ROOT", str(media_root))
+    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
+    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
+    local_client = app.test_client()
+
+    payload = local_client.get("/api/library/items?scope=all").get_json()["data"]
+    item = payload["items"][0]
+    assert item["media_url"] == "/media/%40default/large%20image.png"
+    assert item["thumb_url"] == "/thumb?uri=%40default/large%20image.png"
+
+    first = local_client.get(item["thumb_url"])
+    second = local_client.get(item["thumb_url"])
+    assert first.status_code == 200
+    assert first.mimetype == "image/jpeg"
+    assert second.data == first.data
+    with Image.open(BytesIO(first.data)) as thumbnail:
+        assert max(thumbnail.size) == 640
 
 
 def test_removed_legacy_routes_and_apis_return_404(client):

@@ -498,11 +498,25 @@ def main():
     else:
         media_path = Path(media_sources[0]['path'])
 
+    unavailable_sources = []
     for source in media_sources:
         source_path = Path(str(source.get('path') or '')).expanduser()
         if not source_path.exists() or not source_path.is_dir():
-            print(f"错误: 媒体源不可用 {source.get('id')}: {source_path}", file=sys.stderr)
-            sys.exit(1)
+            unavailable_sources.append((source.get('id'), source_path))
+
+    if media_sources and len(unavailable_sources) == len(media_sources):
+        print("错误: 所有媒体源均不可用", file=sys.stderr)
+        for source_id, source_path in unavailable_sources:
+            print(f"  @{source_id}: {source_path}", file=sys.stderr)
+        sys.exit(1)
+    if not media_root and unavailable_sources:
+        unavailable_ids = {source_id for source_id, _ in unavailable_sources}
+        first_available = next(
+            source for source in media_sources if source.get('id') not in unavailable_ids
+        )
+        media_path = Path(str(first_available['path'])).expanduser()
+    for source_id, source_path in unavailable_sources:
+        print(f"警告: 媒体源不可用，启动时将保留原索引 @{source_id}: {source_path}", file=sys.stderr)
 
     # 设置环境变量供 Flask 使用
     os.environ['MEDIA_ROOT'] = str(media_path.absolute())

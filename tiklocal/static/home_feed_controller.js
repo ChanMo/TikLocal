@@ -987,8 +987,7 @@
           const page = Number(cursor?.page || 1);
           const query = new URLSearchParams({
             page: String(page),
-            size: '96',
-            snapshot: '1',
+            size: '24',
           });
           if (seed) query.set('seed', seed);
 

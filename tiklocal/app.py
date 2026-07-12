@@ -135,8 +135,13 @@ def create_app(test_config=None):
     app_database.migrate()
     media_index = MediaIndexStore(app_database)
     library_indexer = LibraryIndexer(library_service, media_index)
-    if media_index.stats()['total'] == 0:
-        library_indexer.sync()
+    index_sync_result = library_indexer.sync()
+    app.extensions["media_index_sync"] = index_sync_result
+    if index_sync_result["unavailable_sources"]:
+        app.logger.warning(
+            "媒体源不可用，已保留其现有索引: %s",
+            ", ".join(index_sync_result["unavailable_sources"]),
+        )
     activity_store = MediaActivityStore(app_database)
     recommend_service = RecommendService(
         library_service,
@@ -536,7 +541,7 @@ def create_app(test_config=None):
         allowed_modes = {'all', 'image_random', 'similar_images', 'video_latest', 'big_files'}
         mode = _read_choice_arg('mode', 'all', allowed_modes)
         min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
-        limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+        limit = _read_int_arg('limit', 24, minimum=12, maximum=96)
         seed = str(request.args.get('seed', '')).strip()
         search = str(request.args.get('q', '')).strip()[:200]
         if search:
@@ -664,7 +669,7 @@ def create_app(test_config=None):
 
     @app.route('/favorite')
     def favorite_view():
-        limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+        limit = _read_int_arg('limit', 24, minimum=12, maximum=96)
         initial_page = _build_library_page(
             favorites_only=True,
             mode='all',
@@ -696,7 +701,7 @@ def create_app(test_config=None):
         collection = collection_store.get(collection_id)
         if not collection:
             return "Collection not found", 404
-        limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+        limit = _read_int_arg('limit', 24, minimum=12, maximum=96)
         initial_page = _build_library_page(
             favorites_only=False,
             mode='all',
@@ -1095,7 +1100,7 @@ def create_app(test_config=None):
             if not found:
                 return {'success': False, 'error': 'Collection not found'}, 404
             offset = _read_int_arg('offset', 0, minimum=0)
-            limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+            limit = _read_int_arg('limit', 24, minimum=12, maximum=96)
             page = _build_library_page(
                 favorites_only=False,
                 mode='all',
@@ -1453,7 +1458,7 @@ def create_app(test_config=None):
         if scope != 'all':
             mode = 'all'
         offset = _read_int_arg('offset', 0, minimum=0)
-        limit = _read_int_arg('limit', 48, minimum=12, maximum=96)
+        limit = _read_int_arg('limit', 24, minimum=12, maximum=96)
         min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
         seed = str(request.args.get('seed', '')).strip()
         search = str(request.args.get('q', '')).strip()[:200] if scope == 'all' else ''

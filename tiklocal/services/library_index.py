@@ -11,8 +11,18 @@ class MediaIndexStore:
     def __init__(self, database: AppDatabase):
         self.database = database
 
-    def replace_snapshot(self, records: list[dict]) -> dict:
+    def replace_snapshot(
+        self,
+        records: list[dict],
+        *,
+        synced_source_ids: set[str] | None = None,
+    ) -> dict:
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        source_ids = sorted(
+            {str(record["source_id"]) for record in records}
+            if synced_source_ids is None
+            else synced_source_ids
+        )
         with self.database.connect() as conn:
             conn.execute("CREATE TEMP TABLE media_index_seen(uri TEXT PRIMARY KEY)")
             for record in records:
@@ -37,10 +47,19 @@ class MediaIndexStore:
                     values,
                 )
                 conn.execute("INSERT OR IGNORE INTO media_index_seen(uri) VALUES (?)", (record["uri"],))
-            deleted = conn.execute(
-                "DELETE FROM media_items WHERE uri NOT IN (SELECT uri FROM media_index_seen)"
-            ).rowcount
+            deleted = 0
+            if source_ids:
+                placeholders = ",".join("?" for _ in source_ids)
+                deleted = conn.execute(
+                    f"""
+                    DELETE FROM media_items
+                    WHERE source_id IN ({placeholders})
+                      AND uri NOT IN (SELECT uri FROM media_index_seen)
+                    """,
+                    source_ids,
+                ).rowcount
             conn.execute("DROP TABLE media_index_seen")
+            item_count = int(conn.execute("SELECT COUNT(*) FROM media_items").fetchone()[0])
             conn.execute(
                 """
                 INSERT INTO media_index_state(id, last_synced_at, item_count)
@@ -49,9 +68,13 @@ class MediaIndexStore:
                   last_synced_at = excluded.last_synced_at,
                   item_count = excluded.item_count
                 """,
-                (now, len(records)),
+                (now, item_count),
             )
-        return {"indexed": len(records), "deleted": max(deleted, 0), "last_synced_at": now}
+        return {
+            "indexed": len(records),
+            "deleted": max(deleted, 0),
+            "last_synced_at": now,
+        }
 
     def upsert(self, records: list[dict]) -> int:
         if not records:
@@ -225,6 +248,11 @@ class LibraryIndexer:
         self.store = store
 
     def sync(self) -> dict:
+        available_source_ids = {
+            source.id
+            for source in self.library.sources
+            if source.path.exists() and source.path.is_dir()
+        }
         paths = (
             self.library.scan_videos()
             + self.library.scan_images()
@@ -235,7 +263,14 @@ class LibraryIndexer:
             for path in paths
             if (record := self._record_for_path(path))
         }
-        return self.store.replace_snapshot(list(records_by_uri.values()))
+        result = self.store.replace_snapshot(
+            list(records_by_uri.values()),
+            synced_source_ids=available_source_ids,
+        )
+        result["unavailable_sources"] = [
+            source.id for source in self.library.sources if source.id not in available_source_ids
+        ]
+        return result
 
     def register_uris(self, uris: list[str]) -> int:
         records = []

@@ -20,13 +20,14 @@ def legacy_media_key(uri: str) -> str:
 
 def build_feed_media_item(name: str, media_type: str) -> dict[str, str]:
     encoded = quote(name)
+    media_path = quote(name, safe='/')
     detail_url = f"/detail/{encoded}" if media_type == 'video' else f"/image?uri={encoded}"
-    media_url = f"/media?uri={encoded}"
+    media_url = f"/media/{media_path}"
     return {
         'type': media_type,
         'name': name,
         'media_url': media_url,
-        'thumb_url': f"/thumb?uri={encoded}" if media_type == 'video' else media_url,
+        'thumb_url': f"/thumb?uri={encoded}",
         'detail_url': detail_url,
     }
 
@@ -329,13 +330,13 @@ def serialize_library_item(record: dict, metadata_store, library_service) -> dic
     media_type = str(record.get('media_type') or 'video')
     width, height = get_or_probe_media_dims(metadata_store, library_service, name, media_type)
     encoded = quote(name)
-    media_url = f"/media?uri={encoded}"
+    media_url = f"/media/{quote(name, safe='/')}"
     return {
         'name': name,
         'type': media_type,
         'media_url': media_url,
         'detail_url': f"/image?uri={encoded}" if media_type == 'image' else f"/detail/{encoded}",
-        'thumb_url': media_url if media_type == 'image' else f"/thumb?uri={encoded}",
+        'thumb_url': f"/thumb?uri={encoded}",
         'mtime_ts': float(record.get('mtime_ts') or 0),
         'size_bytes': int(record.get('size_bytes') or 0),
         'width': int(width) if width else None,

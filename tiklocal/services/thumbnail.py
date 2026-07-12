@@ -1,19 +1,19 @@
-import os
-import sys
-import json
 import hashlib
 import subprocess as sp
 from pathlib import Path
-from tiklocal.paths import get_thumbnails_dir, get_thumbs_map_path
+
+from PIL import Image, ImageOps
+
+from tiklocal.paths import get_thumbnails_dir
 
 AUDIO_EXTENSIONS = {'.mp3', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wav'}
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
 
 class ThumbnailService:
     def __init__(self, media_root: Path, library_service=None):
         self.media_root = media_root
         self.library_service = library_service
         self.thumb_dir = get_thumbnails_dir()
-        self.thumb_map_file = get_thumbs_map_path()
         self.placeholder = (
             b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0cIDAT\x08\x99c\xf8\xff\xff?\x00\x05\xfe\x02\xfeA\x93\x8a\x1d\x00\x00\x00\x00IEND\xaeB`\x82"
         )
@@ -40,6 +40,9 @@ class ThumbnailService:
 
     def _generate(self, video_path: Path, output_path: Path, timestamp: float = None) -> bool:
         suffix = video_path.suffix.lower()
+
+        if suffix in IMAGE_EXTENSIONS:
+            return self._generate_image(video_path, output_path)
 
         # Audio: extract embedded cover art
         if suffix in AUDIO_EXTENSIONS:
@@ -71,3 +74,21 @@ class ThumbnailService:
             except Exception:
                 continue
         return False
+
+    @staticmethod
+    def _generate_image(image_path: Path, output_path: Path) -> bool:
+        try:
+            with Image.open(image_path) as source:
+                image = ImageOps.exif_transpose(source)
+                image.thumbnail((640, 640), Image.Resampling.LANCZOS)
+                if 'A' in image.getbands():
+                    rgba = image.convert('RGBA')
+                    background = Image.new('RGB', rgba.size, (247, 246, 242))
+                    background.paste(rgba, mask=rgba.getchannel('A'))
+                    image = background
+                else:
+                    image = image.convert('RGB')
+                image.save(output_path, 'JPEG', quality=84, optimize=True, progressive=True)
+            return output_path.exists() and output_path.stat().st_size > 0
+        except Exception:
+            return False
