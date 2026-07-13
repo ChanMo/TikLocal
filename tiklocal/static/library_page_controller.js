@@ -236,6 +236,7 @@
   const waterfall = {
     count: 0,
     gap: 8,
+    gridWidth: 0,
     columnWidth: 0,
     columns: [],
     heights: [],
@@ -259,12 +260,14 @@
     const gap = getWaterfallGap();
     const gridWidth = Math.max(1, grid.clientWidth || window.innerWidth);
     waterfall.gap = gap;
+    waterfall.gridWidth = gridWidth;
     waterfall.columnWidth = Math.max(1, (gridWidth - gap * (count - 1)) / count);
     grid.style.setProperty('--wf-gap', `${gap}px`);
   }
 
   function resetWaterfallLayout() {
     waterfall.count = 0;
+    waterfall.gridWidth = 0;
     waterfall.columnWidth = 0;
     waterfall.columns = [];
     waterfall.heights = [];
@@ -382,6 +385,7 @@
 
   function resetSimilarLayout() {
     waterfall.count = 0;
+    waterfall.gridWidth = 0;
     waterfall.columnWidth = 0;
     waterfall.columns = [];
     waterfall.heights = [];
@@ -433,6 +437,13 @@
     if (relayoutTimer) clearTimeout(relayoutTimer);
     relayoutTimer = setTimeout(() => {
       relayoutTimer = null;
+      const nextCount = getWaterfallColumnCount();
+      const nextGap = getWaterfallGap();
+      const nextGridWidth = Math.max(1, grid.clientWidth || window.innerWidth);
+      const layoutChanged = waterfall.count !== nextCount
+        || waterfall.gap !== nextGap
+        || waterfall.gridWidth !== nextGridWidth;
+      if (isSimilarMode() || !layoutChanged) return;
       relayoutWaterfall();
     }, 180);
   }

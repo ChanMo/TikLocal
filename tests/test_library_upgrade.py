@@ -74,6 +74,8 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     controller = client.get("/static/library_page_controller.js").data.decode("utf-8")
     assert "syncSearchUI" in controller
     assert "aria-pressed" in controller
+    assert "waterfall.gridWidth !== nextGridWidth" in controller
+    assert "if (isSimilarMode() || !layoutChanged) return;" in controller
 
 
 def test_home_feed_uses_unified_immersive_model(client):
