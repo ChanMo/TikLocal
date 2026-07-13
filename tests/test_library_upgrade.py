@@ -99,6 +99,10 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert 'id="flow-state"' in body
     assert 'id="flow-state-retry"' in body
     assert 'id="flow-state-next"' in body
+    assert 'id="video-start-cover"' in body
+    assert 'id="video-start-cover-image"' in body
+    assert "transform: scale(1.01)" not in body
+    assert "filter: blur(2px)" not in body
     assert 'href="/favorite"' in body
     assert '<span>已保存</span>' in body
     assert 'href="/collections"' not in body
@@ -130,6 +134,13 @@ def test_settings_focuses_on_useful_local_controls(client):
     assert "[0.05, 0.40]" in controller
     assert "[0.10, 0.60]" in controller
     assert "_randomStartApplied" in controller
+    assert "function prepareRandomVideoStart(videoEl)" in controller
+    assert "waitForPresentedVideoFrame" in controller
+    assert "prepareRandomVideoStart(v).catch" in controller
+    assert "videoEl._randomStartUsesCover = ratio > 0" in controller
+    assert "videoStartCoverTarget === videoEl" in controller
+    assert "await videoStartCoverImage.decode()" in controller
+    assert "video.poster = item.thumb_url" not in controller
     assert "_activityPlayedSeconds" in controller
 
 

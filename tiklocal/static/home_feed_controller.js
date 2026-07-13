@@ -2,6 +2,8 @@
     document.body.classList.add('immersive');
 
     const feedContainer = document.getElementById('feed-container');
+    const videoStartCover = document.getElementById('video-start-cover');
+    const videoStartCoverImage = document.getElementById('video-start-cover-image');
     const overlayLayer = document.getElementById('overlay-layer');
     const speedBtn = document.getElementById('speed-btn');
     const captionBtn = document.getElementById('caption-btn');
@@ -149,6 +151,76 @@
     let collectionModalOpenedAt = 0;
     const collectionModalGuardMs = 520;
     let flowLoadingTimer = null;
+    let videoStartCoverTimer = null;
+    let videoStartCoverClearTimer = null;
+    let videoStartCoverRequestId = 0;
+    let videoStartCoverTarget = null;
+    let videoActivationId = 0;
+
+    function syncVideoStartCoverImage(videoEl) {
+      const canShow = videoStartCoverTarget === videoEl
+        && videoEl?._randomStartUsesCover === true
+        && videoEl?._startCoverImageReady === true
+        && videoStartCover.classList.contains('is-visible');
+      videoStartCover.classList.toggle('has-image', canShow);
+    }
+
+    function showVideoStartCover(item) {
+      clearTimeout(videoStartCoverTimer);
+      clearTimeout(videoStartCoverClearTimer);
+      const videoEl = item?.el || null;
+      const requestId = ++videoStartCoverRequestId;
+      videoStartCoverTarget = videoEl;
+      if (videoEl) videoEl._startCoverImageReady = false;
+      videoStartCover.classList.remove('has-image', 'is-waiting');
+      videoStartCover.classList.add('is-visible');
+      videoStartCover.setAttribute('aria-hidden', 'false');
+      const markImageReady = async () => {
+        try {
+          if (typeof videoStartCoverImage.decode === 'function') {
+            await videoStartCoverImage.decode();
+          }
+        } catch (error) {
+          return;
+        }
+        if (requestId !== videoStartCoverRequestId || videoStartCoverTarget !== videoEl) return;
+        if (videoEl) videoEl._startCoverImageReady = true;
+        syncVideoStartCoverImage(videoEl);
+      };
+      videoStartCoverImage.onload = markImageReady;
+      videoStartCoverImage.onerror = () => {
+        if (requestId !== videoStartCoverRequestId || videoStartCoverTarget !== videoEl) return;
+        if (videoEl) videoEl._startCoverImageReady = false;
+        syncVideoStartCoverImage(videoEl);
+      };
+      if (item?.thumb_url) {
+        videoStartCoverImage.src = item.thumb_url;
+        if (videoStartCoverImage.complete && videoStartCoverImage.naturalWidth > 0) {
+          markImageReady();
+        }
+      } else {
+        videoStartCoverImage.removeAttribute('src');
+      }
+      videoStartCoverTimer = setTimeout(() => {
+        videoStartCover.classList.add('is-waiting');
+      }, 250);
+    }
+
+    function hideVideoStartCover() {
+      clearTimeout(videoStartCoverTimer);
+      clearTimeout(videoStartCoverClearTimer);
+      videoStartCoverRequestId += 1;
+      videoStartCoverTarget = null;
+      videoStartCoverImage.onload = null;
+      videoStartCoverImage.onerror = null;
+      videoStartCover.classList.remove('has-image', 'is-visible', 'is-waiting');
+      videoStartCover.setAttribute('aria-hidden', 'true');
+      videoStartCoverClearTimer = setTimeout(() => {
+        if (!videoStartCover.classList.contains('is-visible')) {
+          videoStartCoverImage.removeAttribute('src');
+        }
+      }, 180);
+    }
 
     function showFlowStatus(kind, title, detail = '') {
       clearTimeout(flowLoadingTimer);
@@ -600,6 +672,34 @@
       }
     }
 
+    function waitForVideoState(videoEl, eventNames, condition, timeoutMs = 8000) {
+      if (condition()) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        let timeoutId = null;
+        const names = Array.isArray(eventNames) ? eventNames : [eventNames];
+        const cleanup = () => {
+          names.forEach((name) => videoEl.removeEventListener(name, onStateChange));
+          videoEl.removeEventListener('error', onError);
+          clearTimeout(timeoutId);
+        };
+        const onStateChange = () => {
+          if (!condition()) return;
+          cleanup();
+          resolve();
+        };
+        const onError = () => {
+          cleanup();
+          reject(new Error('Video failed while preparing random start'));
+        };
+        names.forEach((name) => videoEl.addEventListener(name, onStateChange));
+        videoEl.addEventListener('error', onError, { once: true });
+        timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error('Timed out while preparing random start'));
+        }, timeoutMs);
+      });
+    }
+
     function stableUnitInterval(value) {
       let hash = 2166136261;
       const input = String(value || '');
@@ -617,13 +717,64 @@
     }
 
     function applyRandomVideoStart(videoEl) {
-      if (!videoEl || videoEl._randomStartApplied) return;
+      if (!videoEl || videoEl._randomStartApplied) return Number(videoEl?.currentTime || 0);
       const duration = Number(videoEl.duration || 0);
-      if (!Number.isFinite(duration) || duration <= 0) return;
+      if (!Number.isFinite(duration) || duration <= 0) return null;
       videoEl._randomStartApplied = true;
       const ratio = randomStartRatio(duration, videoEl.dataset.name || '');
-      if (ratio > 0) videoEl.currentTime = duration * ratio;
+      const targetTime = ratio > 0 ? duration * ratio : 0;
+      if (Math.abs(Number(videoEl.currentTime || 0) - targetTime) > 0.05) {
+        videoEl.currentTime = targetTime;
+      }
       videoEl._activityLastPosition = videoEl.currentTime;
+      return targetTime;
+    }
+
+    function prepareRandomVideoStart(videoEl) {
+      if (!videoEl) return Promise.reject(new Error('Missing video element'));
+      if (videoEl._randomStartReady) return Promise.resolve(videoEl);
+      if (videoEl._randomStartPromise) return videoEl._randomStartPromise;
+
+      videoEl.preload = 'auto';
+      ensureVideoSrc(videoEl);
+      videoEl._randomStartPromise = (async () => {
+        await waitForVideoState(
+          videoEl,
+          ['loadedmetadata', 'durationchange'],
+          () => Number.isFinite(videoEl.duration) && videoEl.duration > 0,
+        );
+
+        const duration = Number(videoEl.duration || 0);
+        const ratio = randomStartRatio(duration, videoEl.dataset.name || '');
+        videoEl._randomStartUsesCover = ratio > 0;
+        syncVideoStartCoverImage(videoEl);
+        const targetTime = ratio > 0 ? duration * ratio : 0;
+        const shouldSeek = Math.abs(Number(videoEl.currentTime || 0) - targetTime) > 0.05;
+        const seekPromise = shouldSeek
+          ? waitForVideoState(
+            videoEl,
+            'seeked',
+            () => Math.abs(Number(videoEl.currentTime || 0) - targetTime) < 0.25,
+          )
+          : Promise.resolve();
+
+        applyRandomVideoStart(videoEl);
+        await seekPromise;
+        await waitForVideoState(
+          videoEl,
+          ['loadeddata', 'canplay'],
+          () => videoEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA,
+        );
+        videoEl._randomStartReady = true;
+        videoEl._activityLastPosition = videoEl.currentTime;
+        videoEl.preload = 'metadata';
+        return videoEl;
+      })().catch((error) => {
+        videoEl._randomStartPromise = null;
+        videoEl.preload = 'metadata';
+        throw error;
+      });
+      return videoEl._randomStartPromise;
     }
 
     function preloadNextVideo() {
@@ -631,11 +782,24 @@
         const item = feedItems[i];
         if (item.type !== 'video') continue;
         const v = item.el;
-        if (v && !v.src) {
-          ensureVideoSrc(v);
-        }
+        if (v) prepareRandomVideoStart(v).catch(() => {});
         break;
       }
+    }
+
+    function waitForPresentedVideoFrame(videoEl, timeoutMs = 350) {
+      if (typeof videoEl.requestVideoFrameCallback !== 'function') return Promise.resolve();
+      return new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve();
+        };
+        const timeoutId = setTimeout(finish, timeoutMs);
+        videoEl.requestVideoFrameCallback(finish);
+      });
     }
 
     function updateVideoProgress(videoEl) {
@@ -847,8 +1011,12 @@
       setCurrentIndex(safeIndex);
       const item = currentItem();
       if (!item) return;
+      const activationId = ++videoActivationId;
       postActivity([previousActivity, beginActivity(item)]);
       flowState.onMediaChanged();
+
+      if (item.type === 'video') showVideoStartCover(item);
+      else hideVideoStartCover();
 
       item.el.style.display = item.type === 'theme_strip' ? '' : 'block';
       requestAnimationFrame(() => item.el.classList.add('active'));
@@ -856,10 +1024,7 @@
 
       if (item.type === 'video') {
         progressBar.disabled = false;
-        ensureVideoSrc(item.el);
-        applyRandomVideoStart(item.el);
         if (item.el._loadFailed) handleMediaFailure(item.el);
-        item.el.muted = false;
         item.el.playbackRate = speedOptions[currentSpeedIndex];
         progressBar.value = 0;
         progressFill.style.width = '0%';
@@ -867,12 +1032,38 @@
         timeTotal.textContent = formatTime(item.el.duration);
         clearCaption();
 
-        const playPromise = item.el.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => playStatusIcon.classList.remove('visible'))
-            .catch(() => playStatusIcon.classList.add('visible'));
+        try {
+          await prepareRandomVideoStart(item.el);
+        } catch (error) {
+          if (activationId !== videoActivationId || currentItem()?.el !== item.el) return;
+          hideVideoStartCover();
+          if (item.el._loadFailed) handleMediaFailure(item.el);
+          item.el.muted = false;
+          const fallbackPlayPromise = item.el.play();
+          if (fallbackPlayPromise !== undefined) {
+            fallbackPlayPromise
+              .then(() => playStatusIcon.classList.remove('visible'))
+              .catch(() => playStatusIcon.classList.add('visible'));
+          } else {
+            playStatusIcon.classList.remove('visible');
+          }
+          preloadNextVideo();
+          return;
         }
+
+        if (activationId !== videoActivationId || currentItem()?.el !== item.el) return;
+        item.el.muted = false;
+        try {
+          const playPromise = item.el.play();
+          if (playPromise !== undefined) await playPromise;
+          await waitForPresentedVideoFrame(item.el);
+          if (activationId !== videoActivationId || currentItem()?.el !== item.el) return;
+          playStatusIcon.classList.remove('visible');
+        } catch (error) {
+          if (activationId !== videoActivationId || currentItem()?.el !== item.el) return;
+          playStatusIcon.classList.add('visible');
+        }
+        hideVideoStartCover();
         preloadNextVideo();
       } else if (item.type === 'image_group') {
         clearCaption();
@@ -997,7 +1188,6 @@
         video.playsInline = true;
         video.controls = false;
         video.preload = 'metadata';
-        video.poster = item.thumb_url || '';
         video.dataset.src = item.media_url;
         video.dataset.name = item.name;
         video.addEventListener('error', () => {
@@ -1031,7 +1221,6 @@
         });
         const updateDuration = () => {
           if (currentItem()?.el !== video) return;
-          applyRandomVideoStart(video);
           const duration = video.duration;
           if (duration && !isNaN(duration) && duration !== Infinity) {
             timeTotal.textContent = formatTime(duration);
@@ -1154,9 +1343,13 @@
       if (item.type === 'video') {
         item.el.pause();
         item.el._loadFailed = false;
+        item.el._randomStartApplied = false;
+        item.el._randomStartReady = false;
+        item.el._randomStartPromise = null;
+        item.el._randomStartUsesCover = false;
         item.el.src = retryUrl;
         item.el.load();
-        item.el.play().catch(() => {});
+        await showItem(getCurrentIndex());
       } else if (item.type === 'image') {
         item.el.src = retryUrl;
       } else if (item.type === 'image_group' && typeof item.renderChild === 'function') {
