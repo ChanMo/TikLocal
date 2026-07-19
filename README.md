@@ -131,9 +131,9 @@ brew install yt-dlp gallery-dl ffmpeg
 sudo apt install yt-dlp gallery-dl ffmpeg
 ```
 
-### Home Mixed Feed
+### Home and Flow
 
-The home page (`/`) now uses a mixed immersive feed:
+The home page (`/`) is a calm launchpad for choosing a session, revisiting recently indexed media, rediscovering images, and opening personal collections. The immersive mixed feed lives at `/flow`:
 
 - Videos and images are mixed in one swipe flow (video-first density, randomized order)
 - Image cards support in-feed AI caption/tags panel

@@ -1,13 +1,13 @@
-# Flow 交互统一架构（Home / Library / Favorites）
+# Flow 交互统一架构（Flow / Library / Favorites）
 
 - 状态: 已落地
 - 更新时间: 2026-02-25
 
 ## 背景/目标
 
-- 首页（`/`）与 Library/Favorites（`/library`、`/favorite`）曾长期维护两套交互状态机，导致行为分叉与回归风险上升。
+- Flow（`/flow`）与 Library/Favorites（`/library`、`/favorite`）曾长期维护两套交互状态机，导致行为分叉与回归风险上升。
 - 典型问题：
-1. 首页与 Library 的沉浸模式切换规则不一致。
+1. Flow 与 Library 的沉浸模式切换规则不一致。
 2. 图片放大镜与沉浸状态存在冲突，跨媒体切换后行为不稳定。
 3. 同类逻辑（时间格式化、放大镜取样几何）在两个模板重复实现。
 - 目标：建立“统一交互内核 + 页面适配器”模型，保证三入口行为一致并降低维护成本。
@@ -30,10 +30,10 @@
 2. `getImageContainRect(imgEl)`
 3. `setMagnifierPosition(lensEl, x, y)`
 4. `updateMagnifierContent(...)`
-- 目的：消除首页与 Library 的重复几何/时间逻辑，避免单点修复失效。
+- 目的：消除 Flow 与 Library 的重复几何/时间逻辑，避免单点修复失效。
 
 3. 页面适配层（保留页面特有渲染）
-- 首页：`tiklocal/templates/tiktok.html`
+- Flow：`tiklocal/templates/tiktok.html`
 - Library/Favorites：`tiklocal/templates/library.html`
 - 仅保留页面差异（数据源、DOM 结构、按钮布局），核心状态流与通用算法走共享模块。
 
@@ -61,15 +61,15 @@
 - 权衡：引入共享脚本文件会增加少量模块边界，但显著降低模板内重复和状态分叉。
 - 风险：
 1. 模板脚本注入顺序错误会导致运行时找不到共享对象。
-2. 共享层改动会同时影响首页与库页，需要明确回归清单。
+2. 共享层改动会同时影响 Flow 与库页，需要明确回归清单。
 
 ## 回归清单（建议固定执行）
 
-1. 首页视频进入沉浸后，滑到图片保持沉浸状态一致。
+1. Flow 视频进入沉浸后，滑到图片保持沉浸状态一致。
 2. 图片/视频开启放大镜时自动退出沉浸，且可正常拖拽镜头。
 3. 视频放大镜在播放中可持续刷新，暂停后仍可在当前帧拖拽观察。
 4. Library 与 Favorites 的手势行为一致（上下滑切换、按钮可用）。
-5. 首页与 Library 的放大镜取样均无横向压扁。
+5. Flow 与 Library 的放大镜取样均无横向压扁。
 
 ## 后续事项
 
