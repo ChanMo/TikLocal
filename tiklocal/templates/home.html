@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='home.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="home-page" aria-labelledby="home-title">
+  <div class="home-atmosphere" aria-hidden="true">
+    <span class="home-glow home-glow-one"></span>
+    <span class="home-glow home-glow-two"></span>
+    <span class="home-grain"></span>
+  </div>
+
+  <header class="home-intro home-reveal" style="--reveal-delay: 40ms">
+    <div>
+      <p class="home-kicker" id="home-kicker">Your private frequency</p>
+      <h1 id="home-title">今晚，想从哪里开始？</h1>
+    </div>
+    <a class="home-library-status" href="/library" aria-label="打开媒体库">
+      <span class="home-status-dot" aria-hidden="true"></span>
+      <span id="home-library-summary">正在轻轻唤醒媒体库…</span>
+      <i data-feather="arrow-up-right" aria-hidden="true"></i>
+    </a>
+  </header>
+
+  <section class="home-modes" aria-label="选择体验模式">
+    <a class="mode-card mode-card-flow home-reveal" style="--reveal-delay: 100ms" href="/flow">
+      <div id="home-flow-collage" class="flow-collage" aria-hidden="true">
+        <span class="flow-collage-placeholder"></span>
+        <span class="flow-collage-placeholder"></span>
+        <span class="flow-collage-placeholder"></span>
+        <span class="flow-collage-placeholder"></span>
+      </div>
+      <span class="mode-card-shade" aria-hidden="true"></span>
+      <div class="mode-card-topline">
+        <span class="mode-number">01</span>
+        <span class="mode-meta" id="home-flow-meta">混合影像漫游</span>
+      </div>
+      <div class="mode-card-copy">
+        <span class="mode-label">FLOW</span>
+        <h2>让下一帧<br>来找你。</h2>
+        <span class="mode-action">开始漫游 <i data-feather="arrow-right" aria-hidden="true"></i></span>
+      </div>
+    </a>
+
+    <a class="mode-card mode-card-radio home-reveal" style="--reveal-delay: 170ms" href="/radio">
+      <div class="radio-signal" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="mode-card-topline">
+        <span class="mode-number">02</span>
+        <span class="mode-meta" id="home-radio-station">私人电台</span>
+      </div>
+      <div class="radio-orbit" aria-hidden="true">
+        <span class="radio-orbit-core"><i data-feather="headphones"></i></span>
+      </div>
+      <div class="mode-card-copy">
+        <span class="mode-label">RADIO</span>
+        <h2 id="home-radio-title">把世界调低一点。</h2>
+        <span class="mode-action" id="home-radio-action">开始收听 <i data-feather="arrow-right" aria-hidden="true"></i></span>
+      </div>
+    </a>
+  </section>
+
+  <section class="home-shelf home-reveal" style="--reveal-delay: 230ms" aria-labelledby="recent-title">
+    <div class="shelf-heading">
+      <div>
+        <p>Freshly indexed</p>
+        <h2 id="recent-title">最近加入</h2>
+      </div>
+      <a href="/library?mode=all">查看全部 <i data-feather="arrow-up-right" aria-hidden="true"></i></a>
+    </div>
+    <div id="home-recent" class="media-ribbon" aria-live="polite">
+      {% for _ in range(6) %}<span class="media-tile media-tile-loading" aria-hidden="true"></span>{% endfor %}
+    </div>
+  </section>
+
+  <div class="home-lower-grid">
+    <section class="home-shelf rediscover-panel home-reveal" style="--reveal-delay: 290ms" aria-labelledby="rediscover-title">
+      <div class="shelf-heading">
+        <div>
+          <p>Serendipity</p>
+          <h2 id="rediscover-title">重新遇见</h2>
+        </div>
+        <a href="/library?mode=image_random">换个角度 <i data-feather="shuffle" aria-hidden="true"></i></a>
+      </div>
+      <div id="home-rediscover" class="rediscover-grid" aria-live="polite">
+        {% for _ in range(3) %}<span class="rediscover-tile media-tile-loading" aria-hidden="true"></span>{% endfor %}
+      </div>
+    </section>
+
+    <section class="home-shelf collection-panel home-reveal" style="--reveal-delay: 350ms" aria-labelledby="collections-title">
+      <div class="shelf-heading">
+        <div>
+          <p>Curated by you</p>
+          <h2 id="collections-title">你的集合</h2>
+        </div>
+        <a href="/collections">管理 <i data-feather="arrow-up-right" aria-hidden="true"></i></a>
+      </div>
+      <div id="home-collections" class="collection-list" aria-live="polite">
+        <div class="collection-empty is-loading"><span></span><span></span></div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="home-footer home-reveal" style="--reveal-delay: 410ms">
+    <span>TikLocal</span>
+    <span>你的媒体，只属于此刻。</span>
+  </footer>
+</main>
+{% endblock %}
+
+{% block extra_body %}
+<script src="{{ url_for('static', filename='home_page_controller.js') }}"></script>
+{% endblock %}

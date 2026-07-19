@@ -495,9 +495,14 @@ def create_app(test_config=None):
 
     # --- Web Routes ---
     @app.route('/')
-    def tiktok():
+    def home_view():
+        """Quiet launchpad for the local media library."""
+        return render_template('home.html', menu='home')
+
+    @app.route('/flow')
+    def flow_view():
         """Immersive Mixed Media Feed"""
-        return render_template('tiktok.html', menu='index')
+        return render_template('tiktok.html', menu='flow')
 
     @app.route('/radio')
     def radio_view():

@@ -48,6 +48,10 @@ def test_download_page_uses_lightweight_inbox_layout(client):
     body = res.get_data(as_text=True)
 
     assert res.status_code == 200
+    assert '<main class="download-page tool-page">' in body
+    assert '<header class="download-header tool-page-header">' in body
+    assert '<span>媒体导入</span>' in body
+    assert '<h1 class="download-title">下载</h1>' in body
     assert 'id="download-form"' in body
     assert '<input id="download-url"' in body
     assert '<textarea id="download-url"' not in body
@@ -65,6 +69,9 @@ def test_settings_page_hosts_download_credentials(client):
     body = res.get_data(as_text=True)
 
     assert res.status_code == 200
+    assert '<main class="settings-page tool-page">' in body
+    assert '<header class="settings-header tool-page-header">' in body
+    assert '<span>本地偏好</span>' in body
     assert 'id="download"' in body
     assert 'id="manage-credentials"' in body
     assert 'id="credential-mask"' in body

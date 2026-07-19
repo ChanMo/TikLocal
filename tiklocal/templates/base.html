@@ -32,7 +32,7 @@
         --dock-shadow: 0 1px 2px rgba(23, 22, 18, 0.08), 0 8px 24px rgba(23, 22, 18, 0.11), 0 20px 48px rgba(23, 22, 18, 0.055);
       }
 
-      [data-nav-context="index"] {
+      [data-nav-context="flow"] {
         --dock-surface: rgba(22, 22, 21, 0.72);
         --menu-surface: rgba(24, 24, 23, 0.92);
         --dock-border: rgba(255, 255, 255, 0.12);
@@ -430,71 +430,80 @@
       }
     </style>
     {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='app_navigation.css')}}">
   </head>
   <body data-theme="{{ theme if theme else 'light' }}" data-nav-context="{{ menu or 'default' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen transition-colors duration-300">
-    
-    {% block content %}{% endblock %}
-    
-    <nav class="floating-dock" aria-label="主导航">
-      <a href="/" class="dock-item {% if menu == 'index' %}active{% endif %}" data-label="推荐" aria-label="推荐" {% if menu == 'index' %}aria-current="page"{% endif %}>
-        <svg class="nav-icon nav-icon-home" viewBox="0 0 24 24" aria-hidden="true">
-          <g class="nav-icon-outline" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3.5 10.5 12 3.6l8.5 6.9"></path><path d="M5.4 9.2v10.1h13.2V9.2"></path><path d="M9.3 19.3v-5.6h5.4v5.6"></path>
-          </g>
-          <path class="nav-icon-filled" fill="currentColor" d="M11.2 2.95a1.25 1.25 0 0 1 1.6 0l8.2 6.67a1.05 1.05 0 0 1-.66 1.87h-.56v7.72c0 .72-.58 1.3-1.3 1.3h-4.3v-6.12H9.82v6.12h-4.3c-.72 0-1.3-.58-1.3-1.3v-7.72h-.56A1.05 1.05 0 0 1 3 9.62l8.2-6.67Z"></path>
-        </svg>
+    <header class="mobile-app-header {% if menu not in ['flow', 'radio'] %}is-utility-page{% endif %}" aria-label="应用导航">
+      {% if menu in ['flow', 'radio'] %}
+      <nav class="mobile-mode-switch" aria-label="体验模式">
+        <a href="/flow" class="mobile-mode-link {% if menu == 'flow' %}is-active{% endif %}" {% if menu == 'flow' %}aria-current="page"{% endif %}>Flow</a>
+        <a href="/radio" class="mobile-mode-link {% if menu == 'radio' %}is-active{% endif %}" {% if menu == 'radio' %}aria-current="page"{% endif %}>Radio</a>
+      </nav>
+      {% else %}
+      <a class="app-wordmark" href="/" aria-label="返回首页">
+        <span class="app-wordmark-mark" aria-hidden="true">TL</span>
+        <span>TikLocal</span>
       </a>
-
-      <a href="/radio" class="dock-item {% if menu == 'radio' %}active{% endif %}" data-label="电台" aria-label="电台" {% if menu == 'radio' %}aria-current="page"{% endif %}>
-        <svg class="nav-icon nav-icon-radio" viewBox="0 0 24 24" aria-hidden="true">
-          <g class="nav-icon-outline" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4.2 13v-1.2a7.8 7.8 0 0 1 15.6 0V13"></path><path d="M4.2 13.2c0-1 .8-1.8 1.8-1.8h1.1v7.2H6c-1 0-1.8-.8-1.8-1.8v-3.6ZM19.8 13.2c0-1-.8-1.8-1.8-1.8h-1.1v7.2H18c1 0 1.8-.8 1.8-1.8v-3.6Z"></path>
-          </g>
-          <g class="nav-icon-filled" fill="currentColor">
-            <path d="M12 3a9 9 0 0 0-9 9v4.5A3.5 3.5 0 0 0 6.5 20h1.6V10.5H6.5c-.47 0-.92.1-1.32.27a6.9 6.9 0 0 1 13.64 0 3.5 3.5 0 0 0-1.32-.27h-1.6V20h1.6a3.5 3.5 0 0 0 3.5-3.5V12a9 9 0 0 0-9-9Z"></path>
-          </g>
-        </svg>
-      </a>
-
-      <a href="/library" class="dock-item {% if menu == 'library' %}active{% endif %}" data-label="媒体库" aria-label="媒体库" {% if menu == 'library' %}aria-current="page"{% endif %}>
-        <svg class="nav-icon nav-icon-library" viewBox="0 0 24 24" aria-hidden="true">
-          <g class="nav-icon-outline" fill="none" stroke="currentColor" stroke-width="1.9">
-            <rect x="3.3" y="3.3" width="7.1" height="7.1" rx="1.7"></rect><rect x="13.6" y="3.3" width="7.1" height="7.1" rx="1.7"></rect><rect x="3.3" y="13.6" width="7.1" height="7.1" rx="1.7"></rect><rect x="13.6" y="13.6" width="7.1" height="7.1" rx="1.7"></rect>
-          </g>
-          <g class="nav-icon-filled" fill="currentColor">
-            <rect x="2.8" y="2.8" width="7.8" height="7.8" rx="2"></rect><rect x="13.4" y="2.8" width="7.8" height="7.8" rx="2"></rect><rect x="2.8" y="13.4" width="7.8" height="7.8" rx="2"></rect><rect x="13.4" y="13.4" width="7.8" height="7.8" rx="2"></rect>
-          </g>
-        </svg>
-      </a>
-
-      <button id="more-menu-trigger" type="button" class="dock-item {% if menu in ['favorite', 'download', 'settings'] %}active{% endif %}" data-label="更多" aria-label="更多" aria-expanded="false" aria-controls="more-menu">
-        <svg class="nav-icon nav-icon-more" viewBox="0 0 24 24" aria-hidden="true">
-          <g class="nav-icon-outline" fill="currentColor">
-            <circle cx="5" cy="12" r="1.45"></circle><circle cx="12" cy="12" r="1.45"></circle><circle cx="19" cy="12" r="1.45"></circle>
-          </g>
-          <g class="nav-icon-filled" fill="currentColor">
-            <circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle>
-          </g>
-        </svg>
+      {% endif %}
+      <button id="app-nav-menu-trigger" class="mobile-nav-trigger" type="button" aria-label="打开媒体与工具" aria-expanded="false" aria-controls="app-nav-menu">
+        <i data-feather="grid"></i>
       </button>
+    </header>
+
+    <nav class="floating-dock" aria-label="主导航">
+      <a class="rail-brand" href="/" aria-label="TikLocal 首页">TL</a>
+      <a href="/" class="dock-item {% if menu == 'home' %}active{% endif %}" data-label="首页" aria-label="首页" {% if menu == 'home' %}aria-current="page"{% endif %}>
+        <i data-feather="home"></i><span class="rail-tooltip">首页</span>
+      </a>
+      <div class="rail-divider rail-divider-compact" aria-hidden="true"></div>
+      <a href="/flow" class="dock-item {% if menu == 'flow' %}active{% endif %}" data-label="Flow" aria-label="Flow" {% if menu == 'flow' %}aria-current="page"{% endif %}>
+        <i data-feather="play-circle"></i><span class="rail-tooltip">Flow</span>
+      </a>
+      <a href="/radio" class="dock-item {% if menu == 'radio' %}active{% endif %}" data-label="Radio" aria-label="Radio" {% if menu == 'radio' %}aria-current="page"{% endif %}>
+        <i data-feather="headphones"></i><span class="rail-tooltip">Radio</span>
+      </a>
+      <div class="rail-divider" aria-hidden="true"></div>
+      <a href="/library" class="dock-item {% if menu == 'library' %}active{% endif %}" data-label="媒体库" aria-label="媒体库" {% if menu == 'library' %}aria-current="page"{% endif %}>
+        <i data-feather="grid"></i><span class="rail-tooltip">媒体库</span>
+      </a>
+      <a href="/favorite" class="dock-item {% if menu == 'favorite' %}active{% endif %}" data-label="已保存" aria-label="已保存" {% if menu == 'favorite' %}aria-current="page"{% endif %}>
+        <i data-feather="bookmark"></i><span class="rail-tooltip">已保存</span>
+      </a>
+      <div class="rail-spacer"></div>
+      <a href="/download" class="dock-item {% if menu == 'download' %}active{% endif %}" data-label="下载" aria-label="下载" {% if menu == 'download' %}aria-current="page"{% endif %}>
+        <i data-feather="download"></i><span class="rail-tooltip">下载</span>
+      </a>
+      <a href="/settings" class="dock-item {% if menu == 'settings' %}active{% endif %}" data-label="设置" aria-label="设置" {% if menu == 'settings' %}aria-current="page"{% endif %}>
+        <i data-feather="settings"></i><span class="rail-tooltip">设置</span>
+      </a>
     </nav>
 
-    <div id="more-menu" class="more-menu" aria-hidden="true" inert>
-      <nav class="more-menu-card" aria-label="更多导航">
-        <div class="more-menu-list">
-          <a href="/favorite" class="more-menu-item {% if request.path == '/favorite' or request.path == '/collections' or request.path.startswith('/collection/') %}is-active{% endif %}">
-            <i data-feather="bookmark"></i><span>已保存</span>
-          </a>
-          <a href="/download" class="more-menu-item {% if menu == 'download' %}is-active{% endif %}">
-            <i data-feather="download"></i><span>下载</span>
-          </a>
-          <div class="more-menu-divider" aria-hidden="true"></div>
-          <a href="/settings" class="more-menu-item {% if menu == 'settings' %}is-active{% endif %}">
-            <i data-feather="settings"></i><span>设置</span>
-          </a>
+    <div id="app-nav-menu" class="app-nav-menu" aria-hidden="true" inert>
+      <nav class="app-nav-menu-card" aria-label="媒体与工具">
+        <div class="app-nav-menu-handle" aria-hidden="true"></div>
+        <div class="app-nav-menu-label">概览</div>
+        <div class="app-nav-menu-list app-nav-menu-list-single">
+          <a href="/" class="app-nav-menu-item {% if menu == 'home' %}is-active{% endif %}"><i data-feather="home"></i><span>首页</span></a>
+        </div>
+        <div class="app-nav-menu-label">体验</div>
+        <div class="app-nav-menu-list">
+          <a href="/flow" class="app-nav-menu-item {% if menu == 'flow' %}is-active{% endif %}"><i data-feather="play-circle"></i><span>Flow</span></a>
+          <a href="/radio" class="app-nav-menu-item {% if menu == 'radio' %}is-active{% endif %}"><i data-feather="headphones"></i><span>Radio</span></a>
+        </div>
+        <div class="app-nav-menu-label">媒体</div>
+        <div class="app-nav-menu-list">
+          <a href="/library" class="app-nav-menu-item {% if menu == 'library' %}is-active{% endif %}"><i data-feather="grid"></i><span>媒体库</span></a>
+          <a href="/favorite" class="app-nav-menu-item {% if menu == 'favorite' %}is-active{% endif %}"><i data-feather="bookmark"></i><span>已保存</span></a>
+        </div>
+        <div class="app-nav-menu-divider" aria-hidden="true"></div>
+        <div class="app-nav-menu-list">
+          <a href="/download" class="app-nav-menu-item {% if menu == 'download' %}is-active{% endif %}"><i data-feather="download"></i><span>下载</span></a>
+          <a href="/settings" class="app-nav-menu-item {% if menu == 'settings' %}is-active{% endif %}"><i data-feather="settings"></i><span>设置</span></a>
         </div>
       </nav>
     </div>
+
+    {% block content %}{% endblock %}
     
     {% block extra_body %}{% endblock %}
     <script>
@@ -540,8 +549,8 @@
 
       class MoreMenu {
         constructor() {
-          this.menu = document.getElementById('more-menu');
-          this.trigger = document.getElementById('more-menu-trigger');
+          this.menu = document.getElementById('app-nav-menu');
+          this.trigger = document.getElementById('app-nav-menu-trigger');
           this.bindEvents();
         }
         isOpen() {
@@ -553,6 +562,7 @@
           this.menu.removeAttribute('inert');
           this.menu.setAttribute('aria-hidden', 'false');
           this.trigger.setAttribute('aria-expanded', 'true');
+          document.body.classList.add('app-nav-menu-open');
           this.menu.querySelector('a[href], button')?.focus();
         }
         close({ restoreFocus = true } = {}) {
@@ -561,6 +571,7 @@
           this.menu.setAttribute('inert', '');
           this.menu.setAttribute('aria-hidden', 'true');
           this.trigger.setAttribute('aria-expanded', 'false');
+          document.body.classList.remove('app-nav-menu-open');
           if (restoreFocus) this.trigger.focus();
         }
         bindEvents() {

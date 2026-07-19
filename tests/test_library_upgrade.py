@@ -78,8 +78,8 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert "if (isSimilarMode() || !layoutChanged) return;" in controller
 
 
-def test_home_feed_uses_unified_immersive_model(client):
-    res = client.get("/")
+def test_flow_uses_unified_immersive_model(client):
+    res = client.get("/flow")
     assert res.status_code == 200
     body = res.data.decode("utf-8")
     assert "body.immersive-mode .caption-panel:not(.is-hidden)" in body
@@ -92,8 +92,13 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert 'id="collection-btn"' in body
     assert 'id="collection-count"' in body
     assert 'id="collection-modal"' in body
-    assert 'id="more-menu-trigger"' in body
-    assert 'id="more-menu"' in body
+    assert 'id="app-nav-menu-trigger"' in body
+    assert 'id="app-nav-menu"' in body
+    assert 'href="/static/app_navigation.css"' in body
+    assert 'class="mobile-mode-link is-active"' in body
+    assert '>Flow</a>' in body
+    assert '>Radio</a>' in body
+    assert 'class="rail-brand"' in body
     assert 'id="more-theme-toggle"' not in body
     assert '<span>设置</span>' in body
     assert 'id="flow-state"' in body
@@ -106,6 +111,22 @@ def test_home_feed_uses_unified_immersive_model(client):
     assert 'href="/favorite"' in body
     assert '<span>已保存</span>' in body
     assert 'href="/collections"' not in body
+
+
+def test_home_is_a_media_launchpad(client):
+    res = client.get("/")
+    assert res.status_code == 200
+    body = res.data.decode("utf-8")
+    assert 'data-nav-context="home"' in body
+    assert 'href="/static/home.css"' in body
+    assert 'home_page_controller.js' in body
+    assert 'id="home-title"' in body
+    assert 'href="/flow"' in body
+    assert 'href="/radio"' in body
+    assert 'id="home-recent"' in body
+    assert 'id="home-rediscover"' in body
+    assert 'id="home-collections"' in body
+    assert "home_feed_controller.js" not in body
 
 
 def test_settings_focuses_on_useful_local_controls(client):

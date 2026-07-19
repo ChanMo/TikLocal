@@ -31,22 +31,6 @@
     padding: 27px 14px 10px;
     color: var(--settings-ink);
   }
-  .settings-header { padding: 0 3px 27px; }
-  .settings-eyebrow {
-    margin: 0 0 4px;
-    color: var(--settings-muted);
-    font-size: 10px;
-    font-weight: 680;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-  .settings-title {
-    margin: 0;
-    font-size: clamp(25px, 5vw, 31px);
-    font-weight: 680;
-    letter-spacing: -0.04em;
-    line-height: 1.08;
-  }
   .settings-stack { display: grid; gap: 27px; }
   .settings-section-title {
     margin: 0 0 9px 4px;
@@ -262,10 +246,11 @@
 {% endblock %}
 
 {% block content %}
-<main class="settings-page">
-  <header class="settings-header">
-    <p class="settings-eyebrow">TikLocal</p>
+<main class="settings-page tool-page">
+  <header class="settings-header tool-page-header">
+    <p class="tool-page-overline"><i data-feather="sliders"></i><span>本地偏好</span></p>
     <h1 class="settings-title">设置</h1>
+    <p class="tool-page-intro">管理显示方式、媒体索引和本机服务。</p>
   </header>
 
   <div class="settings-stack">

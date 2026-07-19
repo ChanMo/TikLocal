@@ -35,28 +35,6 @@
     padding: 28px 14px 24px;
     color: var(--download-ink);
   }
-  .download-header { padding: 0 3px 25px; }
-  .download-eyebrow {
-    margin: 0 0 5px;
-    color: var(--download-muted);
-    font-size: 10px;
-    font-weight: 680;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-  }
-  .download-title {
-    margin: 0;
-    font-size: clamp(27px, 6vw, 34px);
-    font-weight: 680;
-    letter-spacing: -.045em;
-    line-height: 1.06;
-  }
-  .download-intro {
-    margin: 7px 0 0;
-    color: var(--download-muted);
-    font-size: 13px;
-    line-height: 1.5;
-  }
   .download-composer {
     padding: 7px;
     border: 1px solid var(--download-line);
@@ -183,9 +161,6 @@
   }
 
   /* Single-link composer */
-  .download-header { padding-bottom: 22px; }
-  .download-title { font-size: clamp(29px, 6vw, 36px); }
-  .download-intro { max-width: 390px; margin-top: 9px; font-size: 13px; }
   .download-composer { padding: 5px; overflow: hidden; border-radius: 21px; }
   .download-editor { position: relative; display: flex; align-items: center; min-height: 46px; padding: 0 13px; }
   .download-input {
@@ -292,10 +267,11 @@
 {% endblock %}
 
 {% block content %}
-<main class="download-page">
-  <header class="download-header">
-    <h1 class="download-title">Download</h1>
-    <p class="download-intro">粘贴一个链接，将网络上的图片或视频保存到本地。</p>
+<main class="download-page tool-page">
+  <header class="download-header tool-page-header">
+    <p class="tool-page-overline"><i data-feather="arrow-down-circle"></i><span>媒体导入</span></p>
+    <h1 class="download-title">下载</h1>
+    <p class="download-intro tool-page-intro">粘贴一个链接，将网络上的图片或视频保存到本地。</p>
   </header>
 
   <form id="download-form" class="download-composer">
