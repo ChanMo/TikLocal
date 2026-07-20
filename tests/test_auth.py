@@ -56,6 +56,8 @@ def test_auth_store_hashes_password_and_increments_revision(tmp_path):
     assert bootstrap.generated_password is None
     assert PASSWORD not in auth_path.read_text(encoding='utf-8')
     assert data['password_hash'].startswith('scrypt:')
+    assert data['created_at'].endswith('+00:00')
+    assert data['updated_at'].endswith('+00:00')
     assert store.verify(PASSWORD)
     assert stat.S_IMODE(auth_path.stat().st_mode) == 0o600
 

@@ -78,7 +78,7 @@ class AuthStore:
         supplied = str(initial_password or '').strip()
         password = supplied or generate_initial_password()
         self._validate_password(password)
-        now = datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat()
+        now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
         self._save({
             'version': AUTH_FILE_VERSION,
             'password_hash': generate_password_hash(password),
@@ -92,7 +92,7 @@ class AuthStore:
     def set_password(self, password: str) -> None:
         self._validate_password(password)
         current = self._load() or {}
-        now = datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat()
+        now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
         self._save({
             'version': AUTH_FILE_VERSION,
             'password_hash': generate_password_hash(password),
