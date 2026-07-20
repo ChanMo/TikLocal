@@ -105,7 +105,9 @@ def test_flow_uses_unified_immersive_model(client):
     assert 'id="flow-state-retry"' in body
     assert 'id="flow-state-next"' in body
     assert 'id="video-start-cover"' in body
-    assert 'id="video-start-cover-image"' in body
+    assert 'id="video-start-cover-image"' not in body
+    assert ".video-start-cover.is-visible" in body
+    assert "transition: none" in body
     assert "transform: scale(1.01)" not in body
     assert "filter: blur(2px)" not in body
     assert 'href="/favorite"' in body
@@ -150,17 +152,15 @@ def test_settings_focuses_on_useful_local_controls(client):
     controller = client.get("/static/home_feed_controller.js").data.decode("utf-8")
     assert "size: '24'" in controller
     assert "snapshot: '1'" not in controller
-    assert "function randomStartRatio(duration, name)" in controller
-    assert "duration < 20" in controller
-    assert "[0.05, 0.40]" in controller
-    assert "[0.10, 0.60]" in controller
-    assert "_randomStartApplied" in controller
-    assert "function prepareRandomVideoStart(videoEl)" in controller
+    assert "randomStartRatio" not in controller
+    assert "_randomStart" not in controller
+    assert "function prepareVideoStart(videoEl)" in controller
+    assert "function isVideoStartReady(videoEl)" in controller
     assert "waitForPresentedVideoFrame" in controller
-    assert "prepareRandomVideoStart(v).catch" in controller
-    assert "videoEl._randomStartUsesCover = ratio > 0" in controller
-    assert "videoStartCoverTarget === videoEl" in controller
-    assert "await videoStartCoverImage.decode()" in controller
+    assert "prepareVideoStart(v).catch" in controller
+    assert "const needsVideoStartCover = item.type === 'video' && !isVideoStartReady(item.el)" in controller
+    assert "updateControls(item);\n      preloadNextVideo();" in controller
+    assert "videoStartCoverImage" not in controller
     assert "video.poster = item.thumb_url" not in controller
     assert "_activityPlayedSeconds" in controller
 

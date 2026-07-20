@@ -3,7 +3,6 @@
 
     const feedContainer = document.getElementById('feed-container');
     const videoStartCover = document.getElementById('video-start-cover');
-    const videoStartCoverImage = document.getElementById('video-start-cover-image');
     const overlayLayer = document.getElementById('overlay-layer');
     const speedBtn = document.getElementById('speed-btn');
     const captionBtn = document.getElementById('caption-btn');
@@ -152,55 +151,18 @@
     const collectionModalGuardMs = 520;
     let flowLoadingTimer = null;
     let videoStartCoverTimer = null;
-    let videoStartCoverClearTimer = null;
-    let videoStartCoverRequestId = 0;
-    let videoStartCoverTarget = null;
     let videoActivationId = 0;
 
-    function syncVideoStartCoverImage(videoEl) {
-      const canShow = videoStartCoverTarget === videoEl
-        && videoEl?._randomStartUsesCover === true
-        && videoEl?._startCoverImageReady === true
-        && videoStartCover.classList.contains('is-visible');
-      videoStartCover.classList.toggle('has-image', canShow);
+    function isVideoStartReady(videoEl) {
+      return videoEl?._startReady === true
+        && videoEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
     }
 
-    function showVideoStartCover(item) {
+    function showVideoStartCover() {
       clearTimeout(videoStartCoverTimer);
-      clearTimeout(videoStartCoverClearTimer);
-      const videoEl = item?.el || null;
-      const requestId = ++videoStartCoverRequestId;
-      videoStartCoverTarget = videoEl;
-      if (videoEl) videoEl._startCoverImageReady = false;
-      videoStartCover.classList.remove('has-image', 'is-waiting');
+      videoStartCover.classList.remove('is-waiting');
       videoStartCover.classList.add('is-visible');
       videoStartCover.setAttribute('aria-hidden', 'false');
-      const markImageReady = async () => {
-        try {
-          if (typeof videoStartCoverImage.decode === 'function') {
-            await videoStartCoverImage.decode();
-          }
-        } catch (error) {
-          return;
-        }
-        if (requestId !== videoStartCoverRequestId || videoStartCoverTarget !== videoEl) return;
-        if (videoEl) videoEl._startCoverImageReady = true;
-        syncVideoStartCoverImage(videoEl);
-      };
-      videoStartCoverImage.onload = markImageReady;
-      videoStartCoverImage.onerror = () => {
-        if (requestId !== videoStartCoverRequestId || videoStartCoverTarget !== videoEl) return;
-        if (videoEl) videoEl._startCoverImageReady = false;
-        syncVideoStartCoverImage(videoEl);
-      };
-      if (item?.thumb_url) {
-        videoStartCoverImage.src = item.thumb_url;
-        if (videoStartCoverImage.complete && videoStartCoverImage.naturalWidth > 0) {
-          markImageReady();
-        }
-      } else {
-        videoStartCoverImage.removeAttribute('src');
-      }
       videoStartCoverTimer = setTimeout(() => {
         videoStartCover.classList.add('is-waiting');
       }, 250);
@@ -208,18 +170,8 @@
 
     function hideVideoStartCover() {
       clearTimeout(videoStartCoverTimer);
-      clearTimeout(videoStartCoverClearTimer);
-      videoStartCoverRequestId += 1;
-      videoStartCoverTarget = null;
-      videoStartCoverImage.onload = null;
-      videoStartCoverImage.onerror = null;
-      videoStartCover.classList.remove('has-image', 'is-visible', 'is-waiting');
+      videoStartCover.classList.remove('is-visible', 'is-waiting');
       videoStartCover.setAttribute('aria-hidden', 'true');
-      videoStartCoverClearTimer = setTimeout(() => {
-        if (!videoStartCover.classList.contains('is-visible')) {
-          videoStartCoverImage.removeAttribute('src');
-        }
-      }, 180);
     }
 
     function showFlowStatus(kind, title, detail = '') {
@@ -700,81 +652,31 @@
       });
     }
 
-    function stableUnitInterval(value) {
-      let hash = 2166136261;
-      const input = String(value || '');
-      for (let i = 0; i < input.length; i++) {
-        hash ^= input.charCodeAt(i);
-        hash = Math.imul(hash, 16777619);
-      }
-      return (hash >>> 0) / 4294967296;
-    }
-
-    function randomStartRatio(duration, name) {
-      if (!Number.isFinite(duration) || duration < 20) return 0;
-      const [minimum, maximum] = duration < 60 ? [0.05, 0.40] : [0.10, 0.60];
-      return minimum + stableUnitInterval(`${seed}:${name}`) * (maximum - minimum);
-    }
-
-    function applyRandomVideoStart(videoEl) {
-      if (!videoEl || videoEl._randomStartApplied) return Number(videoEl?.currentTime || 0);
-      const duration = Number(videoEl.duration || 0);
-      if (!Number.isFinite(duration) || duration <= 0) return null;
-      videoEl._randomStartApplied = true;
-      const ratio = randomStartRatio(duration, videoEl.dataset.name || '');
-      const targetTime = ratio > 0 ? duration * ratio : 0;
-      if (Math.abs(Number(videoEl.currentTime || 0) - targetTime) > 0.05) {
-        videoEl.currentTime = targetTime;
-      }
-      videoEl._activityLastPosition = videoEl.currentTime;
-      return targetTime;
-    }
-
-    function prepareRandomVideoStart(videoEl) {
+    function prepareVideoStart(videoEl) {
       if (!videoEl) return Promise.reject(new Error('Missing video element'));
-      if (videoEl._randomStartReady) return Promise.resolve(videoEl);
-      if (videoEl._randomStartPromise) return videoEl._randomStartPromise;
+      if (isVideoStartReady(videoEl)) return Promise.resolve(videoEl);
+      if (videoEl._startPromise) return videoEl._startPromise;
 
+      videoEl._startReady = false;
       videoEl.preload = 'auto';
       ensureVideoSrc(videoEl);
-      videoEl._randomStartPromise = (async () => {
-        await waitForVideoState(
-          videoEl,
-          ['loadedmetadata', 'durationchange'],
-          () => Number.isFinite(videoEl.duration) && videoEl.duration > 0,
-        );
-
-        const duration = Number(videoEl.duration || 0);
-        const ratio = randomStartRatio(duration, videoEl.dataset.name || '');
-        videoEl._randomStartUsesCover = ratio > 0;
-        syncVideoStartCoverImage(videoEl);
-        const targetTime = ratio > 0 ? duration * ratio : 0;
-        const shouldSeek = Math.abs(Number(videoEl.currentTime || 0) - targetTime) > 0.05;
-        const seekPromise = shouldSeek
-          ? waitForVideoState(
-            videoEl,
-            'seeked',
-            () => Math.abs(Number(videoEl.currentTime || 0) - targetTime) < 0.25,
-          )
-          : Promise.resolve();
-
-        applyRandomVideoStart(videoEl);
-        await seekPromise;
+      videoEl._startPromise = (async () => {
         await waitForVideoState(
           videoEl,
           ['loadeddata', 'canplay'],
           () => videoEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA,
         );
-        videoEl._randomStartReady = true;
+        videoEl._startReady = true;
+        videoEl._startPromise = null;
         videoEl._activityLastPosition = videoEl.currentTime;
         videoEl.preload = 'metadata';
         return videoEl;
       })().catch((error) => {
-        videoEl._randomStartPromise = null;
+        videoEl._startPromise = null;
         videoEl.preload = 'metadata';
         throw error;
       });
-      return videoEl._randomStartPromise;
+      return videoEl._startPromise;
     }
 
     function preloadNextVideo() {
@@ -782,7 +684,7 @@
         const item = feedItems[i];
         if (item.type !== 'video') continue;
         const v = item.el;
-        if (v) prepareRandomVideoStart(v).catch(() => {});
+        if (v) prepareVideoStart(v).catch(() => {});
         break;
       }
     }
@@ -1015,12 +917,14 @@
       postActivity([previousActivity, beginActivity(item)]);
       flowState.onMediaChanged();
 
-      if (item.type === 'video') showVideoStartCover(item);
+      const needsVideoStartCover = item.type === 'video' && !isVideoStartReady(item.el);
+      if (needsVideoStartCover) showVideoStartCover();
       else hideVideoStartCover();
 
       item.el.style.display = item.type === 'theme_strip' ? '' : 'block';
       requestAnimationFrame(() => item.el.classList.add('active'));
       updateControls(item);
+      preloadNextVideo();
 
       if (item.type === 'video') {
         progressBar.disabled = false;
@@ -1033,7 +937,7 @@
         clearCaption();
 
         try {
-          await prepareRandomVideoStart(item.el);
+          await prepareVideoStart(item.el);
         } catch (error) {
           if (activationId !== videoActivationId || currentItem()?.el !== item.el) return;
           hideVideoStartCover();
@@ -1063,8 +967,7 @@
           if (activationId !== videoActivationId || currentItem()?.el !== item.el) return;
           playStatusIcon.classList.add('visible');
         }
-        hideVideoStartCover();
-        preloadNextVideo();
+        if (needsVideoStartCover) hideVideoStartCover();
       } else if (item.type === 'image_group') {
         clearCaption();
         if (typeof item.renderChild === 'function') {
@@ -1343,10 +1246,8 @@
       if (item.type === 'video') {
         item.el.pause();
         item.el._loadFailed = false;
-        item.el._randomStartApplied = false;
-        item.el._randomStartReady = false;
-        item.el._randomStartPromise = null;
-        item.el._randomStartUsesCover = false;
+        item.el._startReady = false;
+        item.el._startPromise = null;
         item.el.src = retryUrl;
         item.el.load();
         await showItem(getCurrentIndex());
