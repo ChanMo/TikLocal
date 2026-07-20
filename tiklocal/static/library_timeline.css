@@ -1,0 +1,473 @@
+:root {
+  --archive-ink: #26241f;
+  --archive-muted: rgba(38, 36, 31, 0.52);
+  --archive-paper: #f6f3ec;
+  --archive-line: rgba(45, 41, 32, 0.11);
+  --archive-accent: #bd5b3d;
+  --archive-shadow: 0 24px 70px rgba(49, 42, 28, 0.1);
+}
+
+[data-theme="dark"] {
+  --archive-ink: rgba(248, 244, 235, 0.94);
+  --archive-muted: rgba(248, 244, 235, 0.5);
+  --archive-paper: #181815;
+  --archive-line: rgba(255, 250, 240, 0.1);
+  --archive-accent: #e18462;
+  --archive-shadow: 0 26px 80px rgba(0, 0, 0, 0.3);
+}
+
+.timeline-page-shell {
+  position: relative;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 28px clamp(14px, 3vw, 38px) 120px;
+  color: var(--archive-ink);
+  isolation: isolate;
+}
+
+.timeline-page-shell::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 14% 7%, rgba(191, 91, 61, 0.08), transparent 27rem),
+    radial-gradient(circle at 88% 32%, rgba(112, 126, 102, 0.055), transparent 30rem),
+    linear-gradient(180deg, rgba(246, 243, 236, 0.28), transparent 34rem);
+}
+
+[data-theme="dark"] .timeline-page-shell::before {
+  background:
+    radial-gradient(circle at 14% 7%, rgba(213, 112, 79, 0.08), transparent 29rem),
+    radial-gradient(circle at 88% 30%, rgba(117, 132, 105, 0.07), transparent 32rem);
+}
+
+.timeline-masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  min-height: 190px;
+  padding: 30px 0 34px;
+  border-bottom: 1px solid var(--archive-line);
+}
+
+.timeline-masthead-copy {
+  max-width: 670px;
+}
+
+.timeline-kicker,
+.explore-kicker,
+.month-detail-header p {
+  margin: 0 0 12px;
+  color: var(--archive-accent);
+  font: 650 10px/1.2 "Avenir Next", "PingFang SC", sans-serif;
+  letter-spacing: 0.22em;
+}
+
+.timeline-masthead h1 {
+  margin: 0;
+  font-family: "Iowan Old Style", Baskerville, "Songti SC", serif;
+  font-size: clamp(38px, 7vw, 72px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.timeline-intro {
+  margin: 20px 0 0;
+  color: var(--archive-muted);
+  font: 400 14px/1.8 "Avenir Next", "PingFang SC", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.library-view-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--archive-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--archive-paper) 76%, transparent);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.library-view-switch a {
+  min-width: 62px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  color: var(--archive-muted);
+  font: 560 12px/1.2 "Avenir Next", "PingFang SC", sans-serif;
+  text-align: center;
+  text-decoration: none;
+  transition: color 160ms ease, background-color 160ms ease, transform 120ms ease;
+}
+
+.library-view-switch a:active { transform: scale(0.96); }
+.library-view-switch a.is-active {
+  color: var(--archive-ink);
+  background: color-mix(in srgb, var(--archive-ink) 8%, var(--archive-paper));
+}
+
+.timeline-sticky-bar {
+  position: sticky;
+  z-index: 32;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  margin: 0 -8px;
+  padding: 8px;
+  border-bottom: 1px solid transparent;
+  background: color-mix(in srgb, var(--archive-paper) 90%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(120%);
+  backdrop-filter: blur(22px) saturate(120%);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.timeline-sticky-bar.is-pinned {
+  border-color: var(--archive-line);
+  box-shadow: 0 12px 30px rgba(40, 35, 25, 0.04);
+}
+
+.timeline-current-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--archive-ink);
+  background: transparent;
+  font-family: "Iowan Old Style", Baskerville, "Songti SC", serif;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.timeline-current-date:hover { background: color-mix(in srgb, var(--archive-ink) 5%, transparent); }
+.timeline-current-date svg { width: 14px; height: 14px; stroke-width: 1.6; }
+
+.timeline-time-basis {
+  padding-right: 8px;
+  color: var(--archive-muted);
+  font: 500 10px/1 "Avenir Next", "PingFang SC", sans-serif;
+  letter-spacing: 0.08em;
+}
+
+.timeline-year-popover {
+  position: sticky;
+  z-index: 36;
+  top: 54px;
+  width: min(100%, 430px);
+  margin: 0 0 -1px;
+  padding: 10px;
+  border: 1px solid var(--archive-line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--archive-paper) 95%, transparent);
+  box-shadow: var(--archive-shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  backdrop-filter: blur(24px) saturate(120%);
+}
+
+.timeline-year-popover[hidden] { display: none; }
+.timeline-year-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.timeline-year-button {
+  padding: 12px 8px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--archive-muted);
+  background: transparent;
+  font: 520 15px/1 "Iowan Old Style", Baskerville, "Songti SC", serif;
+}
+.timeline-year-button:hover,
+.timeline-year-button.is-current {
+  color: var(--archive-ink);
+  background: color-mix(in srgb, var(--archive-ink) 7%, transparent);
+}
+
+.timeline-stream {
+  min-height: 42vh;
+}
+
+.timeline-year-marker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 20px;
+  padding: clamp(52px, 9vw, 92px) 0 24px;
+  border-bottom: 1px solid var(--archive-line);
+}
+
+.timeline-year-marker h2 {
+  margin: 0;
+  font: 500 clamp(46px, 8vw, 82px)/0.8 "Iowan Old Style", Baskerville, "Songti SC", serif;
+  letter-spacing: -0.06em;
+}
+
+.timeline-year-marker span {
+  color: var(--archive-muted);
+  font: 500 11px/1.2 "Avenir Next", "PingFang SC", sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.timeline-month {
+  padding: clamp(34px, 6vw, 62px) 0 clamp(50px, 8vw, 86px);
+  border-bottom: 1px solid var(--archive-line);
+  scroll-margin-top: 66px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 620px;
+}
+
+.timeline-month[data-reveal] .timeline-month-head,
+.timeline-month[data-reveal] .timeline-mosaic,
+.timeline-month[data-reveal] .timeline-month-foot {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 440ms ease, transform 520ms cubic-bezier(.2,.7,.2,1);
+}
+.timeline-month[data-reveal] .timeline-mosaic { transition-delay: 45ms; }
+.timeline-month[data-reveal] .timeline-month-foot { transition-delay: 80ms; }
+.timeline-month.is-revealed .timeline-month-head,
+.timeline-month.is-revealed .timeline-mosaic,
+.timeline-month.is-revealed .timeline-month-foot {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.timeline-month-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 17px;
+}
+
+.timeline-month-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  color: var(--archive-ink);
+  text-decoration: none;
+}
+
+.timeline-month-number {
+  font: 500 clamp(31px, 5vw, 48px)/0.9 "Iowan Old Style", Baskerville, "Songti SC", serif;
+  letter-spacing: -0.055em;
+}
+
+.timeline-month-unit {
+  color: var(--archive-muted);
+  font: 500 11px/1 "Avenir Next", "PingFang SC", sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.timeline-month-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--archive-muted);
+  font: 500 11px/1.3 "Avenir Next", "PingFang SC", sans-serif;
+  white-space: nowrap;
+}
+
+.timeline-month-meta svg { width: 13px; height: 13px; stroke-width: 1.7; }
+
+.timeline-mosaic {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: 3px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--archive-ink) 5%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3), 0 18px 50px rgba(41, 36, 27, 0.07);
+}
+
+.timeline-tile {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  background: color-mix(in srgb, var(--archive-ink) 9%, var(--archive-paper));
+  aspect-ratio: 1;
+  cursor: pointer;
+}
+
+.timeline-tile.is-hero {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.timeline-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.001);
+  opacity: 0;
+  transition: opacity 260ms ease, transform 500ms cubic-bezier(.2,.7,.2,1), filter 260ms ease;
+}
+
+.timeline-tile img.is-loaded { opacity: 1; }
+.timeline-tile:hover img { transform: scale(1.035); filter: saturate(1.04); }
+.timeline-tile:focus-visible { z-index: 2; outline: 2px solid var(--archive-paper); outline-offset: -4px; }
+
+.timeline-video-mark {
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  color: white;
+  background: rgba(14, 14, 13, 0.36);
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+}
+.timeline-video-mark svg { width: 11px; height: 11px; fill: currentColor; stroke-width: 1.5; }
+
+.timeline-more-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  background: rgba(22, 21, 18, 0.5);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  font: 580 15px/1 "Avenir Next", "PingFang SC", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.timeline-month-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.timeline-open-month {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 2px;
+  color: var(--archive-muted);
+  font: 530 11px/1.2 "Avenir Next", "PingFang SC", sans-serif;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+.timeline-open-month:hover { color: var(--archive-ink); }
+.timeline-open-month svg { width: 14px; height: 14px; transition: transform 160ms ease; }
+.timeline-open-month:hover svg { transform: translateX(3px); }
+
+.timeline-skeleton {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  overflow: hidden;
+  border-radius: 20px;
+}
+.timeline-skeleton span {
+  aspect-ratio: 1;
+  background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,.24) 38%, transparent 52%),
+              color-mix(in srgb, var(--archive-ink) 7%, transparent);
+  background-size: 220% 100%;
+  animation: timeline-shimmer 1.4s ease-in-out infinite;
+}
+.timeline-skeleton span:first-child { grid-column: span 2; grid-row: span 2; }
+@keyframes timeline-shimmer { to { background-position-x: -220%; } }
+
+.timeline-empty {
+  padding: 15vh 20px;
+  color: var(--archive-muted);
+  text-align: center;
+  font: 400 14px/1.8 "Avenir Next", "PingFang SC", sans-serif;
+}
+
+.explore-heading-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 8px 0 17px;
+  padding: 13px 2px 18px;
+  border-bottom: 1px solid var(--archive-line);
+}
+.explore-kicker { margin-bottom: 5px; }
+.explore-title {
+  margin: 0;
+  color: var(--archive-ink);
+  font: 500 26px/1.1 "Iowan Old Style", Baskerville, "Songti SC", serif;
+  letter-spacing: -0.035em;
+}
+
+.month-detail-header {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(20px, 5vw, 48px);
+  max-width: 920px;
+  margin: 16px auto 26px;
+  padding: 28px 2px 24px;
+  border-bottom: 1px solid var(--archive-line);
+  color: var(--archive-ink);
+}
+.month-detail-header p { margin-bottom: 8px; }
+.month-detail-header h1 {
+  margin: 0;
+  font: 500 clamp(34px, 7vw, 58px)/0.95 "Iowan Old Style", Baskerville, "Songti SC", serif;
+  letter-spacing: -0.05em;
+}
+.month-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid var(--archive-line);
+  border-radius: 999px;
+  color: var(--archive-muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+.month-detail-back:hover { color: var(--archive-ink); }
+.month-detail-back svg { width: 14px; height: 14px; }
+
+@media (min-width: 700px) {
+  .timeline-mosaic { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; border-radius: 24px; }
+  .timeline-skeleton { grid-template-columns: repeat(6, 1fr); gap: 4px; border-radius: 24px; }
+}
+
+@media (max-width: 640px) {
+  .timeline-page-shell { padding-top: 8px; }
+  .timeline-masthead { min-height: 168px; padding: 30px 0 25px; align-items: flex-start; flex-direction: column; gap: 25px; }
+  .timeline-masthead h1 { font-size: clamp(42px, 13vw, 58px); }
+  .timeline-intro { max-width: 25em; margin-top: 14px; font-size: 12px; }
+  .library-view-switch { align-self: flex-end; }
+  .timeline-year-marker { padding-top: 50px; }
+  .timeline-month { padding-top: 36px; padding-bottom: 54px; }
+  .timeline-mosaic { border-radius: 16px; }
+  .timeline-month-head { margin-bottom: 13px; }
+  .timeline-month-number { font-size: 34px; }
+  .timeline-time-basis { font-size: 9px; }
+  .timeline-year-popover { width: 100%; }
+  .explore-heading-row { align-items: flex-start; }
+  .month-detail-header { align-items: flex-start; flex-direction: column; gap: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-tile img,
+  .library-view-switch a,
+  .timeline-open-month svg { transition-duration: 0.01ms !important; }
+  .timeline-skeleton span { animation: none; }
+  html { scroll-behavior: auto !important; }
+  .timeline-month[data-reveal] .timeline-month-head,
+  .timeline-month[data-reveal] .timeline-mosaic,
+  .timeline-month[data-reveal] .timeline-month-foot {
+    opacity: 1;
+    transform: none;
+  }
+}

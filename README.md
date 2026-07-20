@@ -12,6 +12,7 @@ TikLocal's main features include:
 * **A file manager-like directory browsing** feature that allows you to easily find and manage local video files.
 * **A Pinterest-like grid layout** feature that allows you to enjoy local images.
 * **Search, favorites, collections, and lightweight local recommendations** backed by a per-device media index.
+* **A year/month timeline** for browsing multi-year libraries through compact, lazy-loaded monthly chapters.
 * **Multiple media sources and URL downloads** merged into one local library.
 * **Support for light and dark modes** to suit your personal preferences.
 
@@ -151,6 +152,12 @@ The home page (`/`) is a calm launchpad for choosing a session, revisiting recen
 - Image cards support in-feed AI caption/tags panel
 - Image cards support circular magnifier (2.5x / 5x)
 - Image cards do **not** auto-advance; swipe manually to move next/previous
+
+### Media timeline
+
+Library now opens as a year/month timeline for images and videos. Each month loads a stable representative set—up to 9 items on phones and 15 on larger screens—while the complete month remains available with Quick Viewer, favorites, and collections.
+
+The timeline prefers image EXIF capture time, then a date embedded in the filename, and finally filesystem modification time. Resolved values are cached in the local SQLite index so unchanged files are not reopened on every startup. Random images, similar images, latest videos, and large-file browsing remain available under Explore.
 
 ### Configuration
 

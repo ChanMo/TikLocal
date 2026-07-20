@@ -13,6 +13,7 @@
   const initialSeed = String(boot.initialSeed || '');
   const minMb = Number(boot.minMb || 0);
   const emptyMessage = String(boot.emptyMessage || '');
+  const timelineMonth = String(boot.timelineMonth || '');
   const focusName = new URLSearchParams(window.location.search).get('focus') || '';
   let searchQuery = new URLSearchParams(window.location.search).get('q') || '';
 
@@ -333,9 +334,10 @@
       tile.appendChild(badge);
     } else {
       const img = document.createElement('img');
-      img.src = item.media_url;
+      img.src = item.thumb_url || item.media_url;
       img.alt = '';
       img.loading = 'lazy';
+      img.decoding = 'async';
       img.style.aspectRatio = ratio;
       tile.appendChild(img);
     }
@@ -482,6 +484,7 @@
       params.set('seed', seed);
     }
     if (searchQuery) params.set('q', searchQuery);
+    if (timelineMonth) params.set('month', timelineMonth);
     return params;
   }
 
@@ -1605,6 +1608,11 @@
   });
 
   quickSpeed.textContent = `${speedOptions[currentSpeedIndex]}x`;
+  const monthHeading = document.querySelector('[data-month-heading]');
+  if (monthHeading && /^\d{4}-\d{2}$/.test(timelineMonth)) {
+    const [year, monthNumber] = timelineMonth.split('-');
+    monthHeading.textContent = `${year} 年 ${Number(monthNumber)} 月`;
+  }
   applyZoom(2.5);
   relayoutWaterfall();
   if (!items.length && !flowSession.hasMore()) {

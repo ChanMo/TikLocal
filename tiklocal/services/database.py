@@ -196,12 +196,86 @@ def _migrate_005_create_media_index(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_006_add_media_capture_time(conn: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(media_items)").fetchall()
+    }
+    additions = {
+        "captured_at": "REAL",
+        "captured_local_date": "TEXT",
+        "capture_year": "TEXT",
+        "capture_month": "TEXT",
+        "time_source": "TEXT NOT NULL DEFAULT 'filesystem_mtime'",
+        "time_confidence": "TEXT NOT NULL DEFAULT 'fallback'",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE media_items ADD COLUMN {name} {definition}")
+    conn.execute(
+        """
+        UPDATE media_items
+        SET captured_at = COALESCE(captured_at, mtime),
+            captured_local_date = COALESCE(
+              captured_local_date,
+              strftime('%Y-%m-%dT%H:%M:%S', mtime, 'unixepoch', 'localtime')
+            ),
+            capture_year = COALESCE(capture_year, substr(captured_local_date, 1, 4)),
+            capture_month = COALESCE(capture_month, substr(captured_local_date, 1, 7))
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_media_items_capture_date
+        ON media_items(capture_month DESC, media_type, captured_at DESC, uri)
+        """
+    )
+
+
+def _migrate_007_add_capture_calendar_buckets(conn: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(media_items)").fetchall()
+    }
+    for name in ("capture_year", "capture_month"):
+        if name not in columns:
+            conn.execute(f"ALTER TABLE media_items ADD COLUMN {name} TEXT")
+    conn.execute(
+        """
+        UPDATE media_items
+        SET capture_year = COALESCE(capture_year, substr(captured_local_date, 1, 4)),
+            capture_month = COALESCE(capture_month, substr(captured_local_date, 1, 7))
+        """
+    )
+    conn.execute("DROP INDEX IF EXISTS idx_media_items_capture_date")
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_media_items_capture_month
+        ON media_items(capture_month DESC, media_type, captured_at DESC, uri)
+        """
+    )
+
+
+def _migrate_008_add_time_metadata_version(conn: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(media_items)").fetchall()
+    }
+    if "time_metadata_version" not in columns:
+        conn.execute(
+            "ALTER TABLE media_items ADD COLUMN time_metadata_version INTEGER NOT NULL DEFAULT 0"
+        )
+
+
 MIGRATIONS = [
     Migration(1, "create_image_vectors", _migrate_001_create_image_vectors),
     Migration(2, "create_media_similarity_groups", _migrate_002_create_media_similarity_groups),
     Migration(3, "create_media_activity", _migrate_003_create_media_activity),
     Migration(4, "create_preference_dimensions", _migrate_004_create_preference_dimensions),
     Migration(5, "create_media_index", _migrate_005_create_media_index),
+    Migration(6, "add_media_capture_time", _migrate_006_add_media_capture_time),
+    Migration(7, "add_capture_calendar_buckets", _migrate_007_add_capture_calendar_buckets),
+    Migration(8, "add_time_metadata_version", _migrate_008_add_time_metadata_version),
 ]
 
 

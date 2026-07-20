@@ -392,6 +392,40 @@ def create_app(test_config=None):
     def _serialize_library_item(record: dict) -> dict:
         return view_builders.serialize_library_item(record, metadata_store, library_service)
 
+    def _serialize_timeline_payload(payload: dict) -> dict:
+        months = []
+        for month in payload.get('months') or []:
+            covers = []
+            for record in month.get('records') or []:
+                item = _build_feed_media_item(
+                    str(record.get('name') or ''),
+                    str(record.get('media_type') or 'image'),
+                )
+                covers.append({
+                    **item,
+                    'mtime_ts': float(record.get('mtime_ts') or 0),
+                })
+            months.append({
+                'key': str(month.get('key') or ''),
+                'count': int(month.get('count') or 0),
+                'image_count': int(month.get('image_count') or 0),
+                'video_count': int(month.get('video_count') or 0),
+                'covers': covers,
+            })
+        return {
+            'months': months,
+            'years': [
+                {
+                    'year': str(year.get('year') or ''),
+                    'count': int(year.get('count') or 0),
+                    'month_count': int(year.get('month_count') or 0),
+                }
+                for year in payload.get('years') or []
+            ],
+            'has_more': payload.get('has_more') is True,
+            'next_before': str(payload.get('next_before') or ''),
+        }
+
     def _serialize_similar_group(group: dict) -> dict:
         items = []
         for member in group.get('items') or []:
@@ -466,12 +500,14 @@ def create_app(test_config=None):
         seed: str = '',
         collection_id: str = '',
         search: str = '',
+        month: str = '',
     ) -> dict:
         if not favorites_only and not collection_id and mode != 'image_random':
             indexed_page = media_index.page(
                 search=search,
                 media_type='video' if mode in {'video_latest', 'big_files'} else '',
                 min_size=min_mb * 1024 * 1024 if mode == 'big_files' else 0,
+                month=month,
                 offset=offset,
                 limit=limit,
             )
@@ -559,6 +595,14 @@ def create_app(test_config=None):
     def library_view():
         allowed_modes = {'all', 'image_random', 'similar_images', 'video_latest', 'big_files'}
         mode = _read_choice_arg('mode', 'all', allowed_modes)
+        requested_view = str(request.args.get('view', '')).strip()
+        if requested_view not in {'timeline', 'explore', 'month'}:
+            requested_view = 'explore' if request.args.get('mode') or request.args.get('q') else 'timeline'
+        month = str(request.args.get('month', '')).strip()
+        if not media_index.is_month_key(month):
+            month = ''
+        if requested_view == 'month' and not month:
+            requested_view = 'timeline'
         min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
         limit = _read_int_arg('limit', 24, minimum=12, maximum=96)
         seed = str(request.args.get('seed', '')).strip()
@@ -568,9 +612,19 @@ def create_app(test_config=None):
         if mode == 'image_random' and not seed:
             seed = str(random.randint(1, 999999))
 
-        if mode == 'similar_images':
+        timeline_payload = {'months': [], 'has_more': False, 'next_before': ''}
+        if requested_view == 'timeline':
+            timeline_payload = _serialize_timeline_payload(
+                media_index.timeline_months(limit=8, preview_limit=18)
+            )
+            initial_page = {
+                'items': [], 'total': 0, 'offset': 0, 'limit': limit,
+                'next_offset': 0, 'has_more': False, 'seed': '',
+            }
+        elif mode == 'similar_images' and requested_view == 'explore':
             initial_page = _build_similar_groups_page(offset=0, limit=min(limit, 24))
         else:
+            mode = 'all' if requested_view == 'month' else mode
             initial_page = _build_library_page(
                 favorites_only=False,
                 mode=mode,
@@ -579,10 +633,9 @@ def create_app(test_config=None):
                 min_mb=min_mb,
                 seed=seed,
                 search=search,
+                month=month,
             )
-        return render_template(
-            'library.html',
-            **_build_library_template_context(
+        context = _build_library_template_context(
                 menu='library',
                 scope='all',
                 collection_id='',
@@ -591,8 +644,13 @@ def create_app(test_config=None):
                 min_mb=min_mb,
                 empty_message='暂无可展示媒体。' if mode != 'similar_images' else '运行 tiklocal analyze-similar 后查看相似图片组。',
                 initial_page=initial_page,
-            ),
-        )
+            )
+        context.update({
+            'library_view': requested_view,
+            'timeline_month': month,
+            'timeline_payload': timeline_payload,
+        })
+        return render_template('library.html', **context)
 
 
     # --- Detail & Action Routes ---
@@ -1468,6 +1526,21 @@ def create_app(test_config=None):
         result = library_indexer.sync()
         return {'success': True, 'data': result}
 
+    @app.route('/api/library/timeline')
+    def api_library_timeline():
+        before = str(request.args.get('before', '')).strip()
+        limit = _read_int_arg('limit', 18, minimum=1, maximum=36)
+        preview_limit = _read_int_arg('preview_limit', 18, minimum=1, maximum=18)
+        payload = media_index.timeline_months(
+            before=before,
+            limit=limit,
+            preview_limit=preview_limit,
+        )
+        return {
+            'success': True,
+            'data': _serialize_timeline_payload(payload),
+        }
+
     @app.route('/api/library/items')
     def api_library_items():
         scope = str(request.args.get('scope', 'all')).strip()
@@ -1486,6 +1559,9 @@ def create_app(test_config=None):
         min_mb = _read_int_arg('min_mb', 50, minimum=1, maximum=10240)
         seed = str(request.args.get('seed', '')).strip()
         search = str(request.args.get('q', '')).strip()[:200] if scope == 'all' else ''
+        month = str(request.args.get('month', '')).strip() if scope == 'all' else ''
+        if not media_index.is_month_key(month):
+            month = ''
         if search:
             mode = 'all'
         if mode == 'image_random' and not seed:
@@ -1500,6 +1576,7 @@ def create_app(test_config=None):
             seed=seed,
             collection_id=collection_id,
             search=search,
+            month=month,
         )
         return {
             'success': True,

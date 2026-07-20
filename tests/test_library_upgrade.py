@@ -5,6 +5,7 @@ from urllib.parse import quote
 import pytest
 from PIL import Image
 
+import tiklocal.services.library_index as library_index_module
 from tiklocal.app import create_app
 from tiklocal.services import LibraryService
 from tiklocal.services.database import AppDatabase
@@ -37,7 +38,18 @@ def client(tmp_path, monkeypatch):
 
 
 def test_library_page_has_mode_tabs_and_no_masonry_label(client):
-    res = client.get("/library")
+    timeline = client.get("/library")
+    assert timeline.status_code == 200
+    timeline_body = timeline.data.decode("utf-8")
+    assert 'id="timeline-stream"' in timeline_body
+    assert 'id="timeline-current-date"' in timeline_body
+    assert '时间里的影像' in timeline_body
+    assert 'library_timeline.css' in timeline_body
+    assert 'library_timeline_controller.js' in timeline_body
+    assert 'window.__TIKLOCAL_TIMELINE_BOOT__' in timeline_body
+    assert 'library_page_controller.js' not in timeline_body
+
+    res = client.get("/library?view=explore")
     assert res.status_code == 200
     body = res.data.decode("utf-8")
     assert "data-mode=\"all\"" in body
@@ -70,12 +82,92 @@ def test_library_page_has_mode_tabs_and_no_masonry_label(client):
     assert 'id="library-status-text"' in body
     assert 'id="library-retry"' in body
     assert 'id="library-clear-search"' in body
+    assert '探索媒体库' in body
+    assert 'href="/library"' in body
 
     controller = client.get("/static/library_page_controller.js").data.decode("utf-8")
     assert "syncSearchUI" in controller
     assert "aria-pressed" in controller
     assert "waterfall.gridWidth !== nextGridWidth" in controller
     assert "if (isSimilarMode() || !layoutChanged) return;" in controller
+
+
+def test_library_timeline_groups_months_and_month_detail_filters(client):
+    timeline = client.get("/api/library/timeline?limit=12&preview_limit=9")
+    assert timeline.status_code == 200
+    data = timeline.get_json()["data"]
+    assert data["months"]
+    assert data["years"]
+    month = data["months"][0]
+    assert month["key"] == "2023-11"
+    assert month["count"] == 13
+    assert len(month["covers"]) == 9
+    assert all(item["thumb_url"].startswith("/thumb?uri=") for item in month["covers"])
+
+    month_page = client.get("/library?view=month&month=2023-11")
+    assert month_page.status_code == 200
+    month_body = month_page.data.decode("utf-8")
+    assert 'data-month-heading="2023-11"' in month_body
+    assert 'timelineMonth: "2023-11"' in month_body
+    assert 'library_page_controller.js' in month_body
+
+    items = client.get("/api/library/items?scope=all&month=2023-11&limit=20").get_json()["data"]
+    assert items["total"] == 13
+
+
+def test_timeline_prefers_embedded_and_filename_capture_dates(tmp_path, monkeypatch):
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    photo = media_root / "old-memory.jpg"
+    image = Image.new("RGB", (80, 60), (120, 80, 60))
+    exif = Image.Exif()
+    exif[36867] = "2019:04:08 10:20:30"
+    image.save(photo, exif=exif)
+    video = media_root / "VID_20210703_142233.mp4"
+    video.write_bytes(b"video")
+    recent_ts = 1_750_000_000
+    os.utime(photo, (recent_ts, recent_ts))
+    os.utime(video, (recent_ts, recent_ts))
+
+    data_root = tmp_path / "tiklocal-data"
+    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
+    database = AppDatabase(tmp_path / "timeline.sqlite3")
+    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root, "APP_DATABASE": database})
+    local_client = app.test_client()
+
+    timeline = local_client.get("/api/library/timeline").get_json()["data"]
+    keys = [month["key"] for month in timeline["months"]]
+    assert keys == ["2021-07", "2019-04"]
+
+    records = {item["name"]: item for item in MediaIndexStore(database).records()}
+    assert records["@default/old-memory.jpg"]["time_source"] == "exif_original"
+    assert records["@default/old-memory.jpg"]["time_confidence"] == "high"
+    assert records["@default/VID_20210703_142233.mp4"]["time_source"] == "filename"
+
+    # Simulate a pre-timeline index row. It must be enriched once, then reused.
+    with database.connect() as conn:
+        conn.execute(
+            """
+            UPDATE media_items
+            SET captured_at = mtime,
+                captured_local_date = '2025-06-15T15:06:40',
+                capture_year = '2025',
+                capture_month = '2025-06',
+                time_source = 'filesystem_mtime',
+                time_confidence = 'fallback',
+                time_metadata_version = 0
+            WHERE uri = '@default/old-memory.jpg'
+            """
+        )
+    create_app({"TESTING": True, "MEDIA_ROOT": media_root, "APP_DATABASE": database})
+    enriched = {item["name"]: item for item in MediaIndexStore(database).records()}
+    assert enriched["@default/old-memory.jpg"]["time_source"] == "exif_original"
+
+    def fail_reopen(_path):
+        raise AssertionError("unchanged media metadata should be reused")
+
+    monkeypatch.setattr(library_index_module, "_image_capture_time", fail_reopen)
+    create_app({"TESTING": True, "MEDIA_ROOT": media_root, "APP_DATABASE": database})
 
 
 def test_flow_uses_unified_immersive_model(client):

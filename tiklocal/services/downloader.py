@@ -862,7 +862,6 @@ class DownloadManager:
                     return
 
                 if return_code == 0:
-                    job["status"] = "success"
                     job["progress_percent"] = 100.0
                     job["eta_sec"] = 0
                     job["output_files_rel"] = output_rel_list
@@ -879,9 +878,8 @@ class DownloadManager:
                 else:
                     job["status"] = "failed"
                     job["error_message"] = error_message or "下载失败，请检查 URL 与网络环境。"
-
-                job["finished_at"] = _utc_now_iso()
-                self._persist_locked()
+                    job["finished_at"] = _utc_now_iso()
+                    self._persist_locked()
 
             if source_context:
                 self._record_job_sources_on_success(source_context)
@@ -890,6 +888,17 @@ class DownloadManager:
                     self.on_outputs(output_rel_list)
                 except Exception:
                     pass
+            if return_code == 0:
+                # Do not expose a successful job until its outputs are visible in
+                # the media index. Otherwise clients can observe success and then
+                # briefly fail to find the downloaded file.
+                with self._lock:
+                    job = self._jobs.get(job_id)
+                    if not job:
+                        return
+                    job["status"] = "success"
+                    job["finished_at"] = _utc_now_iso()
+                    self._persist_locked()
         except FileNotFoundError as exc:
             with self._lock:
                 job = self._jobs.get(job_id)

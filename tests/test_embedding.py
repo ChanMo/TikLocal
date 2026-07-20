@@ -340,7 +340,7 @@ def test_library_similar_groups_api(embedding_client):
 def test_library_page_has_similar_images_tab(embedding_client):
     client, _ = embedding_client
 
-    res = client.get("/library")
+    res = client.get("/library?view=explore")
     body = res.get_data(as_text=True)
 
     assert res.status_code == 200

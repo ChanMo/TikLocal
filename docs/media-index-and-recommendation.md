@@ -1,11 +1,12 @@
 # 媒体索引与本地推荐架构
 
 - 模块: Library Index / Recommendation / Thumbnail
-- 更新时间: 2026-07-12
+- 更新时间: 2026-07-20
 
 ## 现状概述
 
 - TikLocal 以文件系统作为媒体事实来源，以 `~/.tiklocal/tiklocal.sqlite3` 中的 `media_items` 作为页面查询索引。
+- `media_items` 同时缓存媒体时间、原始本地日期、时间来源与可信度；图片按 EXIF、文件名、文件时间的顺序解析，未变化文件复用已有结果。
 - Home Flow、Library、Favorites、Collections 与视频详情页共用规范媒体 URI：`@source_id/relative/path`。
 - 推荐保持轻量本地实现，使用收藏、完成、跳过、重播、近期曝光和媒体维度偏好参与排序，不依赖云端画像或任务系统。
 - Library 列表使用按需缩略图，Quick Viewer 与详情页才加载原始媒体。
@@ -27,6 +28,7 @@
 - `ThumbnailService.get_thumbnail()`：读取有效缓存或同步生成单规格缩略图。
 - `/api/feed/mix`：按 seed 返回稳定的混合媒体分页。
 - `/api/library/items`：返回媒体库分页数据。
+- `/api/library/timeline`：返回轻量年/月统计和每月代表媒体，不读取原图或同步探测尺寸。
 - `/api/library/sync`：手动触发与启动时相同的安全同步。
 
 ## 数据流与状态
@@ -46,6 +48,11 @@
   → /thumb 首次访问
   → 本地 JPEG 缓存
   → Library / Feed 预览
+
+图片 / 视频文件
+  → EXIF / 文件名 / 文件时间
+  → captured_at / captured_local_date / time_source
+  → Timeline 年月聚合与月份详情
 ```
 
 ## 兼容性与迁移

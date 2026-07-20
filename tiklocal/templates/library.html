@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='library_timeline.css') }}">
 <style>
   body:not([data-nav-context="favorite"]) {
     padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
@@ -1040,10 +1041,54 @@
 {% endblock %}
 
 {% block content %}
-<main class="{% if scope in ['favorite', 'collection'] %}saved-page{% else %}container mx-auto px-2 pt-2 pb-1 md:px-3{% endif %}">
-  {% if scope == 'all' %}
+<main class="{% if scope in ['favorite', 'collection'] %}saved-page{% elif library_view == 'timeline' %}timeline-page-shell{% else %}container mx-auto px-2 pt-2 pb-1 md:px-3{% endif %}">
+  {% if scope == 'all' and library_view == 'timeline' %}
+  <header class="timeline-masthead">
+    <div class="timeline-masthead-copy">
+      <p class="timeline-kicker">PRIVATE ARCHIVE</p>
+      <h1>时间里的影像</h1>
+      <p class="timeline-intro">沿着月份，重新遇见那些被留在本地的片刻。</p>
+    </div>
+    <nav class="library-view-switch" aria-label="媒体库视图">
+      <a class="is-active" href="/library" aria-current="page">时间线</a>
+      <a href="/library?view=explore">探索</a>
+    </nav>
+  </header>
+  <div class="timeline-sticky-bar" id="timeline-sticky-bar">
+    <button class="timeline-current-date" id="timeline-current-date" type="button" aria-label="选择年份">
+      <span id="timeline-current-label">最近</span>
+      <i data-feather="chevron-down" aria-hidden="true"></i>
+    </button>
+    <span class="timeline-time-basis">按媒体时间</span>
+  </div>
+  <div class="timeline-year-popover" id="timeline-year-popover" hidden>
+    <div class="timeline-year-list" id="timeline-year-list"></div>
+  </div>
+  <section id="timeline-stream" class="timeline-stream" aria-label="按月份浏览媒体"></section>
+  {% elif scope == 'all' and library_view == 'month' %}
+  <header class="month-detail-header">
+    <a class="month-detail-back" href="/library?view=timeline#month-{{ timeline_month }}" aria-label="返回时间线">
+      <i data-feather="arrow-left" aria-hidden="true"></i>
+      <span>时间线</span>
+    </a>
+    <div>
+      <p>MONTH ARCHIVE</p>
+      <h1 data-month-heading="{{ timeline_month }}">{{ timeline_month }}</h1>
+    </div>
+  </header>
+  {% elif scope == 'all' %}
   <section class="library-toolbar-wrap">
     <div id="library-toolbar" class="library-toolbar{% if request.args.get('q', '') %} is-searching is-search-open{% endif %}">
+    <div class="explore-heading-row">
+      <div>
+        <p class="explore-kicker">DISCOVER</p>
+        <h1 class="explore-title">探索媒体库</h1>
+      </div>
+      <nav class="library-view-switch" aria-label="媒体库视图">
+        <a href="/library">时间线</a>
+        <a class="is-active" href="/library?view=explore" aria-current="page">探索</a>
+      </nav>
+    </div>
     <div class="library-toolbar-row">
     <div class="mode-tabs" id="mode-tabs" aria-label="媒体库浏览模式">
       <button type="button" class="mode-tab" data-mode="all">全部</button>
@@ -1100,7 +1145,9 @@
   </section>
   {% endif %}
 
+  {% if not (scope == 'all' and library_view == 'timeline') %}
   <section id="library-grid" class="masonry-grid{% if scope in ['favorite', 'collection'] %} saved-content{% endif %}"></section>
+  {% endif %}
   <div id="library-loading" class="library-loading" aria-live="polite">
     <div id="library-status-text">正在加载...</div>
     <div id="library-status-actions" class="library-status-actions" hidden>
@@ -1222,7 +1269,16 @@
     initialSeed: {{ mode_seed | tojson }},
     minMb: {{ min_mb }},
     emptyMessage: {{ empty_message | tojson }},
+    libraryView: {{ library_view | default('explore') | tojson }},
+    timelineMonth: {{ timeline_month | default('') | tojson }},
   };
 </script>
+{% if scope == 'all' and library_view == 'timeline' %}
+<script>
+  window.__TIKLOCAL_TIMELINE_BOOT__ = {{ timeline_payload | tojson }};
+</script>
+<script src="{{ url_for('static', filename='library_timeline_controller.js') }}"></script>
+{% else %}
 <script src="{{ url_for('static', filename='library_page_controller.js') }}"></script>
+{% endif %}
 {% endblock %}
