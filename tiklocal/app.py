@@ -53,6 +53,8 @@ from tiklocal.services.downloader import (
 from tiklocal.services.collections import CollectionStore
 from tiklocal.services.embedded_metadata import read_embedded_generation
 from tiklocal.services.radio import RadioCandidate, RadioProfileStore, RadioService
+from tiklocal.services.auth import AuthStore
+from tiklocal.auth import configure_auth
 from tiklocal.paths import (
     get_metadata_path,
     get_favorites_path,
@@ -65,6 +67,7 @@ from tiklocal.paths import (
     get_download_sources_path,
     get_collections_path,
     get_radio_profile_path,
+    get_auth_path,
 )
 from tiklocal import view_builders
 
@@ -101,23 +104,34 @@ app_version = get_app_version()
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
-    app.config.from_prefixed_env()
     app.config.from_mapping(
-        SECRET_KEY = 'dev',
+        SECRET_KEY = None,
         MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', '.')),
         MEDIA_SOURCES = None,
         DOWNLOAD_SOURCE = 'default',
         VISION_CONFIG = None,
         EMBEDDING_CONFIG = None,
         VECTOR_INDEX = None,
+        AUTH_ENABLED = None,
+        AUTH_COOKIE_SECURE = False,
     )
     app.config.from_pyfile('config.py', silent=True)
+    app.config.from_prefixed_env()
     if test_config is not None:
         app.config.update(test_config)
     try:
         os.makedirs(app.instance_path)
     except OSError:
         pass
+
+    configured_auth = app.config.get('AUTH_ENABLED')
+    auth_enabled = not bool(app.config.get('TESTING')) if configured_auth is None else bool(configured_auth)
+    auth_store = AuthStore(app.config.get('AUTH_PATH') or get_auth_path())
+    bootstrap = None
+    if auth_enabled:
+        bootstrap = auth_store.ensure(os.environ.get('TIKLOCAL_AUTH_PASSWORD'))
+    configure_auth(app, auth_store, enabled=auth_enabled)
+    app.extensions['auth_bootstrap'] = bootstrap
 
     # Initialize Services
     media_sources = build_media_sources(app.config['MEDIA_ROOT'], app.config.get('MEDIA_SOURCES'))

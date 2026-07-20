@@ -4,8 +4,10 @@
     <meta charset="utf-8" />
     <title>TikLocal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    {% if auth_enabled %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endif %}
     <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='output.css')}}">
     <script src="{{url_for('static', filename='feather.min.js')}}"></script>
+    {% if auth_enabled %}<script src="{{ url_for('static', filename='csrf_fetch.js') }}"></script>{% endif %}
     <style>
       /* A soft, content-first dock with page-aware material. */
       :root {
@@ -476,6 +478,12 @@
       <a href="/settings" class="dock-item {% if menu == 'settings' %}active{% endif %}" data-label="设置" aria-label="设置" {% if menu == 'settings' %}aria-current="page"{% endif %}>
         <i data-feather="settings"></i><span class="rail-tooltip">设置</span>
       </a>
+      {% if auth_enabled %}
+      <form method="post" action="{{ url_for('logout_view') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <button class="dock-item" type="submit" data-label="退出" aria-label="退出登录"><i data-feather="log-out"></i><span class="rail-tooltip">退出</span></button>
+      </form>
+      {% endif %}
     </nav>
 
     <div id="app-nav-menu" class="app-nav-menu" aria-hidden="true" inert>
@@ -499,6 +507,12 @@
         <div class="app-nav-menu-list">
           <a href="/download" class="app-nav-menu-item {% if menu == 'download' %}is-active{% endif %}"><i data-feather="download"></i><span>下载</span></a>
           <a href="/settings" class="app-nav-menu-item {% if menu == 'settings' %}is-active{% endif %}"><i data-feather="settings"></i><span>设置</span></a>
+          {% if auth_enabled %}
+          <form method="post" action="{{ url_for('logout_view') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <button class="app-nav-menu-item" type="submit" aria-label="退出登录"><i data-feather="log-out"></i><span>退出登录</span></button>
+          </form>
+          {% endif %}
         </div>
       </nav>
     </div>

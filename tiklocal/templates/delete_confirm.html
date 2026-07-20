@@ -5,6 +5,7 @@
     <h1 class="title">Delete the file "{{file}}"?</h1>
     <p class="notification is-warning is-light">The file will be deleted from the disk.</p>
     <form method="post">
+      {% if auth_enabled %}<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">{% endif %}
       <button type="submit" class="button">Delete</button>
     </form>
   </div>

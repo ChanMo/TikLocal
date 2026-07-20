@@ -60,7 +60,10 @@
     function postActivity(events, useBeacon = false) {
       const valid = events.filter(Boolean);
       if (!valid.length) return;
-      const body = JSON.stringify({ events: valid });
+      const body = JSON.stringify({
+        events: valid,
+        _csrf_token: window.TikLocalSecurity?.csrfToken || '',
+      });
       if (useBeacon && navigator.sendBeacon) {
         navigator.sendBeacon('/api/activity', new Blob([body], { type: 'application/json' }));
         return;

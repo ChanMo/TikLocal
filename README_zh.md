@@ -55,6 +55,18 @@ tiklocal --port 9000              # 使用自定义端口
 tiklocal --media-source photos=~/Pictures/AI  # 追加媒体源，可重复
 ```
 
+**访问认证：**
+
+认证默认启用。首次启动时，TikLocal 会在终端打印自动生成的访问密码。所有页面、API、媒体文件和管理操作都需要先登录；登录后可使用全部功能。
+
+```bash
+tiklocal auth status              # 查看认证状态和存储路径
+tiklocal auth set-password        # 修改密码，并使已有登录会话失效
+TIKLOCAL_AUTH_PASSWORD='一个足够长的私人密码' tiklocal auth set-password
+```
+
+密码只以 scrypt 哈希存放在 `~/.tiklocal/auth.json`，不会明文落盘。仍建议仅在可信内网使用；若通过 HTTPS 反向代理对外提供访问，请设置 `FLASK_AUTH_COOKIE_SECURE=true`，使浏览器只通过 HTTPS 发送会话 Cookie。
+
 **生成视频缩略图：**
 ```bash
 tiklocal thumbs /path/to/media    # 生成缩略图
@@ -210,7 +222,7 @@ tiklocal analyze-similar /path/to/media --profile --dry-run
 ## TODO
 
 * [ ] 增加更多管理操作, 比如移动文件, 创建文件夹
-* [ ] 增加基础的登录控制*
+* [x] 增加基础的登录控制
 * [ ] 增加Docker镜像
 * [ ] 增加标签功能
 

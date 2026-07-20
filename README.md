@@ -57,6 +57,18 @@ tiklocal --port 9000              # Use custom port
 tiklocal --media-source photos=~/Pictures/AI  # Add a media source, repeatable
 ```
 
+**Access authentication:**
+
+Authentication is enabled by default. On first start, TikLocal prints a generated access password in the terminal. Every page, API, media file, and management action requires sign-in; after sign-in, all features are available.
+
+```bash
+tiklocal auth status              # Show authentication status and storage path
+tiklocal auth set-password        # Set a new password and invalidate existing sessions
+TIKLOCAL_AUTH_PASSWORD='a-long-private-password' tiklocal auth set-password
+```
+
+The password is stored as a scrypt hash in `~/.tiklocal/auth.json`; the plain password is never stored. Keep TikLocal on a trusted LAN. When exposing it behind an HTTPS reverse proxy, set `FLASK_AUTH_COOKIE_SECURE=true` so browsers only send the session cookie over HTTPS.
+
 **Generate video thumbnails:**
 ```bash
 tiklocal thumbs /path/to/media    # Generate thumbnails
@@ -210,7 +222,7 @@ API keys are read from environment variables, preferring `TIKLOCAL_VISION_API_KE
 ## TODO
 
 * [ ] Add more management operations, such as moving files and creating folders
-* [ ] Add basic login control
+* [x] Add basic login control
 * [ ] Add a Docker image
 * [ ] Add a tagging feature
 

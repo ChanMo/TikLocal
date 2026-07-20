@@ -699,6 +699,7 @@
       name: track.name,
       event: event,
       ratio: ratio,
+      _csrf_token: window.TikLocalSecurity && window.TikLocalSecurity.csrfToken || '',
     });
     if (navigator.sendBeacon) {
       try {

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171815">
+  <title>进入 TikLocal</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #eeeae1;
+      --ink: #1b1c18;
+      --night: #171815;
+      --acid: #d9ff52;
+      --muted: rgba(27, 28, 24, 0.5);
+      --line: rgba(27, 28, 24, 0.13);
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; }
+    .login-shell {
+      position: relative;
+      min-height: 100dvh;
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(390px, .92fr);
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .login-scene {
+      position: relative;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(28px, 4.2vw, 64px);
+      overflow: hidden;
+      color: rgba(255,255,255,.94);
+      background:
+        radial-gradient(circle at 72% 28%, rgba(217,255,82,.17), transparent 24%),
+        linear-gradient(145deg, #20221d 0%, var(--night) 52%, #0e0f0d 100%);
+    }
+    .login-scene::before {
+      content: "";
+      position: absolute;
+      width: min(64vw, 760px);
+      aspect-ratio: 1;
+      right: -28%;
+      top: 10%;
+      border: 1px solid rgba(217,255,82,.28);
+      border-radius: 50%;
+      box-shadow: 0 0 0 42px rgba(217,255,82,.018), 0 0 0 112px rgba(217,255,82,.012);
+      animation: orbit-in 1.2s var(--ease) both;
+    }
+    .login-scene::after,
+    .login-panel::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: .21;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.94' numOctaves='3' stitchTiles='stitchTiles'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+    .scene-top,
+    .scene-copy,
+    .scene-foot { position: relative; z-index: 2; }
+    .scene-top { display: flex; align-items: center; justify-content: space-between; }
+    .wordmark { display: flex; align-items: center; gap: 11px; font-size: 13px; font-weight: 680; letter-spacing: -.02em; }
+    .wordmark-mark {
+      width: 34px; height: 34px; display: grid; place-items: center;
+      border: 1px solid rgba(255,255,255,.19); border-radius: 50%;
+      color: var(--acid); font: 760 10px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+    }
+    .scene-index { color: rgba(255,255,255,.38); font: 700 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace; letter-spacing: .16em; }
+    .scene-copy { max-width: 700px; padding: 10vh 0 8vh; animation: reveal 850ms 80ms var(--ease) both; }
+    .scene-kicker { margin: 0 0 20px; color: var(--acid); font: 720 10px/1 ui-monospace, "SFMono-Regular", Menlo, monospace; letter-spacing: .22em; }
+    .scene-copy h1 {
+      max-width: 680px; margin: 0;
+      font-family: ui-serif, "Iowan Old Style", "Songti SC", "STSong", serif;
+      font-size: clamp(54px, 7.2vw, 108px); font-weight: 470; letter-spacing: -.072em; line-height: .91;
+    }
+    .scene-copy h1 em { display: block; color: var(--acid); font-style: normal; }
+    .scene-foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; color: rgba(255,255,255,.42); font-size: 10px; }
+    .private-signal { display: inline-flex; align-items: center; gap: 8px; }
+    .private-signal::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--acid); box-shadow: 0 0 0 5px rgba(217,255,82,.09); }
+    .login-panel {
+      position: relative;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: max(28px, env(safe-area-inset-top)) clamp(24px, 6vw, 92px) max(28px, env(safe-area-inset-bottom));
+      background: var(--paper);
+    }
+    .login-panel::after { opacity: .1; z-index: -1; }
+    .login-card { width: min(100%, 430px); animation: reveal 720ms 160ms var(--ease) both; }
+    .login-overline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 50px; color: var(--muted); font: 720 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace; letter-spacing: .16em; text-transform: uppercase; }
+    .login-overline span:last-child { color: var(--ink); }
+    .login-card h2 { margin: 0; font-family: ui-serif, "Iowan Old Style", "Songti SC", "STSong", serif; font-size: clamp(40px, 5vw, 58px); font-weight: 500; letter-spacing: -.06em; line-height: .98; }
+    .login-intro { max-width: 340px; margin: 16px 0 42px; color: var(--muted); font-size: 13px; line-height: 1.75; }
+    .field-label { display: block; margin-bottom: 9px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+    .password-field { position: relative; }
+    .password-field input {
+      width: 100%; height: 58px; padding: 0 52px 0 17px;
+      border: 1px solid var(--line); border-radius: 3px; outline: 0;
+      color: var(--ink); background: rgba(255,255,255,.38);
+      font-size: 17px; letter-spacing: .03em;
+      transition: border-color 160ms ease, box-shadow 180ms ease, background 160ms ease;
+    }
+    .password-field input:focus { border-color: rgba(27,28,24,.6); background: rgba(255,255,255,.65); box-shadow: 0 0 0 4px rgba(27,28,24,.055); }
+    .password-toggle {
+      position: absolute; top: 50%; right: 10px; width: 38px; height: 38px; transform: translateY(-50%);
+      display: grid; place-items: center; border: 0; border-radius: 50%; color: var(--muted); background: transparent; cursor: pointer;
+    }
+    .password-toggle:hover { color: var(--ink); background: rgba(27,28,24,.055); }
+    .password-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .password-toggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .login-options { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 17px 0 28px; color: var(--muted); font-size: 11px; }
+    .remember { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; }
+    .remember input { width: 15px; height: 15px; margin: 0; accent-color: var(--ink); }
+    .local-note { font: 680 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace; letter-spacing: .08em; }
+    .login-submit {
+      width: 100%; min-height: 58px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 18px 0 20px; border: 1px solid var(--night); border-radius: 3px;
+      color: #fff; background: var(--night); cursor: pointer;
+      font-size: 12px; font-weight: 680; letter-spacing: .02em;
+      transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+    }
+    .login-submit:hover { color: var(--night); background: var(--acid); }
+    .login-submit:active { transform: scale(.985); }
+    .login-submit:focus-visible { outline: 2px solid var(--night); outline-offset: 3px; }
+    .login-submit svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; transition: transform 220ms var(--ease); }
+    .login-submit:hover svg { transform: translateX(4px); }
+    .login-error { margin: -13px 0 20px; padding: 12px 14px; border-left: 2px solid #b85045; color: #8f382f; background: rgba(184,80,69,.07); font-size: 11px; line-height: 1.55; animation: error-in 300ms ease both; }
+    .login-help { margin: 22px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .login-help code { color: var(--ink); font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes orbit-in { from { opacity: 0; transform: scale(.84) rotate(-10deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+    @keyframes error-in { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }
+    @media (max-width: 760px) {
+      .login-shell { display: block; background: var(--night); }
+      .login-scene { min-height: 34dvh; padding: max(22px, env(safe-area-inset-top)) 22px 58px; }
+      .login-scene::before { width: 330px; right: -190px; top: -90px; }
+      .scene-copy { padding: 64px 0 0; }
+      .scene-copy h1 { font-size: clamp(43px, 14vw, 64px); }
+      .scene-copy h1 em { display: inline; }
+      .scene-foot { display: none; }
+      .login-panel { min-height: 66dvh; place-items: start center; padding: 34px 22px max(30px, env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; margin-top: -24px; z-index: 3; }
+      .login-card { max-width: 470px; }
+      .login-overline { margin-bottom: 28px; }
+      .login-card h2 { font-size: 39px; }
+      .login-intro { margin: 11px 0 30px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="login-shell">
+    <section class="login-scene" aria-label="TikLocal 私人媒体空间">
+      <div class="scene-top">
+        <div class="wordmark"><span class="wordmark-mark">TL</span><span>TikLocal</span></div>
+        <span class="scene-index">PRIVATE / 01</span>
+      </div>
+      <div class="scene-copy">
+        <p class="scene-kicker">YOUR PRIVATE FREQUENCY</p>
+        <h1>只为你的<em>此刻。</em></h1>
+      </div>
+      <div class="scene-foot">
+        <span class="private-signal">本地媒体空间已上锁</span>
+        <span>FLOW · RADIO · LIBRARY</span>
+      </div>
+    </section>
+
+    <section class="login-panel" aria-labelledby="login-title">
+      <div class="login-card">
+        <div class="login-overline"><span>Access portal</span><span>TL—LOCAL</span></div>
+        <h2 id="login-title">欢迎回来。</h2>
+        <p class="login-intro">输入这台 TikLocal 的访问密码，继续浏览你的影像、声音与收藏。</p>
+
+        <form method="post" action="{{ url_for('login_view') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_value }}">
+          <input type="hidden" name="next" value="{{ next_url }}">
+          {% if error %}<div class="login-error" role="alert">{{ error }}</div>{% endif %}
+          <label class="field-label" for="password">访问密码</label>
+          <div class="password-field">
+            <input id="password" name="password" type="password" autocomplete="current-password" required aria-describedby="login-help">
+            <button class="password-toggle" type="button" aria-label="显示密码" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-5 9.5-5 9.5 5 9.5 5-3.4 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+            </button>
+          </div>
+          <div class="login-options">
+            <label class="remember"><input type="checkbox" name="remember" value="1" checked><span>在此设备保持登录</span></label>
+            <span class="local-note">PRIVATE LAN</span>
+          </div>
+          <button class="login-submit" type="submit"><span>进入 TikLocal</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </form>
+        <p class="login-help" id="login-help">忘记密码？在运行 TikLocal 的电脑上执行 <code>tiklocal auth set-password</code>。</p>
+      </div>
+    </section>
+  </main>
+  <script>
+    const input = document.getElementById('password');
+    const toggle = document.querySelector('.password-toggle');
+    if (window.matchMedia('(min-width: 761px)').matches) input.focus({ preventScroll: true });
+    toggle.addEventListener('click', () => {
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      toggle.setAttribute('aria-pressed', String(!showing));
+      toggle.setAttribute('aria-label', showing ? '显示密码' : '隐藏密码');
+      input.focus();
+    });
+  </script>
+</body>
+</html>

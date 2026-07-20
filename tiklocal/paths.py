@@ -67,3 +67,7 @@ def get_collections_path() -> Path:
 
 def get_radio_profile_path() -> Path:
     return get_data_dir() / 'radio_profile.json'
+
+
+def get_auth_path() -> Path:
+    return get_data_dir() / 'auth.json'

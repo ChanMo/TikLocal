@@ -1,11 +1,14 @@
 import os
 import sys
 import argparse
+import getpass
 from pathlib import Path
 from waitress import serve
 from tiklocal.app import create_app
 from tiklocal.thumbs import generate_thumbnails
 from tiklocal.paths import get_data_dir, get_database_path
+from tiklocal.paths import get_auth_path
+from tiklocal.services.auth import AuthStore
 from tiklocal.services import LibraryService, build_media_sources, normalize_source_id
 from tiklocal.services.embedding import (
     ImageVectorService,
@@ -329,7 +332,7 @@ def main():
             if idx != 0:
                 argv.pop(idx)
                 argv.insert(0, 'thumbs')
-        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize', 'analyze-similar'):
+        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize', 'analyze-similar', 'auth'):
             # 默认回退 serve（空参数或第一个不是已知子命令）
             argv.insert(0, 'serve')
 
@@ -348,6 +351,7 @@ def main():
   tiklocal dedupe /path --execute          # 删除重复，保留最早文件
   tiklocal vectorize /path --limit 200     # 按最新时间向量化前 200 张
   tiklocal analyze-similar /path --yes     # 预生成相似图片组
+  tiklocal auth set-password               # 设置新的访问密码
         '''
     )
 
@@ -362,6 +366,9 @@ def main():
     serve_parser.add_argument('--media-source', action='append', type=parse_cli_media_source,
                               help='添加媒体源，格式 id=/path/to/media，可重复')
     serve_parser.add_argument('--download-source', default=None, help='下载保存到的媒体源 id')
+
+    auth_parser = subparsers.add_parser('auth', help='管理访问认证')
+    auth_parser.add_argument('action', choices=['set-password', 'status'], help='认证操作')
 
     # thumbs 子命令
     thumbs_parser = subparsers.add_parser('thumbs', help='批量生成视频缩略图')
@@ -473,6 +480,34 @@ def main():
         run_analyze_similar(config, args, parser)
         return
 
+    if cmd == 'auth':
+        auth_store = AuthStore(get_auth_path())
+        if args.action == 'status':
+            try:
+                bootstrap = auth_store.ensure(os.environ.get('TIKLOCAL_AUTH_PASSWORD'))
+            except ValueError as exc:
+                parser.error(str(exc))
+            print(f"认证状态: 已启用")
+            print(f"认证文件: {auth_store.path}")
+            if bootstrap.generated_password:
+                print(f"首次访问密码: {bootstrap.generated_password}")
+            return
+
+        env_password = str(os.environ.get('TIKLOCAL_AUTH_PASSWORD') or '')
+        if env_password:
+            password = env_password
+        else:
+            password = getpass.getpass('新的访问密码: ')
+            confirmation = getpass.getpass('再次输入密码: ')
+            if password != confirmation:
+                parser.error('两次输入的密码不一致')
+        try:
+            auth_store.set_password(password)
+        except ValueError as exc:
+            parser.error(str(exc))
+        print('访问密码已更新，所有已登录设备需要重新登录。')
+        return
+
     # serve 路径
     media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
     host = args.host or os.environ.get('TIKLOCAL_HOST') or config.get('host', '0.0.0.0')
@@ -533,13 +568,24 @@ def main():
     print(f"数据目录: {get_data_dir()}")
     print(f"访问地址: http://{host}:{port}")
 
-    app = create_app({
-        "MEDIA_ROOT": media_path,
-        "MEDIA_SOURCES": media_sources or None,
-        "DOWNLOAD_SOURCE": normalize_source_id(download_source),
-        "VISION_CONFIG": vision_config,
-        "EMBEDDING_CONFIG": embedding_config,
-    })
+    try:
+        app = create_app({
+            "MEDIA_ROOT": media_path,
+            "MEDIA_SOURCES": media_sources or None,
+            "DOWNLOAD_SOURCE": normalize_source_id(download_source),
+            "VISION_CONFIG": vision_config,
+            "EMBEDDING_CONFIG": embedding_config,
+        })
+    except ValueError as exc:
+        parser.error(str(exc))
+    bootstrap = app.extensions.get('auth_bootstrap')
+    print("访问认证: 已启用")
+    if bootstrap and bootstrap.generated_password:
+        print("┌────────────────────────────────────────────┐")
+        print("│ 首次启动访问密码                           │")
+        print(f"│ {bootstrap.generated_password:<42} │")
+        print("│ 请保存；可用 tiklocal auth set-password 更改 │")
+        print("└────────────────────────────────────────────┘")
     if getattr(args, 'dev', False):
         # 开发模式：使用Flask内置服务器
         print("⚠️  开发模式已启用（不要在生产环境使用）")

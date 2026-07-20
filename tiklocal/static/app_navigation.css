@@ -62,6 +62,11 @@ body.app-nav-menu-open {
   overflow: hidden;
 }
 
+.floating-dock form,
+.app-nav-menu-list form {
+  display: contents;
+}
+
 /* Shared heading rhythm for utility surfaces. */
 .tool-page {
   min-height: calc(100dvh - 66px - env(safe-area-inset-top)) !important;
