@@ -54,44 +54,6 @@
     align-items: start;
   }
 
-  .more-menu {
-    min-width: 200px;
-    max-width: calc(100vw - 24px);
-    transform-origin: top right;
-  }
-
-  .more-menu[hidden] {
-    display: none !important;
-  }
-
-  .more-menu.is-open {
-    display: block;
-  }
-
-  .more-menu-item {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    color: rgb(55 65 81);
-    text-align: left;
-  }
-
-  .more-menu-item:hover {
-    background: rgb(243 244 246);
-  }
-
-  [data-theme="dark"] .more-menu-item {
-    color: rgb(229 231 235);
-  }
-
-  [data-theme="dark"] .more-menu-item:hover {
-    background: rgb(55 65 81);
-  }
-
   .speed-btn {
     height: 32px;
     border-radius: 999px;
@@ -182,28 +144,29 @@
           <i data-feather="maximize" class="w-5 h-5"></i>
         </button>
 
-        <button id="more-menu-btn" class="material-icon-btn" aria-label="更多操作" type="button" aria-haspopup="menu" aria-expanded="false">
+        <button id="more-menu-btn" class="material-icon-btn" aria-label="更多操作" type="button" aria-haspopup="menu" aria-controls="detail-action-menu" aria-expanded="false">
           <i data-feather="more-vertical" class="w-5 h-5"></i>
         </button>
 
-        <div id="more-menu" class="more-menu absolute right-0 top-full z-50 mt-2 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-800" hidden>
-          <button id="set-thumb-btn" class="more-menu-item" type="button">
+        <div id="detail-action-menu" class="detail-action-menu" role="menu" aria-label="视频操作" hidden>
+          <button id="set-thumb-btn" class="detail-action-item" type="button" role="menuitem">
             <i data-feather="camera" class="w-4 h-4"></i>
-            设当前帧为封面
+            <span>设当前帧为封面</span>
           </button>
-          <button id="copy-link-btn" class="more-menu-item" type="button">
+          <button id="copy-link-btn" class="detail-action-item" type="button" role="menuitem">
             <i data-feather="link" class="w-4 h-4"></i>
-            复制链接
+            <span>复制链接</span>
           </button>
           {% if source_meta and source_meta.url %}
-          <a href="{{ source_meta.url }}" target="_blank" rel="noopener noreferrer" class="more-menu-item">
+          <a href="{{ source_meta.url }}" target="_blank" rel="noopener noreferrer" class="detail-action-item" role="menuitem">
             <i data-feather="external-link" class="w-4 h-4"></i>
-            查看来源
+            <span>查看来源</span>
           </a>
           {% endif %}
-          <button onclick="confirmDelete()" class="more-menu-item text-red-600 dark:text-red-300" type="button">
+          <div class="detail-action-divider" role="separator"></div>
+          <button onclick="confirmDelete()" class="detail-action-item is-danger" type="button" role="menuitem">
             <i data-feather="trash-2" class="w-4 h-4"></i>
-            删除视频
+            <span>删除视频</span>
           </button>
         </div>
       </div>
@@ -225,9 +188,9 @@
         </div>
       </main>
 
-      <aside class="space-y-6 lg:border-l lg:border-gray-200 lg:pl-6 dark:lg:border-gray-800">
+      <aside class="min-w-0 space-y-6 lg:border-l lg:border-gray-200 lg:pl-6 dark:lg:border-gray-800">
         <section>
-          <h1 class="break-words text-xl font-semibold leading-snug text-gray-950 dark:text-white">
+          <h1 class="detail-wrap-anywhere text-xl font-semibold leading-snug text-gray-950 dark:text-white">
             {{ file.rsplit('/', 1)[-1].rsplit('.', 1)[0] }}
           </h1>
         </section>
@@ -239,10 +202,10 @@
             href="{{ source_meta.url }}"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 text-sm font-medium text-gray-800 hover:text-gray-950 dark:text-gray-200 dark:hover:text-white"
+            class="detail-source-link inline-flex items-center gap-2 text-sm font-medium text-gray-800 hover:text-gray-950 dark:text-gray-200 dark:hover:text-white"
           >
             <i data-feather="external-link" class="w-4 h-4"></i>
-            {{ source_meta.source_domain or '查看来源' }}
+            <span>{{ source_meta.source_domain or '查看来源' }}</span>
           </a>
         </section>
         {% endif %}
@@ -306,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const speedBtns = document.querySelectorAll('.speed-btn');
   const setThumbBtn = document.getElementById('set-thumb-btn');
   const moreMenuBtn = document.getElementById('more-menu-btn');
-  const moreMenu = document.getElementById('more-menu');
+  const moreMenu = document.getElementById('detail-action-menu');
   
   const fileName = {{ file|tojson }};
   let isFavorited = false;
@@ -314,7 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeMoreMenu = () => {
     if (!moreMenu || !moreMenuBtn) return;
     moreMenu.hidden = true;
-    moreMenu.classList.remove('is-open');
     moreMenuBtn.setAttribute('aria-expanded', 'false');
   };
 
@@ -322,7 +284,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!moreMenu || !moreMenuBtn) return;
     const nextOpen = moreMenu.hidden;
     moreMenu.hidden = !nextOpen;
-    moreMenu.classList.toggle('is-open', nextOpen);
     moreMenuBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
   };
 
@@ -457,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (moreMenu && !moreMenu.hidden) {
           e.preventDefault();
           closeMoreMenu();
+          moreMenuBtn?.focus();
         }
         break;
       case ' ':

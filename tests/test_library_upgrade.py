@@ -526,6 +526,12 @@ def test_special_chars_in_media_urls_are_encoded(tmp_path, monkeypatch):
     assert 'poster="/thumb?uri=%40default%2Fv%231%2B.mp4"' in video_body
     assert "const fileName = \"@default/v#1+.mp4\";" in video_body
     assert "fetch('/delete/%40default/v%231%2B.mp4', { method: 'POST' })" in video_body
+    assert 'aria-controls="detail-action-menu"' in video_body
+    assert 'id="detail-action-menu" class="detail-action-menu"' in video_body
+    assert 'class="detail-action-item is-danger"' in video_body
+    assert 'class="detail-wrap-anywhere text-xl' in video_body
+    assert "document.getElementById('detail-action-menu')" in video_body
+    assert ".more-menu {" not in video_body
 
     image_detail = local_client.get(f"/image?uri={quote(image_name, safe='')}")
     assert image_detail.status_code == 200
@@ -539,6 +545,15 @@ def test_special_chars_in_media_urls_are_encoded(tmp_path, monkeypatch):
     assert 'id="fullscreen-stage"' in image_body
     assert "fetch('/delete/%40default/a%26b.jpg', { method: 'POST' })" in image_body
     assert "window.location.href = '/library';" in image_body
+    assert 'aria-controls="detail-action-menu"' in image_body
+    assert 'id="detail-action-menu" class="detail-action-menu"' in image_body
+    assert 'id="caption-title" class="detail-wrap-anywhere' in image_body
+    assert "chip.className = 'detail-tag " in image_body
+    assert "document.getElementById('detail-action-menu')" in image_body
+
+    detail_css = local_client.get("/static/output.css").data.decode("utf-8")
+    assert ".detail-action-menu" in detail_css
+    assert ".detail-wrap-anywhere" in detail_css
 
     media_res = local_client.get(f"/media?uri={quote(video_name, safe='')}", follow_redirects=False)
     assert media_res.status_code in {301, 302, 308}
