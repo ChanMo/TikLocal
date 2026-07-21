@@ -539,55 +539,82 @@
     }
   }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='radio.css') }}">
 {% endblock %}
 
 {% block content %}
 <main id="radio-page" class="radio-page" data-radio-root>
-  <section class="signal-stage" aria-label="电台播放器">
-    <button id="btn-play" class="signal-disc" type="button" title="播放" aria-label="播放">
-      <span class="record-surface" aria-hidden="true"></span>
-      <span class="signal-marker"></span>
-      <div id="tuning-dial" class="signal-core">
-        <img id="cover-art" class="cover-art" alt="" decoding="async">
-        <div id="cover-wave" class="signal-bars">
-          <span></span><span></span><span></span><span></span><span></span>
-        </div>
+  <div class="radio-atmosphere" aria-hidden="true">
+    <span class="radio-glow radio-glow-a"></span>
+    <span class="radio-glow radio-glow-b"></span>
+    <span class="radio-grain"></span>
+  </div>
+
+  <div class="radio-layout">
+    <section class="signal-stage" aria-label="电台播放器">
+      <div class="signal-caption" aria-hidden="true">
+        <span>TKL</span><span>RADIO · 24/7</span>
       </div>
-    </button>
-  </section>
+      <button id="btn-play" class="signal-disc" type="button" title="播放" aria-label="播放" aria-pressed="false">
+        <span class="disc-halo" aria-hidden="true"></span>
+        <span class="record-surface" aria-hidden="true"></span>
+        <span class="signal-marker" aria-hidden="true"></span>
+        <span id="tuning-dial" class="signal-core">
+          <img id="cover-art" class="cover-art" alt="" decoding="async">
+          <span id="cover-wave" class="signal-bars" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </span>
+        </span>
+        <span class="play-state" aria-hidden="true">
+          <svg class="play-symbol" viewBox="0 0 24 24"><path d="M8.2 5.7 18 12l-9.8 6.3z"/></svg>
+          <svg class="pause-symbol" viewBox="0 0 24 24"><path d="M7.5 5.5h3.2v13H7.5zm5.8 0h3.2v13h-3.2z"/></svg>
+        </span>
+      </button>
+      <div class="signal-status" aria-hidden="true">
+        <span class="signal-dot"></span><span>ON AIR</span>
+      </div>
+    </section>
 
-  <section class="now-playing" aria-live="polite">
-    <div id="track-title" class="track-title">Radio</div>
-    <div id="track-meta" class="track-meta"></div>
-  </section>
+    <div class="radio-console">
+      <div class="station-chip">
+        <span class="station-pulse" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span id="station-name">默认电台</span>
+      </div>
 
-  <section class="progress-panel" aria-label="播放进度">
-    <input id="progress-bar" type="range" min="0" max="100" value="0" aria-label="播放进度">
-    <div class="time-row">
-      <span id="time-current">0:00</span>
-      <span id="time-total">0:00</span>
+      <section class="now-playing" aria-live="polite">
+        <div class="now-playing-label">NOW PLAYING</div>
+        <div id="track-title" class="track-title">Radio</div>
+        <div id="track-meta" class="track-meta"></div>
+      </section>
+
+      <section class="progress-panel" aria-label="播放进度">
+        <input id="progress-bar" type="range" min="0" max="100" value="0" aria-label="播放进度">
+        <div class="time-row">
+          <span id="time-current">0:00</span>
+          <span id="time-total">0:00</span>
+        </div>
+      </section>
+
+      <section class="radio-controls" aria-label="电台操作">
+        <button id="btn-fav" class="radio-button" type="button" title="收藏" aria-label="收藏" aria-pressed="false">
+          <i data-feather="heart"></i>
+          <span class="sr-only">收藏</span>
+        </button>
+        <button id="btn-next" class="radio-button is-primary" type="button" title="下一首" aria-label="下一首">
+          <i data-feather="skip-forward"></i>
+        </button>
+        <button id="btn-sleep" class="radio-button" type="button" title="定时" aria-label="定时" aria-pressed="false">
+          <i data-feather="moon"></i>
+          <span id="sleep-label" class="sr-only">定时</span>
+        </button>
+      </section>
     </div>
-  </section>
-
-  <section class="radio-controls" aria-label="电台操作">
-    <button id="btn-fav" class="radio-button" type="button" title="收藏" aria-label="收藏">
-      <i data-feather="heart"></i>
-      <span class="sr-only">收藏</span>
-    </button>
-    <button id="btn-next" class="radio-button" type="button" title="下一首" aria-label="下一首">
-      <i data-feather="skip-forward"></i>
-    </button>
-    <button id="btn-sleep" class="radio-button" type="button" title="定时" aria-label="定时">
-      <i data-feather="moon"></i>
-      <span id="sleep-label" class="sr-only">定时</span>
-    </button>
-  </section>
+  </div>
 
   <ul id="upcoming-preview" class="hidden" aria-hidden="true">
     <li></li>
   </ul>
   <ul id="upcoming-list" class="hidden" aria-hidden="true"></ul>
-  <div id="station-name" class="hidden">默认电台</div>
   <div id="station-options" class="hidden"></div>
 </main>
 {% endblock %}

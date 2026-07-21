@@ -52,6 +52,23 @@ def test_radio_stations_are_low_decision_modes(client):
     assert all(station["description"] for station in stations)
 
 
+def test_radio_page_exposes_polished_player_states(client):
+    res = client.get("/radio")
+    body = res.get_data(as_text=True)
+
+    assert res.status_code == 200
+    assert 'radio.css' in body
+    assert 'class="radio-atmosphere"' in body
+    assert 'class="radio-layout"' in body
+    assert 'class="play-state"' in body
+    assert 'id="station-name"' in body
+    assert 'aria-pressed="false"' in body
+
+    css = client.get("/static/radio.css")
+    assert css.status_code == 200
+    assert b"overflow-wrap: anywhere" in css.data
+
+
 def test_radio_tune_returns_playable_tracks(client):
     res = client.get("/api/radio/tune?station=default&limit=4&seed=fixed")
     assert res.status_code == 200

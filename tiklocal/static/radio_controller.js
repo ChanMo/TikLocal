@@ -67,6 +67,7 @@
     });
     audio.addEventListener('play', function () {
       isPlaying = true;
+      setBuffering(false);
       reportTrackPlay();
       updatePlayIcon();
       updateMotion();
@@ -75,6 +76,7 @@
     });
     audio.addEventListener('pause', function () {
       isPlaying = false;
+      setBuffering(false);
       updatePlayIcon();
       updateMotion();
       savePosition();
@@ -82,6 +84,10 @@
       updateMediaPosition();
     });
     audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('loadstart', function () { setBuffering(true); });
+    audio.addEventListener('waiting', function () { setBuffering(true); });
+    audio.addEventListener('canplay', function () { setBuffering(false); });
+    audio.addEventListener('playing', function () { setBuffering(false); });
     audio.addEventListener('loadedmetadata', function () {
       restoreSavedTimeOnce();
       onTimeUpdate();
@@ -188,7 +194,7 @@
     if (!track) {
       audio.removeAttribute('src');
       clearTrackInfoTimers();
-      els.radioPage.classList.remove('is-changing-track');
+      els.radioPage.classList.remove('is-changing-track', 'is-buffering', 'has-error');
       setTrackInfo('暂无音频', '');
       updateSignalArt(null);
       updateFavorite();
@@ -196,6 +202,8 @@
       return;
     }
 
+    els.radioPage.classList.remove('has-error');
+    setBuffering(true);
     audio.src = track.media_url;
     trackPlayReportedFor = '';
     trackExitReportedFor = '';
@@ -300,6 +308,7 @@
       els.sleepLabel = document.getElementById('sleep-label');
       els.btnSleep.style.color = '';
       els.btnSleep.classList.remove('is-active');
+      els.btnSleep.setAttribute('aria-pressed', 'false');
       els.btnSleep.setAttribute('aria-label', '定时');
       els.btnSleep.setAttribute('title', '定时');
       return;
@@ -309,6 +318,7 @@
     els.sleepLabel = document.getElementById('sleep-label');
     els.btnSleep.style.color = 'var(--radio-accent)';
     els.btnSleep.classList.add('is-active');
+    els.btnSleep.setAttribute('aria-pressed', 'true');
     els.btnSleep.setAttribute('aria-label', minutes + ' 分钟后停止');
     els.btnSleep.setAttribute('title', minutes + ' 分钟后停止');
   }
@@ -359,10 +369,16 @@
   function updatePlayIcon() {
     els.btnPlay.setAttribute('aria-label', isPlaying ? '暂停' : '播放');
     els.btnPlay.setAttribute('title', isPlaying ? '暂停' : '播放');
+    els.btnPlay.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
   }
 
   function updateMotion() {
     els.radioPage.classList.toggle('is-playing', isPlaying);
+  }
+
+  function setBuffering(active) {
+    if (!els.radioPage) return;
+    els.radioPage.classList.toggle('is-buffering', Boolean(active));
   }
 
   function updateFavorite() {
@@ -370,6 +386,7 @@
     els.btnFav.innerHTML = (active ? ICONS.heartFilled : ICONS.heart) + '<span class="sr-only">' + (active ? '已收藏' : '收藏') + '</span>';
     els.btnFav.classList.toggle('is-active', active);
     els.btnFav.style.color = active ? 'var(--radio-accent)' : '';
+    els.btnFav.setAttribute('aria-pressed', active ? 'true' : 'false');
     els.btnFav.setAttribute('aria-label', active ? '取消收藏' : '收藏');
     els.btnFav.setAttribute('title', active ? '取消收藏' : '收藏');
   }
@@ -511,13 +528,17 @@
     els.btnPlay.style.setProperty('--radio-art-a', colors[0]);
     els.btnPlay.style.setProperty('--radio-art-b', colors[1]);
     els.btnPlay.style.setProperty('--radio-art-c', colors[2]);
+    els.radioPage.style.setProperty('--radio-art-a', colors[0]);
+    els.radioPage.style.setProperty('--radio-art-b', colors[1]);
+    els.radioPage.style.setProperty('--radio-art-c', colors[2]);
 
     artLoadToken += 1;
     var token = artLoadToken;
     els.btnPlay.classList.remove('has-cover');
     els.btnPlay.classList.add('no-cover');
 
-    if (!track || !track.thumb_url || !els.coverArt) {
+    var artworkUrl = track && (track.artwork_url || track.thumb_url);
+    if (!artworkUrl || !els.coverArt) {
       clearCoverArt();
       return;
     }
@@ -535,8 +556,8 @@
       if (token !== artLoadToken) return;
       clearCoverArt();
     };
-    els.coverArt.src = track.thumb_url
-      + (track.thumb_url.indexOf('?') >= 0 ? '&' : '?')
+    els.coverArt.src = artworkUrl
+      + (artworkUrl.indexOf('?') >= 0 ? '&' : '?')
       + 'v=' + encodeURIComponent(track.name || '');
   }
 
@@ -573,6 +594,8 @@
       console.error('Radio load failed:', error);
     }
     els.trackTitle.textContent = '加载失败';
+    els.radioPage.classList.add('has-error');
+    setBuffering(false);
     if (els.trackMeta) {
       els.trackMeta.textContent = '';
       els.trackMeta.classList.remove('has-meta');
