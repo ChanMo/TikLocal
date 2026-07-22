@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.8.35 (2026-07-22)
+- 新增可安装 Web App：提供实例专属 Manifest、运行时生成的 180/192/512 图标、独立窗口元数据，以及设置页安装入口与 iOS/浏览器差异化指引。
+- 新增 `tiklocal tls init/status/renew/trust` 与 `tiklocal --https`：使用独立本地 CA 自动覆盖主机名和局域网 IP、临期续签服务器证书，在服务端 Mac 写入当前用户信任，并支持 `--tls-cert/--tls-key` 自备证书。
+- HTTPS 模式使用 Cheroot 原生 TLS WSGI 服务，HTTP 模式继续使用 Waitress；安全会话 Cookie 会随内置 HTTPS 自动启用。
+- 新增公开 `/install` 安装诊断与根证书下载页，准确区分证书未信任、Safari 系统菜单、iOS 分享菜单和 Chromium 等待安装条件等状态。
+- 注册最小权限 Service Worker，仅缓存带版本号的公共静态资源与应用图标；HTML、API、缩略图和原始媒体不进入离线缓存并保持视频 Range 请求。
+- 修复安装页在旧服务进程与新模板并存时因 DER 证书路由尚未加载而返回 500 的问题。
+- 新增 PWA、缓存边界、本地证书复用、CLI 状态与 HTTPS Range 回归测试。
+
 ## v0.8.34 (2026-07-21)
 - Radio 重塑为编辑感唱片电台：新增动态曲目氛围背景、黑胶纹理、ON AIR 指示与更清晰的播放/暂停反馈。
 - 桌面端升级为唱片舞台与播放控制台双栏布局，移动端保持紧凑单列，并完善短屏、深色模式与减少动态效果适配。
