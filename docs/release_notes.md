@@ -1,5 +1,11 @@
 # Release Notes
 
+## v0.8.36 (2026-07-22)
+- 修复 Android/Termux 安装因 `cryptography` 缺少 Android wheel、回退到本地 Rust/OpenSSL 编译而失败的问题：基础安装不再依赖或提前导入 `cryptography`。
+- 自动生成与维护本地 HTTPS 证书改为可选能力，通过 `pip install 'TikLocal[https]'` 安装；缺少依赖时 CLI 会给出明确修复命令。
+- 普通 HTTP 与自备 `--tls-cert/--tls-key` 证书继续使用基础安装；CI 仍安装全部可选依赖，保留自动证书、CA 下载和 HTTPS Range 请求的完整回归覆盖。
+- 补充 Android/Termux 同机访问建议：默认使用 `http://127.0.0.1:8000`，无需离线媒体或证书编译成本。
+
 ## v0.8.35 (2026-07-22)
 - 新增可安装 Web App：提供实例专属 Manifest、运行时生成的 180/192/512 图标、独立窗口元数据，以及设置页安装入口与 iOS/浏览器差异化指引。
 - 新增 `tiklocal tls init/status/renew/trust` 与 `tiklocal --https`：使用独立本地 CA 自动覆盖主机名和局域网 IP、临期续签服务器证书，在服务端 Mac 写入当前用户信任，并支持 `--tls-cert/--tls-key` 自备证书。
