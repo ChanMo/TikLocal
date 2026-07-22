@@ -105,7 +105,15 @@ def configure_auth(app, auth_store, *, enabled: bool) -> None:
 
     @app.before_request
     def enforce_authentication():
-        if request.endpoint == 'static':
+        if request.endpoint in {
+            'static',
+            'pwa_manifest',
+            'pwa_icon',
+            'pwa_service_worker',
+            'pwa_install_guide',
+            'pwa_ca_certificate',
+            'pwa_ca_certificate_der',
+        }:
             return None
         if request.endpoint == 'login_view':
             if request.method in UNSAFE_METHODS and not csrf_is_valid():

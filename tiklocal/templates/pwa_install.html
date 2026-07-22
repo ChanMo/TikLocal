@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171815">
+  <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('pwa_icon', size=180) }}">
+  <script src="{{ static_asset('pwa_install.js') }}"></script>
+  <title>安装 TikLocal · {{ instance_name }}</title>
+  <style>
+    :root { color-scheme: light dark; --paper:#eeeae1; --ink:#1b1c18; --muted:rgba(27,28,24,.58); --line:rgba(27,28,24,.13); --night:#171815; --acid:#d9ff52; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100dvh; color:var(--ink); background:var(--paper); font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { width:min(760px,calc(100% - 32px)); margin:0 auto; padding:max(44px,env(safe-area-inset-top)) 0 max(56px,env(safe-area-inset-bottom)); }
+    .brand { display:flex; align-items:center; gap:12px; color:var(--muted); font-size:12px; font-weight:700; }
+    .brand img { width:38px; height:38px; border-radius:11px; }
+    h1 { max-width:650px; margin:54px 0 14px; font-family:ui-serif,"Iowan Old Style","Songti SC",serif; font-size:clamp(42px,8vw,74px); font-weight:500; letter-spacing:-.06em; line-height:.98; }
+    .lead { max-width:610px; margin:0 0 34px; color:var(--muted); font-size:14px; line-height:1.8; }
+    .status { display:flex; align-items:center; gap:9px; margin-bottom:16px; padding:13px 15px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.3); font-size:12px; line-height:1.55; }
+    .status::before { content:""; width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#b87835; }
+    .status.is-ready::before { background:#5b8d49; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .card { padding:22px; border:1px solid var(--line); border-radius:18px; background:rgba(255,255,255,.34); }
+    .card h2 { margin:0 0 10px; font-size:15px; }
+    .card p,.card li { color:var(--muted); font-size:12px; line-height:1.7; }
+    .card ol { margin:0; padding-left:19px; }
+    .action { display:inline-flex; min-height:42px; align-items:center; justify-content:center; margin-top:15px; padding:0 16px; border:1px solid var(--night); border-radius:999px; color:#fff; background:var(--night); font-size:12px; font-weight:700; text-decoration:none; cursor:pointer; }
+    .action.secondary { color:var(--ink); background:transparent; border-color:var(--line); }
+    code { overflow-wrap:anywhere; font:10px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .foot { margin-top:22px; color:var(--muted); font-size:11px; line-height:1.7; }
+    @media (prefers-color-scheme:dark) { :root { --paper:#171815; --ink:#eeeae1; --muted:rgba(238,234,225,.58); --line:rgba(238,234,225,.14); --night:#eeeae1; } .card,.status { background:rgba(255,255,255,.035); } .action { color:#171815; } .action.secondary { color:var(--ink); } }
+    @media (max-width:640px) { .grid { grid-template-columns:1fr; } h1 { margin-top:42px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><img src="{{ url_for('pwa_icon', size=192) }}" alt=""><span>TikLocal · {{ instance_name }}</span></div>
+    <h1>把私有媒体库<br>装到这台设备。</h1>
+    <p class="lead">安装只创建应用入口并缓存公共界面资源。原始视频、音频、图片、API 和登录页面不会离线保存。</p>
+    <div id="install-status" class="status">正在检查浏览器和安全连接…</div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Safari（Mac）</h2>
+        <ol><li>确认地址栏没有证书警告。</li><li>打开菜单“文件”。</li><li>选择“添加到程序坞”。</li></ol>
+      </section>
+      <section class="card">
+        <h2>Chrome / Edge</h2>
+        <ol><li>确认地址栏没有证书警告。</li><li>点击页面并停留约 30 秒。</li><li>点击下方按钮，或从浏览器菜单安装。</li></ol>
+        <button id="direct-install" class="action" type="button" disabled>等待安装条件</button>
+      </section>
+      <section class="card">
+        <h2>iPhone / iPad</h2>
+        <ol><li>下载并安装下方 <code>.cer</code> 描述文件。</li><li>在“设置 → 通用 → 关于本机 → 证书信任设置”中启用完全信任。</li><li>重开浏览器，从分享菜单选择“添加到主屏幕”。</li></ol>
+      </section>
+      <section class="card">
+        <h2>信任本地证书</h2>
+        {% if local_ca_available %}
+          <p>只安装公开根证书，不要复制服务器上的 <code>ca-key.pem</code>。</p>
+          <a class="action secondary" href="/install/ca.cer">下载根证书 (.cer)</a>
+          <p>Mac 下载后双击导入钥匙串并设为“始终信任”；其他系统也可使用 <a href="{{ url_for('pwa_ca_certificate') }}">PEM 格式</a>。</p>
+          {% if ca_fingerprint %}<p><code>SHA-256 {{ ca_fingerprint }}</code></p>{% endif %}
+        {% elif https_enabled %}
+          <p>当前使用自备 HTTPS 证书；请确认它已经被这台设备信任。</p>
+        {% else %}
+          <p>当前服务未启用内置 HTTPS。请使用 <code>tiklocal /path --https</code> 启动。</p>
+        {% endif %}
+      </section>
+    </div>
+    <p class="foot">在运行 TikLocal 的 Mac 上可执行 <code>tiklocal tls trust</code>。其他设备仍需下载并手动信任根证书，然后完全重启浏览器。</p>
+  </main>
+  <script>
+    (() => {
+      const statusNode = document.getElementById('install-status');
+      const button = document.getElementById('direct-install');
+      function render(status = window.TikLocalPWA?.status?.() || {}) {
+        const messages = {
+          installed: 'TikLocal 已作为独立应用运行。',
+          ready: '安全连接和浏览器安装条件均已满足，可以直接安装。',
+          'untrusted-certificate': '当前 HTTPS 证书未被设备信任，请先安装下方根证书并重启浏览器。',
+          'insecure-http': '当前不是 HTTPS，局域网设备无法获得完整安装能力。',
+          'safari-menu': '安全连接正常。Safari 请使用“文件 → 添加到程序坞”。',
+          'share-menu': '安全连接正常。请使用分享菜单中的“添加到主屏幕”。',
+          'chromium-waiting': '安全连接正常。Chrome 正在等待用户交互或浏览时长条件。',
+          manual: '安全连接正常，请使用浏览器菜单创建应用入口。',
+        };
+        statusNode.textContent = messages[status.reason] || messages.manual;
+        statusNode.classList.toggle('is-ready', status.secure);
+        button.disabled = !status.canPrompt;
+        button.textContent = status.canPrompt ? '安装 TikLocal' : '等待安装条件';
+      }
+      window.addEventListener('tiklocal:pwa-status', (event) => render(event.detail));
+      button.addEventListener('click', async () => {
+        const result = await window.TikLocalPWA?.install?.();
+        if (result?.outcome === 'accepted') button.textContent = '正在安装…';
+        render();
+      });
+      render();
+    })();
+  </script>
+</body>
+</html>

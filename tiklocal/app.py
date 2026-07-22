@@ -2,12 +2,17 @@ import os
 import io
 import random
 import datetime
+import json
+import socket
+from functools import lru_cache
 from urllib.parse import quote, unquote
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 
-from flask import Flask, render_template, request, redirect, send_file
+from flask import Flask, render_template, request, redirect, send_file, url_for
 from PIL import Image, ImageDraw
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 
 # Service Imports
 from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS, AUDIO_EXTENSIONS, build_media_sources
@@ -102,6 +107,31 @@ def get_app_version():
 
 app_version = get_app_version()
 
+
+@lru_cache(maxsize=4)
+def _pwa_icon_bytes(size: int) -> bytes:
+    """Render the small, dependency-free TikLocal app mark."""
+    image = Image.new('RGB', (size, size), '#171815')
+    draw = ImageDraw.Draw(image)
+    unit = size / 100
+    draw.rounded_rectangle(
+        (8 * unit, 8 * unit, 92 * unit, 92 * unit),
+        radius=22 * unit,
+        fill='#20211d',
+        outline='#35372f',
+        width=max(1, round(1.2 * unit)),
+    )
+    cream = '#f1ede2'
+    accent = '#d9ff52'
+    draw.rounded_rectangle((23 * unit, 28 * unit, 55 * unit, 37 * unit), radius=4 * unit, fill=cream)
+    draw.rounded_rectangle((34.5 * unit, 28 * unit, 43.5 * unit, 72 * unit), radius=4 * unit, fill=cream)
+    draw.rounded_rectangle((58 * unit, 36 * unit, 67 * unit, 72 * unit), radius=4 * unit, fill=cream)
+    draw.rounded_rectangle((58 * unit, 63 * unit, 79 * unit, 72 * unit), radius=4 * unit, fill=cream)
+    draw.ellipse((69 * unit, 25 * unit, 79 * unit, 35 * unit), fill=accent)
+    output = io.BytesIO()
+    image.save(output, format='PNG', optimize=True)
+    return output.getvalue()
+
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
@@ -114,11 +144,23 @@ def create_app(test_config=None):
         VECTOR_INDEX = None,
         AUTH_ENABLED = None,
         AUTH_COOKIE_SECURE = False,
+        INSTANCE_NAME = None,
+        HTTPS_ENABLED = False,
+        TLS_CA_CERT_PATH = None,
+        TLS_CA_FINGERPRINT = None,
     )
     app.config.from_pyfile('config.py', silent=True)
     app.config.from_prefixed_env()
     if test_config is not None:
         app.config.update(test_config)
+
+    instance_name = str(
+        app.config.get('INSTANCE_NAME')
+        or os.environ.get('TIKLOCAL_NAME')
+        or socket.gethostname()
+        or 'Local'
+    ).strip()[:48] or 'Local'
+    app.config['INSTANCE_NAME'] = instance_name
     try:
         os.makedirs(app.instance_path)
     except OSError:
@@ -132,6 +174,42 @@ def create_app(test_config=None):
         bootstrap = auth_store.ensure(os.environ.get('TIKLOCAL_AUTH_PASSWORD'))
     configure_auth(app, auth_store, enabled=auth_enabled)
     app.extensions['auth_bootstrap'] = bootstrap
+
+    @app.template_global()
+    def static_asset(filename: str) -> str:
+        return url_for('static', filename=filename, v=app_version)
+
+    @app.context_processor
+    def app_identity_context():
+        return {
+            'app_version': app_version,
+            'instance_name': instance_name,
+        }
+
+    @app.after_request
+    def apply_cache_policy(response):
+        endpoint = request.endpoint or ''
+        if endpoint == 'static':
+            if request.args.get('v') == app_version:
+                response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+            else:
+                response.headers['Cache-Control'] = 'public, max-age=0, must-revalidate'
+        elif endpoint in {'pwa_manifest', 'pwa_icon'}:
+            response.headers['Cache-Control'] = 'public, max-age=86400'
+        elif endpoint == 'pwa_service_worker':
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Service-Worker-Allowed'] = '/'
+        elif endpoint == 'pwa_ca_certificate':
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+        elif request.path.startswith('/api/'):
+            response.headers['Cache-Control'] = 'private, no-store'
+        elif request.path.startswith('/media'):
+            response.headers['Cache-Control'] = 'private, no-cache'
+        elif request.path == '/thumb':
+            response.headers['Cache-Control'] = 'private, max-age=3600, must-revalidate'
+        elif response.mimetype == 'text/html':
+            response.headers['Cache-Control'] = 'private, no-cache'
+        return response
 
     # Initialize Services
     media_sources = build_media_sources(app.config['MEDIA_ROOT'], app.config.get('MEDIA_SOURCES'))
@@ -544,6 +622,85 @@ def create_app(test_config=None):
 
 
     # --- Web Routes ---
+    @app.get('/app.webmanifest')
+    def pwa_manifest():
+        manifest = {
+            'id': '/',
+            'name': f'TikLocal · {instance_name}',
+            'short_name': f'TL · {instance_name[:12]}',
+            'description': '你的内网私有媒体库',
+            'start_url': '/',
+            'scope': '/',
+            'display': 'standalone',
+            'background_color': '#171815',
+            'theme_color': '#171815',
+            'icons': [
+                {'src': '/pwa/icon-192.png', 'sizes': '192x192', 'type': 'image/png', 'purpose': 'any'},
+                {'src': '/pwa/icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'any maskable'},
+            ],
+            'shortcuts': [
+                {'name': 'Flow', 'short_name': 'Flow', 'url': '/flow'},
+                {'name': '媒体库', 'short_name': '媒体库', 'url': '/library'},
+                {'name': 'Radio', 'short_name': 'Radio', 'url': '/radio'},
+            ],
+        }
+        return app.response_class(
+            json.dumps(manifest, ensure_ascii=False),
+            mimetype='application/manifest+json',
+        )
+
+    @app.get('/pwa/icon-<int:size>.png')
+    def pwa_icon(size):
+        if size not in {180, 192, 512}:
+            return 'Not found', 404
+        return send_file(
+            io.BytesIO(_pwa_icon_bytes(size)),
+            mimetype='image/png',
+            download_name=f'tiklocal-{size}.png',
+        )
+
+    @app.get('/service-worker.js')
+    def pwa_service_worker():
+        return send_file(
+            Path(app.static_folder) / 'service_worker.js',
+            mimetype='application/javascript',
+        )
+
+    @app.get('/install')
+    def pwa_install_guide():
+        ca_path = app.config.get('TLS_CA_CERT_PATH')
+        return render_template(
+            'pwa_install.html',
+            local_ca_available=bool(ca_path and Path(ca_path).is_file()),
+            ca_fingerprint=app.config.get('TLS_CA_FINGERPRINT'),
+            https_enabled=bool(app.config.get('HTTPS_ENABLED')),
+        )
+
+    @app.get('/install/ca.pem')
+    def pwa_ca_certificate():
+        ca_path = app.config.get('TLS_CA_CERT_PATH')
+        if not ca_path or not Path(ca_path).is_file():
+            return 'TikLocal local CA is not available', 404
+        return send_file(
+            Path(ca_path),
+            mimetype='application/x-pem-file',
+            as_attachment=True,
+            download_name='tiklocal-ca.pem',
+        )
+
+    @app.get('/install/ca.cer')
+    def pwa_ca_certificate_der():
+        ca_path = app.config.get('TLS_CA_CERT_PATH')
+        if not ca_path or not Path(ca_path).is_file():
+            return 'TikLocal local CA is not available', 404
+        certificate = x509.load_pem_x509_certificate(Path(ca_path).read_bytes())
+        return send_file(
+            io.BytesIO(certificate.public_bytes(serialization.Encoding.DER)),
+            mimetype='application/pkix-cert',
+            as_attachment=True,
+            download_name='tiklocal-ca.cer',
+        )
+
     @app.route('/')
     def home_view():
         """Quiet launchpad for the local media library."""

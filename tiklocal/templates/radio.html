@@ -539,7 +539,7 @@
     }
   }
 </style>
-<link rel="stylesheet" href="{{ url_for('static', filename='radio.css') }}">
+<link rel="stylesheet" href="{{ static_asset('radio.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -620,5 +620,5 @@
 {% endblock %}
 
 {% block extra_body %}
-<script src="{{ url_for('static', filename='radio_controller.js') }}"></script>
+<script src="{{ static_asset('radio_controller.js') }}"></script>
 {% endblock %}

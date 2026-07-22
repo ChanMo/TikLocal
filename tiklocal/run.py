@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import getpass
+import datetime
 from pathlib import Path
 from waitress import serve
 from tiklocal.app import create_app
@@ -9,6 +10,12 @@ from tiklocal.thumbs import generate_thumbnails
 from tiklocal.paths import get_data_dir, get_database_path
 from tiklocal.paths import get_auth_path
 from tiklocal.services.auth import AuthStore
+from tiklocal.services.tls import (
+    ensure_tls_material,
+    local_ca_is_installed,
+    read_tls_material,
+    trust_local_ca,
+)
 from tiklocal.services import LibraryService, build_media_sources, normalize_source_id
 from tiklocal.services.embedding import (
     ImageVectorService,
@@ -315,6 +322,35 @@ def run_analyze_similar(config, args, parser):
     print(f"  saved groups: {saved}")
 
 
+def _print_tls_status(material) -> None:
+    expired = material.expires_at <= datetime.datetime.now(datetime.timezone.utc)
+    state = '已过期' if expired else ('已新建' if material.cert_created else '有效')
+    print(f'HTTPS 证书: {state}')
+    print(f'服务器证书: {material.cert_path}')
+    print(f'服务器私钥: {material.key_path}')
+    print(f'根证书: {material.ca_cert_path}')
+    print(f'有效期至: {material.expires_at.astimezone().isoformat(timespec="seconds")}')
+    print(f'主机名: {", ".join(material.hostnames)}')
+    print(f'IP 地址: {", ".join(material.ip_addresses)}')
+    print(f'CA SHA-256: {material.ca_fingerprint}')
+    installed = local_ca_is_installed(material.ca_cert_path)
+    if installed is not None:
+        print(f'本机钥匙串: {"已安装" if installed else "未安装（运行 tiklocal tls trust）"}')
+    print('提示: 只把根证书 ca.pem 安装到访问设备；不要复制 ca-key.pem。')
+
+
+def _serve_https(app, host, port, cert_path, key_path) -> None:
+    from cheroot.ssl.builtin import BuiltinSSLAdapter
+    from cheroot.wsgi import Server
+
+    server = Server((str(host), int(port)), app, server_name='TikLocal')
+    server.ssl_adapter = BuiltinSSLAdapter(str(cert_path), str(key_path))
+    try:
+        server.start()
+    except KeyboardInterrupt:
+        server.stop()
+
+
 def main():
     # 读取配置文件
     config = load_config()
@@ -332,7 +368,7 @@ def main():
             if idx != 0:
                 argv.pop(idx)
                 argv.insert(0, 'thumbs')
-        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize', 'analyze-similar', 'auth'):
+        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize', 'analyze-similar', 'auth', 'tls'):
             # 默认回退 serve（空参数或第一个不是已知子命令）
             argv.insert(0, 'serve')
 
@@ -352,6 +388,8 @@ def main():
   tiklocal vectorize /path --limit 200     # 按最新时间向量化前 200 张
   tiklocal analyze-similar /path --yes     # 预生成相似图片组
   tiklocal auth set-password               # 设置新的访问密码
+  tiklocal tls init                         # 生成本机 HTTPS 证书
+  tiklocal /path --https                    # 通过 HTTPS 启动
         '''
     )
 
@@ -361,14 +399,25 @@ def main():
     serve_parser = subparsers.add_parser('serve', help='启动服务器')
     serve_parser.add_argument('media_root', nargs='?', help='媒体文件根目录路径')
     serve_parser.add_argument('--host', default=None, help='服务器监听地址 (默认: 0.0.0.0)')
-    serve_parser.add_argument('--port', type=int, default=None, help='服务器端口 (默认: 8000)')
+    serve_parser.add_argument('--port', type=int, default=None, help='服务器端口 (HTTP 默认 8000，HTTPS 默认 8443)')
     serve_parser.add_argument('--dev', action='store_true', help='开发模式（启用热重载和调试）')
+    serve_parser.add_argument('--https', action='store_true', help='启用内置 HTTPS，自动维护本机证书')
+    serve_parser.add_argument('--tls-cert', default=None, help='使用自备 TLS 证书文件')
+    serve_parser.add_argument('--tls-key', default=None, help='使用自备 TLS 私钥文件')
+    serve_parser.add_argument('--hostname', action='append', default=None,
+                              help='加入自动证书的主机名，可重复')
+    serve_parser.add_argument('--name', default=None, help='当前实例在安装界面显示的名称')
     serve_parser.add_argument('--media-source', action='append', type=parse_cli_media_source,
                               help='添加媒体源，格式 id=/path/to/media，可重复')
     serve_parser.add_argument('--download-source', default=None, help='下载保存到的媒体源 id')
 
     auth_parser = subparsers.add_parser('auth', help='管理访问认证')
     auth_parser.add_argument('action', choices=['set-password', 'status'], help='认证操作')
+
+    tls_parser = subparsers.add_parser('tls', help='管理本机 HTTPS 证书')
+    tls_parser.add_argument('action', choices=['init', 'status', 'renew', 'trust'], help='证书操作')
+    tls_parser.add_argument('--hostname', action='append', default=None,
+                            help='加入服务器证书的主机名，可重复')
 
     # thumbs 子命令
     thumbs_parser = subparsers.add_parser('thumbs', help='批量生成视频缩略图')
@@ -508,10 +557,36 @@ def main():
         print('访问密码已更新，所有已登录设备需要重新登录。')
         return
 
+    if cmd == 'tls':
+        if args.action == 'status':
+            material = read_tls_material()
+            if material is None:
+                print('HTTPS 证书: 尚未初始化')
+                print('运行 tiklocal tls init 生成本机证书。')
+                return
+        else:
+            material = ensure_tls_material(
+                extra_hostnames=args.hostname or (),
+                force_renew=args.action == 'renew',
+            )
+        _print_tls_status(material)
+        if args.action == 'trust':
+            try:
+                keychain = trust_local_ca(material.ca_cert_path)
+            except RuntimeError as exc:
+                parser.error(str(exc))
+            print(f'根证书已信任: {keychain}')
+            print('请完全退出并重新打开 Safari 和 Chrome。')
+        return
+
     # serve 路径
     media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
     host = args.host or os.environ.get('TIKLOCAL_HOST') or config.get('host', '0.0.0.0')
-    port = args.port or int(os.environ.get('TIKLOCAL_PORT', 0)) or config.get('port', 8000)
+    configured_cert = args.tls_cert or config.get('tls_cert')
+    configured_key = args.tls_key or config.get('tls_key')
+    https_enabled = bool(args.https or config.get('https') or configured_cert or configured_key)
+    configured_port = int(os.environ.get('TIKLOCAL_PORT', 0)) or config.get('port')
+    port = args.port or configured_port or (8443 if https_enabled else 8000)
     media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
     download_source = args.download_source or config.get('download_source') or 'default'
     vision_config = config.get('vision') or config.get('vision_config') or None
@@ -566,7 +641,34 @@ def main():
     else:
         print(f"媒体目录: {media_path.absolute()}")
     print(f"数据目录: {get_data_dir()}")
-    print(f"访问地址: http://{host}:{port}")
+    tls_material = None
+    tls_cert_path = None
+    tls_key_path = None
+    if bool(configured_cert) != bool(configured_key):
+        parser.error('--tls-cert 与 --tls-key 必须同时提供')
+    if configured_cert and configured_key:
+        tls_cert_path = Path(str(configured_cert)).expanduser()
+        tls_key_path = Path(str(configured_key)).expanduser()
+        if not tls_cert_path.is_file() or not tls_key_path.is_file():
+            parser.error('指定的 TLS 证书或私钥文件不存在')
+    elif https_enabled:
+        configured_hostnames = args.hostname or config.get('hostnames') or []
+        if isinstance(configured_hostnames, str):
+            configured_hostnames = [configured_hostnames]
+        tls_material = ensure_tls_material(extra_hostnames=configured_hostnames)
+        tls_cert_path = tls_material.cert_path
+        tls_key_path = tls_material.key_path
+
+    scheme = 'https' if https_enabled else 'http'
+    print(f"访问地址: {scheme}://{host}:{port}")
+    if tls_material:
+        preferred_names = [name for name in tls_material.hostnames if name != 'localhost']
+        for name in preferred_names:
+            print(f"局域网入口: https://{name}:{port}")
+        if tls_material.ca_created:
+            print('已创建 TikLocal 本地 CA；其他设备首次访问前需要信任根证书。')
+        print(f"根证书: {tls_material.ca_cert_path}")
+        print(f"CA 指纹: {tls_material.ca_fingerprint}")
 
     try:
         app = create_app({
@@ -575,6 +677,11 @@ def main():
             "DOWNLOAD_SOURCE": normalize_source_id(download_source),
             "VISION_CONFIG": vision_config,
             "EMBEDDING_CONFIG": embedding_config,
+            "INSTANCE_NAME": args.name or config.get('name') or os.environ.get('TIKLOCAL_NAME'),
+            "AUTH_COOKIE_SECURE": https_enabled,
+            "HTTPS_ENABLED": https_enabled,
+            "TLS_CA_CERT_PATH": str(tls_material.ca_cert_path) if tls_material else None,
+            "TLS_CA_FINGERPRINT": tls_material.ca_fingerprint if tls_material else None,
         })
     except ValueError as exc:
         parser.error(str(exc))
@@ -589,7 +696,10 @@ def main():
     if getattr(args, 'dev', False):
         # 开发模式：使用Flask内置服务器
         print("⚠️  开发模式已启用（不要在生产环境使用）")
-        app.run(host=host, port=port, debug=True, use_reloader=True)
+        ssl_context = (str(tls_cert_path), str(tls_key_path)) if https_enabled else None
+        app.run(host=host, port=port, debug=True, use_reloader=True, ssl_context=ssl_context)
+    elif https_enabled:
+        _serve_https(app, host, port, tls_cert_path, tls_key_path)
     else:
         # 生产模式：使用Waitress
         serve(app, host=host, port=port)

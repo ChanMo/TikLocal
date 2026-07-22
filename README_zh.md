@@ -56,6 +56,22 @@ tiklocal --port 9000              # 使用自定义端口
 tiklocal --media-source photos=~/Pictures/AI  # 追加媒体源，可重复
 ```
 
+**安装到主屏幕与 HTTPS：**
+
+TikLocal 提供 Web App Manifest、实例专属名称与图标，可从设置页安装到手机、平板或桌面。Chrome/Edge 等浏览器通常要求可信 HTTPS；域名不是必需的，可以直接使用设备的稳定局域网主机名。
+
+```bash
+tiklocal ~/Videos --https --name "书房 Mac"       # 自动维护本机 HTTPS 证书，默认端口 8443
+tiklocal tls trust                                # 在服务端 Mac 信任 TikLocal CA
+tiklocal tls status                               # 查看证书、主机名和 CA 指纹
+tiklocal tls renew --hostname studio-mac.local    # 添加稳定主机名并更新服务器证书
+tiklocal ~/Videos --tls-cert cert.pem --tls-key key.pem  # 使用已有证书
+```
+
+自动 HTTPS 会在 `~/.tiklocal/tls/` 创建 TikLocal 专用本地 CA，并在主机名、局域网 IP 或证书临近过期时自动更新服务器证书。在服务端 Mac 上，`tiklocal tls trust` 会把 CA 加入当前用户的登录钥匙串。其他设备首次访问前仍须手动信任 CA；`/install` 提供 Apple 更易识别的 `.cer`、PEM 备用格式、指纹与分平台步骤。不要复制或安装 `ca-key.pem`。每台服务器默认拥有独立 CA，因此多个 TikLocal 实例需要分别信任。`--hostname` 只把名称加入证书，不会修改 DNS；请确认路由器、mDNS/Bonjour 或本机 DNS 能解析该名称。
+
+一期只注册边界严格的 Service Worker，缓存带版本号的公共界面资源和应用图标；动态页面、API、缩略图与原始媒体均不进入离线缓存，保持私有并保留浏览器原生 Range 行为。Safari 使用“文件 → 添加到程序坞”，Chromium 仅在满足安装条件后显示可执行的直接安装按钮。
+
 **访问认证：**
 
 认证默认启用。首次启动时，TikLocal 会在终端打印自动生成的访问密码。所有页面、API、媒体文件和管理操作都需要先登录；登录后可使用全部功能。
@@ -149,6 +165,11 @@ media_sources:
     name: 图片库
     path: ~/Pictures/AI
 download_source: default
+name: 书房 Mac
+https: true
+port: 8443
+hostnames:
+  - studio-mac.local
 
 vision:
   enabled: true

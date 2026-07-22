@@ -186,7 +186,7 @@ def test_flow_uses_unified_immersive_model(client):
     assert 'id="collection-modal"' in body
     assert 'id="app-nav-menu-trigger"' in body
     assert 'id="app-nav-menu"' in body
-    assert 'href="/static/app_navigation.css"' in body
+    assert 'href="/static/app_navigation.css?v=' in body
     assert 'class="mobile-mode-link is-active"' in body
     assert '>Flow</a>' in body
     assert '>Radio</a>' in body
@@ -212,7 +212,7 @@ def test_home_is_a_media_launchpad(client):
     assert res.status_code == 200
     body = res.data.decode("utf-8")
     assert 'data-nav-context="home"' in body
-    assert 'href="/static/home.css"' in body
+    assert 'href="/static/home.css?v=' in body
     assert 'home_page_controller.js' in body
     assert 'id="home-title"' in body
     assert 'href="/flow"' in body

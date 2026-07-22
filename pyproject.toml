@@ -16,6 +16,8 @@ tiklocal = 'tiklocal.run:main'
 python = ">=3.10,<4.0"
 flask = "^3.1.0"
 waitress = "^3.0.2"
+cheroot = "^11.1.2"
+cryptography = "^49.0.0"
 pyyaml = "^6.0"
 requests = "^2.32.0"
 pillow = "^11.0.0"

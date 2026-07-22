@@ -2,12 +2,19 @@
 <html lang="zh">
   <head>
     <meta charset="utf-8" />
-    <title>TikLocal</title>
+    <title>TikLocal · {{ instance_name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#171815" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="TikLocal" />
+    <link rel="manifest" href="{{ url_for('pwa_manifest') }}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('pwa_icon', size=180) }}" />
     {% if auth_enabled %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endif %}
-    <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='output.css')}}">
-    <script src="{{url_for('static', filename='feather.min.js')}}"></script>
-    {% if auth_enabled %}<script src="{{ url_for('static', filename='csrf_fetch.js') }}"></script>{% endif %}
+    <link rel="stylesheet" type="text/css" href="{{ static_asset('output.css') }}">
+    <script src="{{ static_asset('feather.min.js') }}"></script>
+    <script src="{{ static_asset('pwa_install.js') }}"></script>
+    {% if auth_enabled %}<script src="{{ static_asset('csrf_fetch.js') }}"></script>{% endif %}
     <style>
       /* A soft, content-first dock with page-aware material. */
       :root {
@@ -307,7 +314,7 @@
       }
     </style>
     {% block extra_head %}{% endblock %}
-    <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='app_navigation.css')}}">
+    <link rel="stylesheet" type="text/css" href="{{ static_asset('app_navigation.css') }}">
   </head>
   <body data-theme="{{ theme if theme else 'light' }}" data-nav-context="{{ menu or 'default' }}" class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen transition-colors duration-300">
     <header class="mobile-app-header {% if menu not in ['flow', 'radio'] %}is-utility-page{% endif %}" aria-label="应用导航">

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='library_timeline.css') }}">
+<link rel="stylesheet" href="{{ static_asset('library_timeline.css') }}">
 <style>
   body:not([data-nav-context="favorite"]) {
     padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
@@ -1250,12 +1250,12 @@
 {% endblock %}
 
 {% block extra_body %}
-<script src="{{ url_for('static', filename='flow_ui_shared.js') }}"></script>
-<script src="{{ url_for('static', filename='flow_state_controller.js') }}"></script>
-<script src="{{ url_for('static', filename='flow_session.js') }}"></script>
-<script src="{{ url_for('static', filename='flow_actions_shared.js') }}"></script>
-<script src="{{ url_for('static', filename='flow_media_actions_controller.js') }}"></script>
-<script src="{{ url_for('static', filename='hammer.min.js') }}"></script>
+<script src="{{ static_asset('flow_ui_shared.js') }}"></script>
+<script src="{{ static_asset('flow_state_controller.js') }}"></script>
+<script src="{{ static_asset('flow_session.js') }}"></script>
+<script src="{{ static_asset('flow_actions_shared.js') }}"></script>
+<script src="{{ static_asset('flow_media_actions_controller.js') }}"></script>
+<script src="{{ static_asset('hammer.min.js') }}"></script>
 <script>
   window.__TIKLOCAL_LIBRARY_BOOT__ = {
     scope: {{ scope | tojson }},
@@ -1277,8 +1277,8 @@
 <script>
   window.__TIKLOCAL_TIMELINE_BOOT__ = {{ timeline_payload | tojson }};
 </script>
-<script src="{{ url_for('static', filename='library_timeline_controller.js') }}"></script>
+<script src="{{ static_asset('library_timeline_controller.js') }}"></script>
 {% else %}
-<script src="{{ url_for('static', filename='library_page_controller.js') }}"></script>
+<script src="{{ static_asset('library_page_controller.js') }}"></script>
 {% endif %}
 {% endblock %}

@@ -58,6 +58,22 @@ tiklocal --port 9000              # Use custom port
 tiklocal --media-source photos=~/Pictures/AI  # Add a media source, repeatable
 ```
 
+**Installable app and HTTPS:**
+
+TikLocal ships a Web App Manifest, per-instance name, and app icons, so it can be installed from Settings on phones, tablets, and desktops. Browsers such as Chrome and Edge normally require trusted HTTPS. A public domain is optional; a stable LAN hostname is sufficient.
+
+```bash
+tiklocal ~/Videos --https --name "Studio Mac"     # Maintain a local certificate; defaults to port 8443
+tiklocal tls trust                                # Trust TikLocal CA on the server Mac
+tiklocal tls status                               # Inspect certificate names and CA fingerprint
+tiklocal tls renew --hostname studio-mac.local    # Add a stable hostname and renew the leaf certificate
+tiklocal ~/Videos --tls-cert cert.pem --tls-key key.pem  # Use an existing certificate
+```
+
+Automatic HTTPS creates a TikLocal-specific local CA under `~/.tiklocal/tls/` and renews the server certificate when names, LAN addresses, or expiry require it. On the server Mac, `tiklocal tls trust` adds that CA to the current user's login keychain. Every other client device must trust the CA once before connecting; `/install` provides an Apple-friendly `.cer`, a PEM alternative, the fingerprint, and platform instructions. Never copy or install `ca-key.pem`. Each TikLocal server has an independent CA by default, so multiple servers must be trusted separately. `--hostname` only adds a certificate name; it does not configure DNS, so make sure the name resolves through your router, mDNS/Bonjour, or local DNS.
+
+The initial installable-app release registers a deliberately narrow Service Worker for versioned public interface assets and app icons. Dynamic pages, APIs, thumbnails, and original media are excluded, remain private, and preserve native HTTP Range behavior. Safari uses **File > Add to Dock**; Chromium browsers expose the direct button only after their install criteria are met.
+
 **Access authentication:**
 
 Authentication is enabled by default. On first start, TikLocal prints a generated access password in the terminal. Every page, API, media file, and management action requires sign-in; after sign-in, all features are available.
@@ -174,6 +190,11 @@ media_sources:
     name: Photos
     path: ~/Pictures/AI
 download_source: default
+name: Studio Mac
+https: true
+port: 8443
+hostnames:
+  - studio-mac.local
 
 vision:
   enabled: true

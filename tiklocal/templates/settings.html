@@ -188,6 +188,29 @@
   [data-theme="dark"] .settings-action.is-danger { color: #e69a93; background: rgba(230, 154, 147, 0.075); }
   [data-theme="dark"] .settings-action.is-primary { color: #24231f; border-color: #e9e5da; background: #e9e5da; }
   [data-theme="dark"] .settings-action.is-warning { color: #d8b57d; border-color: rgba(216, 181, 125, 0.16); background: rgba(216, 181, 125, 0.08); }
+  .install-row { min-height: 86px; }
+  .install-mark {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--settings-line);
+    border-radius: 13px;
+    background: #171815;
+    box-shadow: 0 6px 18px rgba(23, 24, 21, 0.15);
+  }
+  .install-mark img { display: block; width: 100%; height: 100%; }
+  .install-origin {
+    display: block;
+    max-width: 100%;
+    margin-top: 5px;
+    overflow: hidden;
+    color: color-mix(in oklab, var(--settings-muted) 84%, transparent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .about-footer { padding: 1px 4px 9px; color: var(--settings-muted); text-align: center; }
   .about-card { padding: 0; }
   .about-line { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 7px; }
@@ -271,6 +294,21 @@
           <button class="theme-option" type="button" data-theme-preference="dark" aria-pressed="false">
             <span class="theme-preview theme-preview-dark"><span class="theme-check"><i data-feather="check"></i></span></span><span>深色</span>
           </button>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="install-title">
+      <h2 id="install-title" class="settings-section-title">此设备</h2>
+      <div class="settings-card">
+        <div class="settings-row install-row">
+          <span class="install-mark" aria-hidden="true"><img src="{{ url_for('pwa_icon', size=192) }}" alt=""></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">安装 TikLocal · {{ instance_name }}</div>
+            <div id="install-app-copy" class="settings-row-copy">正在检查当前浏览器的安装方式…</div>
+            <code id="install-origin" class="install-origin"></code>
+          </div>
+          <button id="install-app" class="settings-action is-primary" type="button">安装</button>
         </div>
       </div>
     </section>
@@ -384,8 +422,44 @@
     const refreshButton = document.getElementById('refresh-library');
     const clearCacheButton = document.getElementById('clear-cache');
     const resetButton = document.getElementById('reset-recommendations');
+    const installButton = document.getElementById('install-app');
+    const installCopy = document.getElementById('install-app-copy');
     const credentialMask = document.getElementById('credential-mask');
     const toastWrap = document.getElementById('toast-wrap');
+
+    document.getElementById('install-origin').textContent = window.location.origin;
+
+    function renderInstallStatus(status = window.TikLocalPWA?.status?.() || {}) {
+      if (status.installed) {
+        installCopy.textContent = '已作为独立应用运行；这个入口只连接当前 TikLocal 实例。';
+        installButton.textContent = '已安装';
+        installButton.disabled = true;
+        return;
+      }
+      installButton.disabled = false;
+      if (status.canPrompt) {
+        installCopy.textContent = '安装后会出现在主屏幕或应用列表，不会下载媒体文件。';
+        installButton.textContent = '安装';
+      } else if (status.reason === 'untrusted-certificate') {
+        installCopy.textContent = 'HTTPS 证书尚未被此设备信任，安装能力被浏览器阻止。';
+        installButton.textContent = '配置安全连接';
+      } else if (status.reason === 'insecure-http') {
+        installCopy.textContent = '当前不是可信 HTTPS，浏览器不会提供完整安装能力。';
+        installButton.textContent = '配置安全连接';
+      } else if (status.reason === 'safari-menu') {
+        installCopy.textContent = 'Safari 需要从“文件”菜单选择“添加到程序坞”。';
+        installButton.textContent = '查看 Safari 步骤';
+      } else if (status.reason === 'share-menu') {
+        installCopy.textContent = '请从浏览器分享菜单选择“添加到主屏幕”。';
+        installButton.textContent = '查看移动端步骤';
+      } else if (status.reason === 'chromium-waiting') {
+        installCopy.textContent = '安全连接正常；点击页面并停留片刻，或从 Chrome 菜单安装。';
+        installButton.textContent = '查看 Chrome 步骤';
+      } else {
+        installCopy.textContent = '当前浏览器需要从自身菜单创建应用入口。';
+        installButton.textContent = '查看安装步骤';
+      }
+    }
 
     function currentThemePreference() {
       const saved = localStorage.getItem('theme');
@@ -544,7 +618,18 @@
 
     themeButtons.forEach((button) => button.addEventListener('click', () => setThemePreference(button.dataset.themePreference)));
     window.addEventListener('tiklocal:theme-changed', (event) => syncThemeButtons(event.detail?.preference));
+    window.addEventListener('tiklocal:pwa-status', (event) => renderInstallStatus(event.detail));
+    installButton.addEventListener('click', async () => {
+      const result = await window.TikLocalPWA?.install?.();
+      if (result?.outcome === 'accepted') {
+        showToast('正在安装 TikLocal');
+      } else if (result?.outcome === 'guide') {
+        window.location.assign(result.url || '/install');
+      }
+      renderInstallStatus();
+    });
     syncThemeButtons();
+    renderInstallStatus();
 
     refreshButton.addEventListener('click', () => {
       confirmAction('重新扫描媒体库？', '扫描会校正运行期间发生的文件新增、移动和删除。', '开始扫描', 'primary', () => {
