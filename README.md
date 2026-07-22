@@ -35,6 +35,14 @@ TikLocal is a Python application that you can install using the following comman
 pip install tiklocal
 ```
 
+The default package supports HTTP and existing TLS certificates without compiling
+`cryptography`. This is the recommended installation on Android/Termux. Install the
+optional HTTPS extra only when TikLocal should generate and maintain a local CA:
+
+```bash
+pip install 'TikLocal[https]'
+```
+
 ### Usage
 
 Starting TikLocal is very simple, just run the following command:
@@ -63,6 +71,7 @@ tiklocal --media-source photos=~/Pictures/AI  # Add a media source, repeatable
 TikLocal ships a Web App Manifest, per-instance name, and app icons, so it can be installed from Settings on phones, tablets, and desktops. Browsers such as Chrome and Edge normally require trusted HTTPS. A public domain is optional; a stable LAN hostname is sufficient.
 
 ```bash
+pip install 'TikLocal[https]'                       # Required for automatic local certificates
 tiklocal ~/Videos --https --name "Studio Mac"     # Maintain a local certificate; defaults to port 8443
 tiklocal tls trust                                # Trust TikLocal CA on the server Mac
 tiklocal tls status                               # Inspect certificate names and CA fingerprint
@@ -73,6 +82,12 @@ tiklocal ~/Videos --tls-cert cert.pem --tls-key key.pem  # Use an existing certi
 Automatic HTTPS creates a TikLocal-specific local CA under `~/.tiklocal/tls/` and renews the server certificate when names, LAN addresses, or expiry require it. On the server Mac, `tiklocal tls trust` adds that CA to the current user's login keychain. Every other client device must trust the CA once before connecting; `/install` provides an Apple-friendly `.cer`, a PEM alternative, the fingerprint, and platform instructions. Never copy or install `ca-key.pem`. Each TikLocal server has an independent CA by default, so multiple servers must be trusted separately. `--hostname` only adds a certificate name; it does not configure DNS, so make sure the name resolves through your router, mDNS/Bonjour, or local DNS.
 
 The initial installable-app release registers a deliberately narrow Service Worker for versioned public interface assets and app icons. Dynamic pages, APIs, thumbnails, and original media are excluded, remain private, and preserve native HTTP Range behavior. Safari uses **File > Add to Dock**; Chromium browsers expose the direct button only after their install criteria are met.
+
+On Android/Termux, use the default installation and `http://127.0.0.1:8000` when the
+browser and TikLocal run on the same phone. This avoids the native Rust/OpenSSL build
+required by `cryptography`. To serve other devices with TikLocal-managed HTTPS, install
+`TikLocal[https]` on a supported host; providing your own `--tls-cert` and `--tls-key`
+does not require that extra.
 
 **Access authentication:**
 

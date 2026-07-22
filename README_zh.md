@@ -35,6 +35,13 @@ TikLocal 是一个Python应用程序，您可以通过以下方式安装：
 pip install tiklocal
 ```
 
+默认安装支持普通 HTTP 和自备 TLS 证书，不会编译 `cryptography`，推荐 Android/Termux 使用。
+仅当需要 TikLocal 自动生成和维护本地 CA 时安装 HTTPS 可选依赖：
+
+```bash
+pip install 'TikLocal[https]'
+```
+
 ### 使用
 
 TikLocal 的启动非常简单，只需执行以下命令：
@@ -61,6 +68,7 @@ tiklocal --media-source photos=~/Pictures/AI  # 追加媒体源，可重复
 TikLocal 提供 Web App Manifest、实例专属名称与图标，可从设置页安装到手机、平板或桌面。Chrome/Edge 等浏览器通常要求可信 HTTPS；域名不是必需的，可以直接使用设备的稳定局域网主机名。
 
 ```bash
+pip install 'TikLocal[https]'                       # 自动维护本地证书时需要
 tiklocal ~/Videos --https --name "书房 Mac"       # 自动维护本机 HTTPS 证书，默认端口 8443
 tiklocal tls trust                                # 在服务端 Mac 信任 TikLocal CA
 tiklocal tls status                               # 查看证书、主机名和 CA 指纹
@@ -71,6 +79,11 @@ tiklocal ~/Videos --tls-cert cert.pem --tls-key key.pem  # 使用已有证书
 自动 HTTPS 会在 `~/.tiklocal/tls/` 创建 TikLocal 专用本地 CA，并在主机名、局域网 IP 或证书临近过期时自动更新服务器证书。在服务端 Mac 上，`tiklocal tls trust` 会把 CA 加入当前用户的登录钥匙串。其他设备首次访问前仍须手动信任 CA；`/install` 提供 Apple 更易识别的 `.cer`、PEM 备用格式、指纹与分平台步骤。不要复制或安装 `ca-key.pem`。每台服务器默认拥有独立 CA，因此多个 TikLocal 实例需要分别信任。`--hostname` 只把名称加入证书，不会修改 DNS；请确认路由器、mDNS/Bonjour 或本机 DNS 能解析该名称。
 
 一期只注册边界严格的 Service Worker，缓存带版本号的公共界面资源和应用图标；动态页面、API、缩略图与原始媒体均不进入离线缓存，保持私有并保留浏览器原生 Range 行为。Safari 使用“文件 → 添加到程序坞”，Chromium 仅在满足安装条件后显示可执行的直接安装按钮。
+
+Android/Termux 中，如果浏览器和 TikLocal 运行在同一台手机上，使用默认安装并访问
+`http://127.0.0.1:8000` 即可，避免 `cryptography` 所需的 Rust/OpenSSL 原生编译。
+如需向其他设备提供由 TikLocal 管理的 HTTPS，请在受支持的主机安装 `TikLocal[https]`；
+使用自备的 `--tls-cert` 与 `--tls-key` 不需要该可选依赖。
 
 **访问认证：**
 

@@ -3,6 +3,7 @@ import sys
 import argparse
 import getpass
 import datetime
+import importlib
 from pathlib import Path
 from waitress import serve
 from tiklocal.app import create_app
@@ -10,12 +11,6 @@ from tiklocal.thumbs import generate_thumbnails
 from tiklocal.paths import get_data_dir, get_database_path
 from tiklocal.paths import get_auth_path
 from tiklocal.services.auth import AuthStore
-from tiklocal.services.tls import (
-    ensure_tls_material,
-    local_ca_is_installed,
-    read_tls_material,
-    trust_local_ca,
-)
 from tiklocal.services import LibraryService, build_media_sources, normalize_source_id
 from tiklocal.services.embedding import (
     ImageVectorService,
@@ -322,7 +317,23 @@ def run_analyze_similar(config, args, parser):
     print(f"  saved groups: {saved}")
 
 
-def _print_tls_status(material) -> None:
+TLS_EXTRA_HINT = (
+    "自动生成和维护 HTTPS 证书需要可选依赖。请运行: "
+    "pip install 'TikLocal[https]'"
+)
+
+
+def _load_tls_service():
+    """按需加载证书工具，避免普通 HTTP 安装依赖 cryptography。"""
+    try:
+        return importlib.import_module('tiklocal.services.tls')
+    except ModuleNotFoundError as exc:
+        if exc.name == 'cryptography' or str(exc.name).startswith('cryptography.'):
+            raise RuntimeError(TLS_EXTRA_HINT) from exc
+        raise
+
+
+def _print_tls_status(material, tls_service) -> None:
     expired = material.expires_at <= datetime.datetime.now(datetime.timezone.utc)
     state = '已过期' if expired else ('已新建' if material.cert_created else '有效')
     print(f'HTTPS 证书: {state}')
@@ -333,7 +344,7 @@ def _print_tls_status(material) -> None:
     print(f'主机名: {", ".join(material.hostnames)}')
     print(f'IP 地址: {", ".join(material.ip_addresses)}')
     print(f'CA SHA-256: {material.ca_fingerprint}')
-    installed = local_ca_is_installed(material.ca_cert_path)
+    installed = tls_service.local_ca_is_installed(material.ca_cert_path)
     if installed is not None:
         print(f'本机钥匙串: {"已安装" if installed else "未安装（运行 tiklocal tls trust）"}')
     print('提示: 只把根证书 ca.pem 安装到访问设备；不要复制 ca-key.pem。')
@@ -558,21 +569,25 @@ def main():
         return
 
     if cmd == 'tls':
+        try:
+            tls_service = _load_tls_service()
+        except RuntimeError as exc:
+            parser.error(str(exc))
         if args.action == 'status':
-            material = read_tls_material()
+            material = tls_service.read_tls_material()
             if material is None:
                 print('HTTPS 证书: 尚未初始化')
                 print('运行 tiklocal tls init 生成本机证书。')
                 return
         else:
-            material = ensure_tls_material(
+            material = tls_service.ensure_tls_material(
                 extra_hostnames=args.hostname or (),
                 force_renew=args.action == 'renew',
             )
-        _print_tls_status(material)
+        _print_tls_status(material, tls_service)
         if args.action == 'trust':
             try:
-                keychain = trust_local_ca(material.ca_cert_path)
+                keychain = tls_service.trust_local_ca(material.ca_cert_path)
             except RuntimeError as exc:
                 parser.error(str(exc))
             print(f'根证书已信任: {keychain}')
@@ -655,7 +670,11 @@ def main():
         configured_hostnames = args.hostname or config.get('hostnames') or []
         if isinstance(configured_hostnames, str):
             configured_hostnames = [configured_hostnames]
-        tls_material = ensure_tls_material(extra_hostnames=configured_hostnames)
+        try:
+            tls_service = _load_tls_service()
+        except RuntimeError as exc:
+            parser.error(str(exc))
+        tls_material = tls_service.ensure_tls_material(extra_hostnames=configured_hostnames)
         tls_cert_path = tls_material.cert_path
         tls_key_path = tls_material.key_path
 

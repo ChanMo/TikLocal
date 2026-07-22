@@ -11,8 +11,6 @@ from pathlib import Path
 
 from flask import Flask, render_template, request, redirect, send_file, url_for
 from PIL import Image, ImageDraw
-from cryptography import x509
-from cryptography.hazmat.primitives import serialization
 
 # Service Imports
 from tiklocal.services import LibraryService, FavoriteService, RecommendService, IMAGE_EXTENSIONS, AUDIO_EXTENSIONS, build_media_sources
@@ -693,6 +691,11 @@ def create_app(test_config=None):
         ca_path = app.config.get('TLS_CA_CERT_PATH')
         if not ca_path or not Path(ca_path).is_file():
             return 'TikLocal local CA is not available', 404
+        try:
+            from cryptography import x509
+            from cryptography.hazmat.primitives import serialization
+        except ModuleNotFoundError:
+            return 'DER certificate export requires TikLocal[https]', 503
         certificate = x509.load_pem_x509_certificate(Path(ca_path).read_bytes())
         return send_file(
             io.BytesIO(certificate.public_bytes(serialization.Encoding.DER)),

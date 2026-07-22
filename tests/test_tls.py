@@ -77,7 +77,7 @@ def test_tls_trust_adds_ca_to_current_user_keychain(tmp_path, monkeypatch, capsy
         trusted.append(path)
         return tmp_path / 'login.keychain-db'
 
-    monkeypatch.setattr('tiklocal.run.trust_local_ca', fake_trust)
+    monkeypatch.setattr('tiklocal.services.tls.trust_local_ca', fake_trust)
     monkeypatch.setattr(sys, 'argv', ['tiklocal', 'tls', 'trust'])
     main()
 
