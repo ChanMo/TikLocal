@@ -7,6 +7,23 @@
   var ROOM_KEY = 'radio_room';
   var SLEEP_OPTIONS = [null, 30, 60, 120];
   var MAX_ENCORE_COUNT = 3;
+  var ROOMS = {
+    rain: {
+      label: 'ROOM · RAIN',
+      ariaLabel: '氛围：雨夜，点击选择',
+      sourceKey: 'Rain',
+    },
+    breeze: {
+      label: 'ROOM · BREEZE',
+      ariaLabel: '氛围：午后微风，点击选择',
+      sourceKey: 'Breeze',
+    },
+    off: {
+      label: 'ROOM · OFF',
+      ariaLabel: '氛围：关闭，点击选择',
+      sourceKey: '',
+    },
+  };
 
   var audio = new Audio();
   var stations = [];
@@ -118,7 +135,10 @@
     els.btnFav.addEventListener('click', toggleFavorite);
     els.btnEncore.addEventListener('click', cycleEncore);
     els.btnSleep.addEventListener('click', cycleSleep);
-    els.btnRoom.addEventListener('click', toggleRoomMenu);
+    els.btnRoom.addEventListener('click', function (event) {
+      event.stopPropagation();
+      toggleRoomMenu();
+    });
     els.roomOptions.forEach(function (option) {
       option.addEventListener('click', function () {
         setRoom(option.dataset.room);
@@ -127,7 +147,9 @@
       });
     });
     document.addEventListener('click', function (event) {
-      if (!event.target.closest('.room-picker')) closeRoomMenu();
+      if (!(event.target instanceof Element) || !event.target.closest('.room-picker')) {
+        closeRoomMenu();
+      }
     });
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
@@ -476,11 +498,6 @@
     els.radioAtmosphereVideo.muted = true;
     els.radioAtmosphereVideo.defaultMuted = true;
     els.radioAtmosphereVideo.addEventListener('canplay', syncAtmosphere);
-    els.radioAtmosphereVideo.addEventListener('error', function () {
-      if (els.radioAtmosphereVideo.error && !els.radioAtmosphereVideo.readyState) {
-        els.radioPage.classList.add('has-atmosphere-error');
-      }
-    });
     if (atmosphereMotionQuery.addEventListener) {
       atmosphereMotionQuery.addEventListener('change', syncAtmosphere);
     } else if (atmosphereMotionQuery.addListener) {
@@ -495,7 +512,7 @@
   function syncAtmosphere() {
     if (!els.radioAtmosphereVideo) return;
     var saveData = Boolean(navigator.connection && navigator.connection.saveData);
-    var shouldMove = roomId === 'rain'
+    var shouldMove = roomId !== 'off'
       && isPlaying
       && !document.hidden
       && !atmosphereMotionQuery.matches
@@ -518,7 +535,7 @@
   }
 
   function normalizeRoom(value) {
-    return value === 'off' ? 'off' : 'rain';
+    return Object.prototype.hasOwnProperty.call(ROOMS, value) ? value : 'rain';
   }
 
   function setRoom(nextRoom) {
@@ -528,17 +545,33 @@
   }
 
   function applyRoom() {
-    var isRain = roomId === 'rain';
-    els.radioPage.classList.toggle('is-room-off', !isRain);
-    els.roomLabel.textContent = isRain ? 'ROOM · RAIN' : 'ROOM · OFF';
-    els.btnRoom.setAttribute(
-      'aria-label',
-      isRain ? '氛围：雨夜，点击选择' : '氛围：关闭，点击选择'
-    );
+    var room = ROOMS[roomId];
+    Object.keys(ROOMS).forEach(function (id) {
+      els.radioPage.classList.toggle('is-room-' + id, id === roomId);
+    });
+    els.roomLabel.textContent = room.label;
+    els.btnRoom.setAttribute('aria-label', room.ariaLabel);
     els.roomOptions.forEach(function (option) {
       option.setAttribute('aria-selected', option.dataset.room === roomId ? 'true' : 'false');
     });
+    if (room.sourceKey) applyAtmosphereSource(room.sourceKey);
     syncAtmosphere();
+  }
+
+  function applyAtmosphereSource(sourceKey) {
+    if (!els.radioAtmosphereVideo) return;
+    var sourceAttribute = 'room' + sourceKey + 'Src';
+    var posterAttribute = 'room' + sourceKey + 'Poster';
+    var nextSource = els.radioAtmosphereVideo.dataset[sourceAttribute];
+    var nextPoster = els.radioAtmosphereVideo.dataset[posterAttribute];
+
+    if (!nextSource || els.radioAtmosphereVideo.getAttribute('src') === nextSource) return;
+
+    els.radioAtmosphereVideo.pause();
+    els.radioPage.classList.remove('is-atmosphere-moving');
+    els.radioAtmosphereVideo.setAttribute('src', nextSource);
+    if (nextPoster) els.radioAtmosphereVideo.setAttribute('poster', nextPoster);
+    els.radioAtmosphereVideo.load();
   }
 
   function toggleRoomMenu() {

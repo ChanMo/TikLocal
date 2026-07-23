@@ -554,6 +554,10 @@
       preload="metadata"
       src="{{ static_asset('radio/rain-window.mp4') }}"
       poster="{{ static_asset('radio/rain-window-poster.jpg') }}"
+      data-room-rain-src="{{ static_asset('radio/rain-window.mp4') }}"
+      data-room-rain-poster="{{ static_asset('radio/rain-window-poster.jpg') }}"
+      data-room-breeze-src="{{ static_asset('radio/breeze-window.mp4') }}"
+      data-room-breeze-poster="{{ static_asset('radio/breeze-window-poster.jpg') }}"
       disablepictureinpicture
       tabindex="-1"
     ></video>
@@ -611,6 +615,10 @@
             <button class="room-option" type="button" role="option" data-room="rain" aria-selected="true">
               <span class="room-option-key">RAIN</span>
               <span class="room-option-name">雨夜窗边</span>
+            </button>
+            <button class="room-option" type="button" role="option" data-room="breeze" aria-selected="false">
+              <span class="room-option-key">BREEZE</span>
+              <span class="room-option-name">午后微风</span>
             </button>
             <button class="room-option" type="button" role="option" data-room="off" aria-selected="false">
               <span class="room-option-key">OFF</span>

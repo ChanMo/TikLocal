@@ -74,23 +74,48 @@ def test_radio_page_exposes_polished_player_states(client):
     assert 'id="btn-room"' in body
     assert 'id="room-menu"' in body
     assert 'data-room="rain"' in body
+    assert 'data-room="breeze"' in body
     assert 'data-room="off"' in body
+    assert 'radio/breeze-window.mp4' in body
+    assert 'radio/breeze-window-poster.jpg' in body
+    assert 'BREEZE' in body
+    assert '午后微风' in body
     assert 'aria-pressed="false"' in body
 
     css = client.get("/static/radio.css")
     assert css.status_code == 200
     assert b"overflow-wrap: anywhere" in css.data
     assert b".radio-atmosphere-video" in css.data
+    assert b"--room-video-opacity" in css.data
+    assert b"--room-wash-right" in css.data
+    assert b".radio-console::before" in css.data
 
     video = client.get("/static/radio/rain-window.mp4")
     assert video.status_code == 200
     assert video.content_type == "video/mp4"
+
+    breeze_video = client.get("/static/radio/breeze-window.mp4")
+    assert breeze_video.status_code == 200
+    assert breeze_video.content_type == "video/mp4"
+
+    breeze_range = client.get(
+        "/static/radio/breeze-window.mp4",
+        headers={"Range": "bytes=0-0"},
+    )
+    assert breeze_range.status_code == 206
+    assert breeze_range.headers["Content-Range"].startswith("bytes 0-0/")
+    assert breeze_range.headers["Accept-Ranges"] == "bytes"
+
+    breeze_poster = client.get("/static/radio/breeze-window-poster.jpg")
+    assert breeze_poster.status_code == 200
+    assert breeze_poster.content_type == "image/jpeg"
 
     controller = client.get("/static/radio_controller.js")
     assert controller.status_code == 200
     assert b"prefers-reduced-motion: reduce" in controller.data
     assert b"navigator.connection.saveData" in controller.data
     assert b"radio_room" in controller.data
+    assert b"ROOM \xc2\xb7 BREEZE" in controller.data
 
 
 def test_radio_tune_returns_playable_tracks(client):

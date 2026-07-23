@@ -9,6 +9,16 @@ body:has([data-radio-root]) {
 }
 
 .radio-page {
+  --room-video-opacity: .26;
+  --room-video-opacity-moving: .28;
+  --room-video-filter: saturate(.72) contrast(.95) brightness(.98);
+  --room-video-filter-moving: saturate(.76) contrast(.97) brightness(1);
+  --room-wash-left: 8%;
+  --room-wash-right: 30%;
+  --room-wash-top: 6%;
+  --room-wash-bottom: 16%;
+  --console-scrim-core: 48%;
+  --console-scrim-mid: 26%;
   position: relative;
   isolation: isolate;
   width: 100%;
@@ -46,8 +56,8 @@ body:has([data-radio-root]) {
   z-index: 0;
   object-fit: cover;
   object-position: center;
-  opacity: .2;
-  filter: saturate(.62) contrast(.88);
+  opacity: var(--room-video-opacity);
+  filter: var(--room-video-filter);
   transform: scale(1.025);
   transition: opacity 1.4s var(--radio-ease), filter 1.4s var(--radio-ease);
 }
@@ -55,17 +65,13 @@ body:has([data-radio-root]) {
 .radio-atmosphere-wash {
   z-index: 1;
   background:
-    linear-gradient(90deg, color-mix(in oklab, var(--radio-bg) 18%, transparent), color-mix(in oklab, var(--radio-bg) 74%, transparent)),
-    linear-gradient(to bottom, color-mix(in oklab, var(--radio-bg) 12%, transparent), color-mix(in oklab, var(--radio-bg) 36%, transparent));
+    linear-gradient(90deg, color-mix(in oklab, var(--radio-bg) var(--room-wash-left), transparent), color-mix(in oklab, var(--radio-bg) var(--room-wash-right), transparent)),
+    linear-gradient(to bottom, color-mix(in oklab, var(--radio-bg) var(--room-wash-top), transparent), color-mix(in oklab, var(--radio-bg) var(--room-wash-bottom), transparent));
 }
 
 .radio-page.is-atmosphere-moving .radio-atmosphere-video {
-  opacity: .25;
-  filter: saturate(.7) contrast(.92);
-}
-
-.radio-page.has-atmosphere-error .radio-atmosphere-video {
-  display: none;
+  opacity: var(--room-video-opacity-moving);
+  filter: var(--room-video-filter-moving);
 }
 
 .radio-page.is-room-off .radio-atmosphere-video {
@@ -79,20 +85,47 @@ body:has([data-radio-root]) {
     var(--radio-bg);
 }
 
-[data-theme="dark"] .radio-atmosphere-video {
-  opacity: .34;
-  filter: saturate(.7) contrast(1.02) brightness(.72);
+.radio-page.is-room-breeze {
+  --room-video-opacity: .36;
+  --room-video-opacity-moving: .38;
+  --room-video-filter: saturate(.78) contrast(.94) brightness(1.03);
+  --room-video-filter-moving: saturate(.8) contrast(.96) brightness(1.04);
+  --room-wash-left: 6%;
+  --room-wash-right: 24%;
+  --room-wash-top: 4%;
+  --room-wash-bottom: 12%;
+  --console-scrim-core: 44%;
+  --console-scrim-mid: 23%;
 }
 
-[data-theme="dark"] .radio-page.is-atmosphere-moving .radio-atmosphere-video {
-  opacity: .4;
-  filter: saturate(.78) contrast(1.04) brightness(.76);
+.radio-page.is-room-breeze .radio-atmosphere-video {
+  object-position: center 42%;
 }
 
-[data-theme="dark"] .radio-atmosphere-wash {
-  background:
-    linear-gradient(90deg, color-mix(in oklab, var(--radio-bg) 12%, transparent), color-mix(in oklab, var(--radio-bg) 68%, transparent)),
-    linear-gradient(to bottom, color-mix(in oklab, var(--radio-bg) 8%, transparent), color-mix(in oklab, var(--radio-bg) 28%, transparent));
+[data-theme="dark"] .radio-page {
+  --room-video-opacity: .35;
+  --room-video-opacity-moving: .37;
+  --room-video-filter: saturate(.76) contrast(1.01) brightness(.84);
+  --room-video-filter-moving: saturate(.78) contrast(1.02) brightness(.86);
+  --room-wash-left: 6%;
+  --room-wash-right: 26%;
+  --room-wash-top: 5%;
+  --room-wash-bottom: 14%;
+  --console-scrim-core: 52%;
+  --console-scrim-mid: 30%;
+}
+
+[data-theme="dark"] .radio-page.is-room-breeze {
+  --room-video-opacity: .45;
+  --room-video-opacity-moving: .47;
+  --room-video-filter: saturate(.78) contrast(1) brightness(.84);
+  --room-video-filter-moving: saturate(.8) contrast(1.01) brightness(.86);
+  --room-wash-left: 5%;
+  --room-wash-right: 22%;
+  --room-wash-top: 4%;
+  --room-wash-bottom: 11%;
+  --console-scrim-core: 48%;
+  --console-scrim-mid: 26%;
 }
 
 .radio-glow {
@@ -350,9 +383,25 @@ body:has([data-radio-root]) {
 .radio-page.is-playing .signal-dot { background: #d85e45; box-shadow: 0 0 0 .25rem rgba(216,94,69,.12); }
 
 .radio-console {
+  position: relative;
+  isolation: isolate;
   width: min(100%, 27rem);
   display: grid;
   gap: clamp(1.15rem, 2.8dvh, 1.8rem);
+}
+
+.radio-console::before {
+  content: "";
+  position: absolute;
+  inset: -4.75rem -6rem;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 61% 50%,
+    color-mix(in oklab, var(--radio-bg) var(--console-scrim-core), transparent) 0,
+    color-mix(in oklab, var(--radio-bg) var(--console-scrim-mid), transparent) 43%,
+    transparent 74%
+  );
 }
 
 .station-room-bar {
@@ -419,6 +468,11 @@ body:has([data-radio-root]) {
 .radio-page.is-room-off .room-status-dot {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--radio-muted);
+}
+
+.radio-page.is-room-breeze .room-status-dot {
+  background: var(--radio-warm);
+  box-shadow: 0 0 0 .22rem color-mix(in oklab, var(--radio-warm) 12%, transparent);
 }
 
 .room-trigger:hover,
@@ -628,15 +682,51 @@ body:has([data-radio-root]) {
 }
 
 @media (max-width: 840px) {
-  .radio-atmosphere-video { opacity: .16; }
-  .radio-page.is-atmosphere-moving .radio-atmosphere-video { opacity: .21; }
-  [data-theme="dark"] .radio-atmosphere-video { opacity: .28; }
-  [data-theme="dark"] .radio-page.is-atmosphere-moving .radio-atmosphere-video { opacity: .34; }
+  .radio-page {
+    --room-video-opacity: .23;
+    --room-video-opacity-moving: .25;
+    --mobile-wash-center: 36%;
+    --mobile-wash-edge: 10%;
+    --mobile-wash-top: 9%;
+    --mobile-wash-bottom: 20%;
+    --console-scrim-core: 54%;
+    --console-scrim-mid: 30%;
+  }
+  .radio-page.is-room-breeze {
+    --room-video-opacity: .31;
+    --room-video-opacity-moving: .33;
+    --mobile-wash-center: 32%;
+    --mobile-wash-edge: 8%;
+    --mobile-wash-top: 7%;
+    --mobile-wash-bottom: 16%;
+    --console-scrim-core: 50%;
+    --console-scrim-mid: 27%;
+  }
+  [data-theme="dark"] .radio-page {
+    --room-video-opacity: .31;
+    --room-video-opacity-moving: .33;
+    --mobile-wash-center: 32%;
+    --mobile-wash-edge: 8%;
+    --mobile-wash-top: 7%;
+    --mobile-wash-bottom: 17%;
+    --console-scrim-core: 56%;
+    --console-scrim-mid: 33%;
+  }
+  [data-theme="dark"] .radio-page.is-room-breeze {
+    --room-video-opacity: .39;
+    --room-video-opacity-moving: .41;
+    --mobile-wash-center: 28%;
+    --mobile-wash-edge: 7%;
+    --mobile-wash-top: 6%;
+    --mobile-wash-bottom: 14%;
+    --console-scrim-core: 52%;
+    --console-scrim-mid: 29%;
+  }
   .radio-atmosphere-wash,
   [data-theme="dark"] .radio-atmosphere-wash {
     background:
-      radial-gradient(ellipse at 50% 54%, color-mix(in oklab, var(--radio-bg) 70%, transparent), color-mix(in oklab, var(--radio-bg) 22%, transparent) 72%),
-      linear-gradient(to bottom, color-mix(in oklab, var(--radio-bg) 18%, transparent), color-mix(in oklab, var(--radio-bg) 34%, transparent));
+      radial-gradient(ellipse at 50% 54%, color-mix(in oklab, var(--radio-bg) var(--mobile-wash-center), transparent), color-mix(in oklab, var(--radio-bg) var(--mobile-wash-edge), transparent) 72%),
+      linear-gradient(to bottom, color-mix(in oklab, var(--radio-bg) var(--mobile-wash-top), transparent), color-mix(in oklab, var(--radio-bg) var(--mobile-wash-bottom), transparent));
   }
   .radio-page { padding-top: max(.65rem, env(safe-area-inset-top)); }
   .radio-layout {
