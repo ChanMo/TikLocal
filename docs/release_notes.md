@@ -1,5 +1,11 @@
 # Release Notes
 
+## v0.8.37 (2026-07-23)
+- Radio 新增有限“再听”机制，可为当前喜欢的歌曲追加 1–3 次播放，并保持控制区简洁。
+- 新增 `RAIN / BREEZE / OFF` Room 氛围选择：提供本地无声雨夜与午后窗纱循环视频，选择会持久保存并随音乐播放状态同步。
+- 两段 Room 视频均经过无缝循环、无音轨、H.264 与轻量化处理；保留 poster，并适配减少动态效果和省流量模式。
+- 按 Rain/BREEZE、亮色/暗色和桌面/移动端分别调校背景强度，以局部无边界渐变保护歌曲信息，提升场景辨识度而不过度干扰长时间聆听。
+
 ## v0.8.36 (2026-07-22)
 - 修复 Android/Termux 安装因 `cryptography` 缺少 Android wheel、回退到本地 Rust/OpenSSL 编译而失败的问题：基础安装不再依赖或提前导入 `cryptography`。
 - 自动生成与维护本地 HTTPS 证书改为可选能力，通过 `pip install 'TikLocal[https]'` 安装；缺少依赖时 CLI 会给出明确修复命令。
