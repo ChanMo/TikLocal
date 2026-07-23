@@ -60,16 +60,37 @@ def test_radio_page_exposes_polished_player_states(client):
     assert res.status_code == 200
     assert 'radio.css' in body
     assert 'class="radio-atmosphere"' in body
+    assert 'id="radio-atmosphere-video"' in body
+    assert 'radio/rain-window.mp4' in body
+    assert 'src="/static/radio/rain-window.mp4' in body
+    assert 'preload="metadata"' in body
+    assert 'muted' in body
+    assert 'playsinline' in body
     assert 'class="radio-layout"' in body
     assert 'class="play-state"' in body
     assert 'id="station-name"' in body
     assert 'id="btn-encore"' in body
     assert 'id="encore-count"' in body
+    assert 'id="btn-room"' in body
+    assert 'id="room-menu"' in body
+    assert 'data-room="rain"' in body
+    assert 'data-room="off"' in body
     assert 'aria-pressed="false"' in body
 
     css = client.get("/static/radio.css")
     assert css.status_code == 200
     assert b"overflow-wrap: anywhere" in css.data
+    assert b".radio-atmosphere-video" in css.data
+
+    video = client.get("/static/radio/rain-window.mp4")
+    assert video.status_code == 200
+    assert video.content_type == "video/mp4"
+
+    controller = client.get("/static/radio_controller.js")
+    assert controller.status_code == 200
+    assert b"prefers-reduced-motion: reduce" in controller.data
+    assert b"navigator.connection.saveData" in controller.data
+    assert b"radio_room" in controller.data
 
 
 def test_radio_tune_returns_playable_tracks(client):

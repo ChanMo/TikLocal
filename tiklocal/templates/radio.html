@@ -545,6 +545,19 @@
 {% block content %}
 <main id="radio-page" class="radio-page" data-radio-root>
   <div class="radio-atmosphere" aria-hidden="true">
+    <video
+      id="radio-atmosphere-video"
+      class="radio-atmosphere-video"
+      muted
+      loop
+      playsinline
+      preload="metadata"
+      src="{{ static_asset('radio/rain-window.mp4') }}"
+      poster="{{ static_asset('radio/rain-window-poster.jpg') }}"
+      disablepictureinpicture
+      tabindex="-1"
+    ></video>
+    <span class="radio-atmosphere-wash"></span>
     <span class="radio-glow radio-glow-a"></span>
     <span class="radio-glow radio-glow-b"></span>
     <span class="radio-grain"></span>
@@ -576,9 +589,35 @@
     </section>
 
     <div class="radio-console">
-      <div class="station-chip">
-        <span class="station-pulse" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span id="station-name">默认电台</span>
+      <div class="station-room-bar">
+        <div class="station-chip">
+          <span class="station-pulse" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span id="station-name">默认电台</span>
+        </div>
+        <div class="room-picker">
+          <button
+            id="btn-room"
+            class="room-trigger"
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="room-menu"
+            aria-label="氛围：雨夜，点击选择"
+          >
+            <span class="room-status-dot" aria-hidden="true"></span>
+            <span id="room-label">ROOM · RAIN</span>
+          </button>
+          <div id="room-menu" class="room-menu" role="listbox" aria-label="选择氛围" hidden>
+            <button class="room-option" type="button" role="option" data-room="rain" aria-selected="true">
+              <span class="room-option-key">RAIN</span>
+              <span class="room-option-name">雨夜窗边</span>
+            </button>
+            <button class="room-option" type="button" role="option" data-room="off" aria-selected="false">
+              <span class="room-option-key">OFF</span>
+              <span class="room-option-name">静止背景</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <section class="now-playing" aria-live="polite">

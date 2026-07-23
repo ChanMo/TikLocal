@@ -4,6 +4,7 @@
   var STATION_KEY = 'radio_station';
   var RECENT_KEY = 'radio_recent_tracks';
   var POSITION_KEY = 'radio_position';
+  var ROOM_KEY = 'radio_room';
   var SLEEP_OPTIONS = [null, 30, 60, 120];
   var MAX_ENCORE_COUNT = 3;
 
@@ -28,6 +29,8 @@
   var pendingTrackMeta = '';
   var trackInfoTransitionId = 0;
   var metadataLoadToken = 0;
+  var roomId = normalizeRoom(localStorage.getItem(ROOM_KEY));
+  var atmosphereMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   var els = {};
 
@@ -41,6 +44,7 @@
   function init() {
     cacheEls();
     bindEvents();
+    initAtmosphere();
     updateSignalArt(null);
     replaceFeather();
     loadStations()
@@ -53,10 +57,13 @@
       'radio-page', 'station-name', 'track-title', 'track-meta',
       'progress-bar', 'time-current', 'time-total', 'btn-play', 'btn-next',
       'btn-fav', 'btn-encore', 'encore-count', 'btn-sleep', 'sleep-label',
-      'station-options', 'upcoming-preview', 'upcoming-list', 'cover-wave', 'cover-art'
+      'btn-room', 'room-label', 'room-menu',
+      'station-options', 'upcoming-preview', 'upcoming-list', 'cover-wave', 'cover-art',
+      'radio-atmosphere-video'
     ].forEach(function (id) {
       els[toCamel(id)] = document.getElementById(id);
     });
+    els.roomOptions = Array.from(document.querySelectorAll('[data-room]'));
   }
 
   function bindEvents() {
@@ -69,6 +76,9 @@
       playNext(true);
     });
     audio.addEventListener('error', function () {
+      isPlaying = false;
+      updatePlayIcon();
+      updateMotion();
       reportPlaybackExit('error');
       resetEncore();
       playNext(true);
@@ -101,12 +111,30 @@
       onTimeUpdate();
       updateMediaPosition();
     });
+    document.addEventListener('visibilitychange', syncAtmosphere);
 
     els.btnPlay.addEventListener('click', togglePlay);
     els.btnNext.addEventListener('click', function () { playNext(true, { manual: true }); });
     els.btnFav.addEventListener('click', toggleFavorite);
     els.btnEncore.addEventListener('click', cycleEncore);
     els.btnSleep.addEventListener('click', cycleSleep);
+    els.btnRoom.addEventListener('click', toggleRoomMenu);
+    els.roomOptions.forEach(function (option) {
+      option.addEventListener('click', function () {
+        setRoom(option.dataset.room);
+        closeRoomMenu();
+        els.btnRoom.focus();
+      });
+    });
+    document.addEventListener('click', function (event) {
+      if (!event.target.closest('.room-picker')) closeRoomMenu();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeRoomMenu();
+        els.btnRoom.focus();
+      }
+    });
     els.progressBar.addEventListener('input', function (event) {
       var duration = playableDuration();
       if (!duration) return;
@@ -440,6 +468,89 @@
 
   function updateMotion() {
     els.radioPage.classList.toggle('is-playing', isPlaying);
+    syncAtmosphere();
+  }
+
+  function initAtmosphere() {
+    if (!els.radioAtmosphereVideo) return;
+    els.radioAtmosphereVideo.muted = true;
+    els.radioAtmosphereVideo.defaultMuted = true;
+    els.radioAtmosphereVideo.addEventListener('canplay', syncAtmosphere);
+    els.radioAtmosphereVideo.addEventListener('error', function () {
+      if (els.radioAtmosphereVideo.error && !els.radioAtmosphereVideo.readyState) {
+        els.radioPage.classList.add('has-atmosphere-error');
+      }
+    });
+    if (atmosphereMotionQuery.addEventListener) {
+      atmosphereMotionQuery.addEventListener('change', syncAtmosphere);
+    } else if (atmosphereMotionQuery.addListener) {
+      atmosphereMotionQuery.addListener(syncAtmosphere);
+    }
+    if (navigator.connection && navigator.connection.addEventListener) {
+      navigator.connection.addEventListener('change', syncAtmosphere);
+    }
+    applyRoom();
+  }
+
+  function syncAtmosphere() {
+    if (!els.radioAtmosphereVideo) return;
+    var saveData = Boolean(navigator.connection && navigator.connection.saveData);
+    var shouldMove = roomId === 'rain'
+      && isPlaying
+      && !document.hidden
+      && !atmosphereMotionQuery.matches
+      && !saveData;
+
+    if (!shouldMove) {
+      els.radioAtmosphereVideo.pause();
+      els.radioPage.classList.remove('is-atmosphere-moving');
+      return;
+    }
+
+    var playAttempt = els.radioAtmosphereVideo.play();
+    if (playAttempt && playAttempt.then) {
+      playAttempt.then(function () {
+        els.radioPage.classList.add('is-atmosphere-moving');
+      }).catch(function () {
+        els.radioPage.classList.remove('is-atmosphere-moving');
+      });
+    }
+  }
+
+  function normalizeRoom(value) {
+    return value === 'off' ? 'off' : 'rain';
+  }
+
+  function setRoom(nextRoom) {
+    roomId = normalizeRoom(nextRoom);
+    localStorage.setItem(ROOM_KEY, roomId);
+    applyRoom();
+  }
+
+  function applyRoom() {
+    var isRain = roomId === 'rain';
+    els.radioPage.classList.toggle('is-room-off', !isRain);
+    els.roomLabel.textContent = isRain ? 'ROOM · RAIN' : 'ROOM · OFF';
+    els.btnRoom.setAttribute(
+      'aria-label',
+      isRain ? '氛围：雨夜，点击选择' : '氛围：关闭，点击选择'
+    );
+    els.roomOptions.forEach(function (option) {
+      option.setAttribute('aria-selected', option.dataset.room === roomId ? 'true' : 'false');
+    });
+    syncAtmosphere();
+  }
+
+  function toggleRoomMenu() {
+    var willOpen = els.roomMenu.hidden;
+    els.roomMenu.hidden = !willOpen;
+    els.btnRoom.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  }
+
+  function closeRoomMenu() {
+    if (!els.roomMenu || els.roomMenu.hidden) return;
+    els.roomMenu.hidden = true;
+    els.btnRoom.setAttribute('aria-expanded', 'false');
   }
 
   function setBuffering(active) {

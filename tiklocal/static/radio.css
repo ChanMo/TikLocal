@@ -34,6 +34,44 @@ body:has([data-radio-root]) {
   transition: background 1.2s var(--radio-ease);
 }
 
+.radio-atmosphere-video,
+.radio-atmosphere-wash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.radio-atmosphere-video {
+  z-index: 0;
+  object-fit: cover;
+  object-position: center;
+  opacity: .2;
+  filter: saturate(.62) contrast(.88);
+  transform: scale(1.025);
+  transition: opacity 1.4s var(--radio-ease), filter 1.4s var(--radio-ease);
+}
+
+.radio-atmosphere-wash {
+  z-index: 1;
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--radio-bg) 18%, transparent), color-mix(in oklab, var(--radio-bg) 74%, transparent)),
+    linear-gradient(to bottom, color-mix(in oklab, var(--radio-bg) 12%, transparent), color-mix(in oklab, var(--radio-bg) 36%, transparent));
+}
+
+.radio-page.is-atmosphere-moving .radio-atmosphere-video {
+  opacity: .25;
+  filter: saturate(.7) contrast(.92);
+}
+
+.radio-page.has-atmosphere-error .radio-atmosphere-video {
+  display: none;
+}
+
+.radio-page.is-room-off .radio-atmosphere-video {
+  opacity: 0 !important;
+}
+
 [data-theme="dark"] .radio-atmosphere {
   background:
     linear-gradient(135deg, rgba(255,255,255,.035), transparent 38%),
@@ -41,8 +79,25 @@ body:has([data-radio-root]) {
     var(--radio-bg);
 }
 
+[data-theme="dark"] .radio-atmosphere-video {
+  opacity: .34;
+  filter: saturate(.7) contrast(1.02) brightness(.72);
+}
+
+[data-theme="dark"] .radio-page.is-atmosphere-moving .radio-atmosphere-video {
+  opacity: .4;
+  filter: saturate(.78) contrast(1.04) brightness(.76);
+}
+
+[data-theme="dark"] .radio-atmosphere-wash {
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--radio-bg) 12%, transparent), color-mix(in oklab, var(--radio-bg) 68%, transparent)),
+    linear-gradient(to bottom, color-mix(in oklab, var(--radio-bg) 8%, transparent), color-mix(in oklab, var(--radio-bg) 28%, transparent));
+}
+
 .radio-glow {
   position: absolute;
+  z-index: 2;
   width: min(62rem, 82vw);
   aspect-ratio: 1;
   border-radius: 50%;
@@ -66,6 +121,7 @@ body:has([data-radio-root]) {
 .radio-grain {
   position: absolute;
   inset: 0;
+  z-index: 3;
   opacity: .055;
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.75'/%3E%3C/svg%3E");
@@ -299,8 +355,17 @@ body:has([data-radio-root]) {
   gap: clamp(1.15rem, 2.8dvh, 1.8rem);
 }
 
+.station-room-bar {
+  position: relative;
+  z-index: 8;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .station-chip {
-  justify-self: start;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -320,6 +385,125 @@ body:has([data-radio-root]) {
 .radio-page.is-playing .station-pulse i { animation: station-wave .9s ease-in-out infinite alternate; }
 .radio-page.is-playing .station-pulse i:nth-child(2) { animation-delay: -.34s; }
 .radio-page.is-playing .station-pulse i:nth-child(3) { animation-delay: -.62s; }
+
+.room-picker {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.room-trigger {
+  min-height: 2rem;
+  padding: .45rem .15rem .45rem .65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .48rem;
+  border: 0;
+  border-radius: 999px;
+  color: color-mix(in oklab, var(--radio-ink) 44%, transparent);
+  background: transparent;
+  font: 650 .59rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .16em;
+  white-space: nowrap;
+  transition: color .28s ease, background .28s ease;
+}
+
+.room-status-dot {
+  width: .34rem;
+  height: .34rem;
+  border-radius: 50%;
+  background: var(--radio-accent);
+  box-shadow: 0 0 0 .22rem color-mix(in oklab, var(--radio-accent) 10%, transparent);
+  transition: background .35s ease, box-shadow .35s ease;
+}
+
+.radio-page.is-room-off .room-status-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--radio-muted);
+}
+
+.room-trigger:hover,
+.room-trigger[aria-expanded="true"] {
+  color: var(--radio-ink);
+  background: color-mix(in oklab, var(--radio-paper) 66%, transparent);
+}
+
+.room-trigger:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--radio-accent) 48%, transparent);
+  outline-offset: .12rem;
+}
+
+.room-menu {
+  position: absolute;
+  top: calc(100% + .45rem);
+  right: 0;
+  width: 11.6rem;
+  padding: .38rem;
+  border: 1px solid var(--radio-line);
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--radio-bg) 88%, transparent);
+  box-shadow: 0 1.25rem 3rem rgba(24, 27, 23, .14);
+  backdrop-filter: blur(20px) saturate(1.08);
+  -webkit-backdrop-filter: blur(20px) saturate(1.08);
+  animation: room-menu-in .34s var(--radio-ease);
+}
+
+.room-menu[hidden] {
+  display: none;
+}
+
+.room-option {
+  position: relative;
+  width: 100%;
+  min-height: 3.15rem;
+  padding: .7rem 1.8rem .7rem .8rem;
+  display: grid;
+  grid-template-columns: 3.25rem 1fr;
+  align-items: center;
+  gap: .4rem;
+  border: 0;
+  border-radius: .72rem;
+  color: var(--radio-muted);
+  background: transparent;
+  text-align: left;
+  transition: color .24s ease, background .24s ease;
+}
+
+.room-option:hover,
+.room-option:focus-visible {
+  color: var(--radio-ink);
+  background: color-mix(in oklab, var(--radio-accent) 8%, transparent);
+  outline: none;
+}
+
+.room-option[aria-selected="true"] {
+  color: var(--radio-ink);
+}
+
+.room-option[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  right: .85rem;
+  width: .38rem;
+  height: .38rem;
+  border-radius: 50%;
+  background: var(--radio-accent);
+}
+
+.room-option-key {
+  font: 700 .58rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .14em;
+}
+
+.room-option-name {
+  font-size: .72rem;
+  font-weight: 580;
+  letter-spacing: .01em;
+}
+
+@keyframes room-menu-in {
+  from { opacity: 0; transform: translateY(-.35rem) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 .now-playing {
   min-height: 8.7rem;
@@ -444,6 +628,16 @@ body:has([data-radio-root]) {
 }
 
 @media (max-width: 840px) {
+  .radio-atmosphere-video { opacity: .16; }
+  .radio-page.is-atmosphere-moving .radio-atmosphere-video { opacity: .21; }
+  [data-theme="dark"] .radio-atmosphere-video { opacity: .28; }
+  [data-theme="dark"] .radio-page.is-atmosphere-moving .radio-atmosphere-video { opacity: .34; }
+  .radio-atmosphere-wash,
+  [data-theme="dark"] .radio-atmosphere-wash {
+    background:
+      radial-gradient(ellipse at 50% 54%, color-mix(in oklab, var(--radio-bg) 70%, transparent), color-mix(in oklab, var(--radio-bg) 22%, transparent) 72%),
+      linear-gradient(to bottom, color-mix(in oklab, var(--radio-bg) 18%, transparent), color-mix(in oklab, var(--radio-bg) 34%, transparent));
+  }
   .radio-page { padding-top: max(.65rem, env(safe-area-inset-top)); }
   .radio-layout {
     width: min(100%, 32rem);
@@ -455,7 +649,8 @@ body:has([data-radio-root]) {
   .signal-disc { --disc-size: min(72vw, 44dvh, 20.5rem); }
   .signal-status { bottom: -.1rem; }
   .radio-console { width: 100%; gap: clamp(.55rem, 1.4dvh, .9rem); text-align: center; }
-  .station-chip { justify-self: center; }
+  .station-room-bar { width: min(100%, 23rem); margin-inline: auto; }
+  .room-menu { text-align: left; }
   .now-playing { min-height: 4.8rem; text-align: center; gap: .15rem; }
   .now-playing-label { display: none; }
   .track-title { font-family: inherit; font-size: clamp(1.15rem, 5vw, 1.55rem); font-weight: 640; line-height: 1.2; letter-spacing: -.025em; -webkit-line-clamp: 2; }
@@ -481,16 +676,18 @@ body:has([data-radio-root]) {
 }
 
 @media (max-height: 680px) and (max-width: 840px) {
-  .station-chip, .signal-status { display: none; }
+  .station-room-bar, .signal-status { display: none; }
   .signal-disc { --disc-size: min(64vw, 39dvh, 16rem); }
   .now-playing { min-height: 3.75rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .radio-atmosphere-video { transition: none; }
   .radio-page.is-playing .record-surface,
   .radio-page.is-playing .signal-core,
   .radio-page.is-playing .station-pulse i,
   .radio-page.is-buffering .disc-halo,
-  #btn-encore .encore-count { animation: none; }
+  #btn-encore .encore-count,
+  .room-menu { animation: none; }
   .signal-disc, .play-state, .radio-glow { transition-duration: .01ms; }
 }

@@ -13,7 +13,7 @@ import requests
 
 
 API_URL = "https://openrouter.ai/api/v1/videos"
-MODEL = "x-ai/grok-imagine-video"
+DEFAULT_MODEL = "x-ai/grok-imagine-video-1.5"
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,12 +23,16 @@ def parse_args() -> argparse.Namespace:
             "The image URL must be a provider-accessible HTTPS URL."
         )
     )
+    parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--image-url", required=True)
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--output", default="outputs/grok-image-to-video.mp4")
     parser.add_argument("--duration", type=int, default=4)
     parser.add_argument("--resolution", default="720p")
-    parser.add_argument("--aspect-ratio", default="9:16")
+    parser.add_argument(
+        "--aspect-ratio",
+        help="Optional provider-supported ratio. Omit to follow the first frame.",
+    )
     parser.add_argument("--poll-interval", type=int, default=30)
     parser.add_argument("--max-polls", type=int, default=60)
     parser.add_argument("--generate-audio", action="store_true")
@@ -49,11 +53,10 @@ def request_json(
 
 def submit_job(args: argparse.Namespace, headers: dict[str, str]) -> dict[str, Any]:
     payload = {
-        "model": MODEL,
+        "model": args.model,
         "prompt": args.prompt,
         "duration": args.duration,
         "resolution": args.resolution,
-        "aspect_ratio": args.aspect_ratio,
         "generate_audio": args.generate_audio,
         "frame_images": [
             {
@@ -63,6 +66,8 @@ def submit_job(args: argparse.Namespace, headers: dict[str, str]) -> dict[str, A
             }
         ],
     }
+    if args.aspect_ratio:
+        payload["aspect_ratio"] = args.aspect_ratio
     return request_json("POST", API_URL, headers, json=payload)
 
 
