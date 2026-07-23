@@ -51,7 +51,8 @@ class RadioProfileStore:
     event_weights = {
         "play": 0.02,
         "complete": 0.16,
-        "favorite": 0.12,
+        "replay": 0.18,
+        "favorite": 0.30,
         "skip": -0.09,
         "error": -0.18,
     }
@@ -76,6 +77,7 @@ class RadioProfileStore:
 
         entry["plays"] = int(entry.get("plays") or 0) + (1 if event == "play" else 0)
         entry["completes"] = int(entry.get("completes") or 0) + (1 if event == "complete" else 0)
+        entry["replays"] = int(entry.get("replays") or 0) + (1 if event == "replay" else 0)
         entry["skips"] = int(entry.get("skips") or 0) + (1 if event == "skip" else 0)
         entry["errors"] = int(entry.get("errors") or 0) + (1 if event == "error" else 0)
         if ratio is not None:
@@ -341,7 +343,8 @@ class RadioService:
         score = float(entry.get("score") or 0.0)
         skips = int(entry.get("skips") or 0)
         completes = int(entry.get("completes") or 0)
-        confidence = min(skips + completes, 8) / 8
+        replays = int(entry.get("replays") or 0)
+        confidence = min(skips + completes + replays, 8) / 8
         return max(0.25, min(2.2, 1.0 + score * (0.45 + confidence * 0.55)))
 
     def _spread_by_parent(

@@ -5,6 +5,7 @@
   var RECENT_KEY = 'radio_recent_tracks';
   var POSITION_KEY = 'radio_position';
   var SLEEP_OPTIONS = [null, 30, 60, 120];
+  var MAX_ENCORE_COUNT = 3;
 
   var audio = new Audio();
   var stations = [];
@@ -16,6 +17,7 @@
   var sleepIndex = 0;
   var sleepEnd = null;
   var sleepTickId = null;
+  var encoreRemaining = 0;
   var saveTick = 0;
   var mediaPositionTick = 0;
   var artLoadToken = 0;
@@ -32,6 +34,7 @@
   var ICONS = {
     heart: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
     heartFilled: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
+    repeat: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>',
     moon: '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>',
   };
 
@@ -49,7 +52,7 @@
     [
       'radio-page', 'station-name', 'track-title', 'track-meta',
       'progress-bar', 'time-current', 'time-total', 'btn-play', 'btn-next',
-      'btn-fav', 'btn-sleep', 'sleep-label',
+      'btn-fav', 'btn-encore', 'encore-count', 'btn-sleep', 'sleep-label',
       'station-options', 'upcoming-preview', 'upcoming-list', 'cover-wave', 'cover-art'
     ].forEach(function (id) {
       els[toCamel(id)] = document.getElementById(id);
@@ -59,10 +62,15 @@
   function bindEvents() {
     audio.addEventListener('ended', function () {
       reportPlaybackExit('complete');
+      if (encoreRemaining > 0) {
+        replayCurrentTrack();
+        return;
+      }
       playNext(true);
     });
     audio.addEventListener('error', function () {
       reportPlaybackExit('error');
+      resetEncore();
       playNext(true);
     });
     audio.addEventListener('play', function () {
@@ -97,6 +105,7 @@
     els.btnPlay.addEventListener('click', togglePlay);
     els.btnNext.addEventListener('click', function () { playNext(true, { manual: true }); });
     els.btnFav.addEventListener('click', toggleFavorite);
+    els.btnEncore.addEventListener('click', cycleEncore);
     els.btnSleep.addEventListener('click', cycleSleep);
     els.progressBar.addEventListener('input', function (event) {
       var duration = playableDuration();
@@ -189,6 +198,9 @@
   }
 
   function prepareTrack(track) {
+    if (!track || !currentTrack || currentTrack.name !== track.name) {
+      resetEncore();
+    }
     currentTrack = track;
     metadataLoadToken += 1;
     if (!track) {
@@ -232,6 +244,7 @@
       reportPlaybackExit('skip');
       settleControl(els.btnNext);
     }
+    resetEncore();
     if (!upcoming.length) {
       return tune({ reset: false }).then(function () {
         if (!upcoming.length) {
@@ -271,6 +284,58 @@
         settleControl(els.btnFav);
       })
       .catch(function () {});
+  }
+
+  function cycleEncore() {
+    if (!currentTrack) return;
+    encoreRemaining = (encoreRemaining + 1) % (MAX_ENCORE_COUNT + 1);
+    updateEncore();
+    settleControl(els.btnEncore);
+  }
+
+  function resetEncore() {
+    if (!encoreRemaining) return;
+    encoreRemaining = 0;
+    updateEncore();
+  }
+
+  function replayCurrentTrack() {
+    if (!currentTrack || encoreRemaining <= 0) {
+      playNext(true);
+      return;
+    }
+    var replayedTrack = currentTrack;
+    encoreRemaining -= 1;
+    updateEncore();
+    audio.currentTime = 0;
+    savePosition();
+    audio.play()
+      .then(function () {
+        reportFeedback('replay', replayedTrack, 1);
+      })
+      .catch(function () {
+        if (currentTrack && currentTrack.name === replayedTrack.name) {
+          resetEncore();
+        }
+      });
+  }
+
+  function updateEncore() {
+    if (!els.btnEncore) return;
+    var active = encoreRemaining > 0;
+    var countText = active ? String(encoreRemaining) : '';
+    var label = '再听一遍';
+    if (active) {
+      label = '还会再播放 ' + encoreRemaining + ' 次，点击'
+        + (encoreRemaining === MAX_ENCORE_COUNT ? '关闭' : '增加');
+    }
+    els.btnEncore.innerHTML = ICONS.repeat
+      + '<span id="encore-count" class="encore-count" aria-hidden="true">' + countText + '</span>';
+    els.encoreCount = document.getElementById('encore-count');
+    els.btnEncore.classList.toggle('is-active', active);
+    els.btnEncore.setAttribute('aria-pressed', active ? 'true' : 'false');
+    els.btnEncore.setAttribute('aria-label', label);
+    els.btnEncore.setAttribute('title', label);
   }
 
   function cycleSleep() {
@@ -340,6 +405,7 @@
         renderStations();
         audio.pause();
         currentTrack = null;
+        resetEncore();
         tune({ reset: true, loadFirst: true }).then(function () {
           if (wasPlaying && currentTrack) playTrack(currentTrack);
         });
@@ -766,6 +832,7 @@
     }
     updatePlayIcon();
     updateFavorite();
+    updateEncore();
   }
 
   document.addEventListener('DOMContentLoaded', init);

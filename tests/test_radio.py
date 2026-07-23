@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 
 import pytest
 
@@ -62,6 +63,8 @@ def test_radio_page_exposes_polished_player_states(client):
     assert 'class="radio-layout"' in body
     assert 'class="play-state"' in body
     assert 'id="station-name"' in body
+    assert 'id="btn-encore"' in body
+    assert 'id="encore-count"' in body
     assert 'aria-pressed="false"' in body
 
     css = client.get("/static/radio.css")
@@ -184,6 +187,33 @@ def test_radio_feedback_records_local_profile(client, tmp_path, monkeypatch):
     assert entry["score"] > 0
 
 
+def test_radio_replay_feedback_updates_both_profiles(client, tmp_path):
+    res = client.post(
+        "/api/radio/feedback",
+        json={"name": "@default/a01.mp3", "event": "replay", "ratio": 1},
+    )
+
+    assert res.status_code == 200
+    profile_path = tmp_path / "tiklocal-data" / "radio_profile.json"
+    entry = json.loads(profile_path.read_text(encoding="utf-8"))["tracks"]["@default/a01.mp3"]
+    assert entry["replays"] == 1
+    assert entry["last_event"] == "replay"
+    assert entry["score"] > 0
+
+    database_path = tmp_path / "tiklocal-data" / "tiklocal.sqlite3"
+    with sqlite3.connect(database_path) as conn:
+        event = conn.execute(
+            "SELECT event_type FROM media_events WHERE uri = ? ORDER BY id DESC LIMIT 1",
+            ("@default/a01.mp3",),
+        ).fetchone()
+        affinity = conn.execute(
+            "SELECT replays FROM media_affinity WHERE uri = ?",
+            ("@default/a01.mp3",),
+        ).fetchone()
+    assert event == ("replay",)
+    assert affinity == (1,)
+
+
 def test_radio_profile_scores_completion_above_skip(tmp_path):
     store = RadioProfileStore(tmp_path / "radio_profile.json")
 
@@ -193,3 +223,16 @@ def test_radio_profile_scores_completion_above_skip(tmp_path):
     assert complete["score"] > 0
     assert skip["score"] < 0
     assert complete["score"] > skip["score"]
+
+
+def test_radio_profile_counts_replays_as_strong_interest(tmp_path):
+    store = RadioProfileStore(tmp_path / "radio_profile.json")
+
+    complete = store.record("@default/a01.mp3", "complete", ratio=0)
+    replay = store.record("@default/a01.mp3", "replay", ratio=1)
+    favorite = store.record("@default/a02.mp3", "favorite", ratio=1)
+
+    assert replay["replays"] == 1
+    assert replay["last_event"] == "replay"
+    assert replay["score"] - complete["score"] == pytest.approx(0.18)
+    assert favorite["score"] > replay["score"] - complete["score"]

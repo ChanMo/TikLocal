@@ -1113,7 +1113,7 @@ def create_app(test_config=None):
         payload = request.get_json(silent=True) or {}
         event = str(payload.get('event') or '').strip()
         uri = str(payload.get('name') or payload.get('uri') or '').strip()
-        if event not in {'play', 'complete', 'skip', 'favorite', 'error'}:
+        if event not in {'play', 'complete', 'replay', 'skip', 'favorite', 'error'}:
             return {'success': False, 'error': 'Invalid feedback event'}, 400
         ratio = _positive_ratio(payload.get('ratio'))
         entry = radio_service.record_feedback(uri, event, ratio=ratio)

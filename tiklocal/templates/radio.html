@@ -384,7 +384,7 @@
   .radio-controls {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(3, 3.88rem);
+    grid-template-columns: repeat(4, 3.88rem);
     justify-content: center;
     align-items: center;
     gap: 0.46rem;
@@ -529,7 +529,7 @@
     }
 
     .radio-controls {
-      grid-template-columns: repeat(3, 3.58rem);
+      grid-template-columns: repeat(4, 3.58rem);
       gap: 0.34rem;
     }
 
@@ -599,6 +599,10 @@
         <button id="btn-fav" class="radio-button" type="button" title="收藏" aria-label="收藏" aria-pressed="false">
           <i data-feather="heart"></i>
           <span class="sr-only">收藏</span>
+        </button>
+        <button id="btn-encore" class="radio-button" type="button" title="再听" aria-label="再听一遍" aria-pressed="false">
+          <i data-feather="repeat"></i>
+          <span id="encore-count" class="encore-count" aria-hidden="true"></span>
         </button>
         <button id="btn-next" class="radio-button is-primary" type="button" title="下一首" aria-label="下一首">
           <i data-feather="skip-forward"></i>
