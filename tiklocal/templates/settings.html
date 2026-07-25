@@ -64,6 +64,20 @@
     font-size: 11px;
     line-height: 1.45;
   }
+  .radio-device-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .radio-device-state::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #668b7d;
+  }
+  .radio-device-state.is-expired::before { background: #a58a67; }
+  .radio-device-list { margin-top: 8px; }
   .appearance-card { padding: 15px; }
   .appearance-heading { margin-bottom: 13px; }
   .theme-options {
@@ -255,6 +269,20 @@
   .credential-upload-copy { margin: 4px 0 10px; color: var(--settings-muted); font-size: 10px; line-height: 1.5; }
   .credential-file { width: 100%; color: var(--settings-muted); font-size: 10px; }
   .credential-upload-actions { display: flex; justify-content: flex-end; margin-top: 11px; }
+  .pairing-mask[hidden] { display: none; }
+  .pairing-mask { position: fixed; inset: 0; z-index: 276; display: grid; place-items: center; padding: 16px; background: rgba(18,18,16,.44); backdrop-filter: blur(9px); }
+  .pairing-dialog { width: min(100%, 460px); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--settings-line); border-radius: 22px; color: var(--settings-ink); background: var(--settings-bg); box-shadow: 0 26px 80px rgba(20,19,16,.24); }
+  .pairing-field { display: grid; gap: 7px; margin-top: 18px; }
+  .pairing-label { color: var(--settings-muted); font-size: 10px; font-weight: 650; }
+  .pairing-input, .pairing-link { width: 100%; border: 1px solid var(--settings-line); border-radius: 11px; padding: 11px 12px; color: var(--settings-ink); background: var(--settings-card); font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .pairing-link { min-height: 92px; resize: none; word-break: break-all; }
+  .pairing-warning { min-height: 18px; margin: 6px 0 0; color: #a2654d; font-size: 10px; line-height: 1.45; }
+  .pairing-result[hidden] { display: none; }
+  .pairing-qr { display: block; width: min(220px, 70vw); height: auto; margin: 16px auto 4px; border: 10px solid #fff; border-radius: 16px; background: #fff; }
+  .pairing-expiry { margin: 8px 0 0; color: var(--settings-muted); font-size: 10px; }
+  .pairing-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .pairing-open { display: inline-grid; place-items: center; text-decoration: none; }
+  .pairing-open[aria-disabled="true"] { pointer-events: none; opacity: .5; }
   .toast-wrap { position: fixed; right: 14px; bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 280; width: min(330px, calc(100vw - 28px)); }
   .settings-toast { display: flex; align-items: center; gap: 9px; padding: 11px 13px; border: 1px solid var(--settings-line); border-radius: 13px; color: var(--settings-ink); background: color-mix(in oklab, var(--settings-bg) 92%, transparent); box-shadow: 0 12px 32px rgba(20, 19, 16, 0.14); font-size: 12px; backdrop-filter: blur(16px); animation: toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
   .settings-toast svg { width: 16px; height: 16px; color: #668b7d; }
@@ -309,6 +337,29 @@
             <code id="install-origin" class="install-origin"></code>
           </div>
           <button id="install-app" class="settings-action is-primary" type="button">安装</button>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="radio-devices-title">
+      <h2 id="radio-devices-title" class="settings-section-title">Radio 客户端</h2>
+      <div class="settings-card">
+        <div class="settings-row">
+          <span class="setting-icon"><i data-feather="link"></i></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">配对新手机</div>
+            <div class="settings-row-copy">生成一个两分钟有效、使用一次即失效的安全配对链接。</div>
+          </div>
+          <button id="open-radio-pairing" class="settings-action is-primary" type="button">生成</button>
+        </div>
+      </div>
+      <div id="radio-device-list" class="settings-card radio-device-list">
+        <div class="settings-row">
+          <span class="setting-icon"><i data-feather="radio"></i></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">已配对设备</div>
+            <div class="settings-row-copy">正在读取设备令牌…</div>
+          </div>
         </div>
       </div>
     </section>
@@ -412,6 +463,35 @@
     </div>
   </section>
 </div>
+<div id="pairing-mask" class="pairing-mask" hidden>
+  <section class="pairing-dialog" role="dialog" aria-modal="true" aria-labelledby="pairing-title">
+    <div class="credential-head">
+      <div>
+        <h2 id="pairing-title" class="credential-title">配对 TikLocal Radio</h2>
+        <p class="credential-copy">链接不包含访问密码或长期设备令牌，并会在两分钟后失效。</p>
+      </div>
+      <button id="close-radio-pairing" class="credential-close" type="button" aria-label="关闭"><i data-feather="x"></i></button>
+    </div>
+    <label class="pairing-field">
+      <span class="pairing-label">手机能够访问的 Server 地址</span>
+      <input id="pairing-server-url" class="pairing-input" type="url" inputmode="url" autocomplete="url">
+    </label>
+    <p id="pairing-warning" class="pairing-warning"></p>
+    <div id="pairing-result" class="pairing-result" hidden>
+      <img id="pairing-qr" class="pairing-qr" alt="TikLocal Radio 一次性配对二维码">
+      <label class="pairing-field">
+        <span class="pairing-label">在 TikLocal Radio 中粘贴</span>
+        <textarea id="pairing-link" class="pairing-link" readonly></textarea>
+      </label>
+      <p id="pairing-expiry" class="pairing-expiry" aria-live="polite"></p>
+    </div>
+    <div class="pairing-actions">
+      <button id="generate-radio-pairing" class="settings-action is-primary" type="button">生成配对链接</button>
+      <button id="copy-radio-pairing" class="settings-action" type="button" hidden>复制链接</button>
+      <a id="open-radio-link" class="settings-action pairing-open" href="#" aria-disabled="true" hidden>在本机打开</a>
+    </div>
+  </section>
+</div>
 <div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
 {% endblock %}
 
@@ -425,7 +505,17 @@
     const installButton = document.getElementById('install-app');
     const installCopy = document.getElementById('install-app-copy');
     const credentialMask = document.getElementById('credential-mask');
+    const pairingMask = document.getElementById('pairing-mask');
+    const pairingServerUrl = document.getElementById('pairing-server-url');
+    const pairingResult = document.getElementById('pairing-result');
+    const pairingQr = document.getElementById('pairing-qr');
+    const pairingLink = document.getElementById('pairing-link');
+    const pairingExpiry = document.getElementById('pairing-expiry');
+    const copyPairingButton = document.getElementById('copy-radio-pairing');
+    const openRadioLink = document.getElementById('open-radio-link');
+    const radioDeviceList = document.getElementById('radio-device-list');
     const toastWrap = document.getElementById('toast-wrap');
+    let pairingTimer = 0;
 
     document.getElementById('install-origin').textContent = window.location.origin;
 
@@ -503,7 +593,10 @@
     async function requestJson(url, options = {}) {
       const response = await fetch(url, options);
       const payload = await response.json();
-      if (!response.ok || payload.success === false) throw new Error(payload.error || '请求失败');
+      if (!response.ok || payload.success === false) {
+        const message = typeof payload.error === 'object' ? payload.error?.message : payload.error;
+        throw new Error(message || '请求失败');
+      }
       return payload;
     }
 
@@ -535,6 +628,71 @@
       } catch (error) {
         document.getElementById('index-sync-copy').textContent = '暂时无法读取索引状态';
         document.getElementById('index-sync-state').classList.add('is-error');
+      }
+    }
+
+    function formatDeviceTime(value) {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? '配对时间未知' : `配对于 ${date.toLocaleString()}`;
+    }
+
+    function renderRadioDevices(devices = []) {
+      radioDeviceList.replaceChildren();
+      if (!devices.length) {
+        const row = document.createElement('div');
+        row.className = 'settings-row';
+        row.innerHTML = '<span class="setting-icon"><i data-feather="radio"></i></span><div class="settings-row-main"><div class="settings-row-title">还没有 Radio 客户端</div><div class="settings-row-copy">在 TikLocal Radio 中输入此 Server 的地址和访问密码即可配对。</div></div>';
+        radioDeviceList.appendChild(row);
+        feather.replace();
+        return;
+      }
+
+      devices.forEach((device) => {
+        const row = document.createElement('div');
+        row.className = 'settings-row';
+        const icon = document.createElement('span');
+        icon.className = 'setting-icon';
+        icon.innerHTML = '<i data-feather="smartphone"></i>';
+        const main = document.createElement('div');
+        main.className = 'settings-row-main';
+        const title = document.createElement('div');
+        title.className = 'settings-row-title';
+        title.textContent = device.name || 'TikLocal Radio';
+        const copy = document.createElement('div');
+        copy.className = `settings-row-copy radio-device-state${device.active ? '' : ' is-expired'}`;
+        copy.textContent = `${device.active ? '令牌有效' : '已因改密失效'} · ${formatDeviceTime(device.created_at)}`;
+        const revoke = document.createElement('button');
+        revoke.className = 'settings-action is-danger';
+        revoke.type = 'button';
+        revoke.textContent = '撤销';
+        revoke.addEventListener('click', () => {
+          confirmAction(
+            '撤销这个 Radio 客户端？',
+            `${device.name || '此设备'} 将无法继续访问媒体，需要重新输入访问密码配对。`,
+            '确认撤销',
+            'danger',
+            () => {
+              runButton(revoke, '撤销中…', async () => {
+                await requestJson(`/api/radio/devices/${encodeURIComponent(device.id)}`, { method: 'DELETE' });
+                await loadRadioDevices();
+                showToast('Radio 客户端已撤销');
+              }).catch(() => showToast('撤销失败，请稍后重试', 'error'));
+            },
+          );
+        });
+        main.append(title, copy);
+        row.append(icon, main, revoke);
+        radioDeviceList.appendChild(row);
+      });
+      feather.replace();
+    }
+
+    async function loadRadioDevices() {
+      try {
+        const payload = await requestJson('/api/radio/devices');
+        renderRadioDevices(payload.data?.devices || []);
+      } catch (_) {
+        radioDeviceList.querySelector('.settings-row-copy').textContent = '暂时无法读取已配对设备。';
       }
     }
 
@@ -616,6 +774,73 @@
       document.getElementById('manage-credentials').focus();
     }
 
+    function updatePairingWarning() {
+      let warning = '';
+      try {
+        const hostname = new URL(pairingServerUrl.value).hostname;
+        if (['localhost', '127.0.0.1', '::1'].includes(hostname)) {
+          warning = '这个地址只指向当前电脑；请改成手机可访问的局域网 IP、.local 主机名或 HTTPS 地址。';
+        }
+      } catch (_) {
+        warning = '请输入完整的 http:// 或 https:// 地址。';
+      }
+      document.getElementById('pairing-warning').textContent = warning;
+    }
+
+    function stopPairingTimer() {
+      if (pairingTimer) window.clearInterval(pairingTimer);
+      pairingTimer = 0;
+    }
+
+    function startPairingTimer(expiresIn) {
+      stopPairingTimer();
+      const deadline = Date.now() + Math.max(0, Number(expiresIn || 0)) * 1000;
+      const render = () => {
+        const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        const minutes = Math.floor(seconds / 60);
+        pairingExpiry.textContent = seconds
+          ? `此链接将在 ${minutes}:${String(seconds % 60).padStart(2, '0')} 后失效，使用一次后立即作废。`
+          : '此链接已失效，请重新生成。';
+        copyPairingButton.disabled = !seconds;
+        openRadioLink.setAttribute('aria-disabled', String(!seconds));
+        if (!seconds) stopPairingTimer();
+      };
+      render();
+      pairingTimer = window.setInterval(render, 1000);
+    }
+
+    function openRadioPairing() {
+      pairingServerUrl.value = window.location.origin;
+      pairingResult.hidden = true;
+      copyPairingButton.hidden = true;
+      openRadioLink.hidden = true;
+      pairingLink.value = '';
+      pairingQr.removeAttribute('src');
+      stopPairingTimer();
+      updatePairingWarning();
+      pairingMask.hidden = false;
+      document.body.style.overflow = 'hidden';
+      pairingServerUrl.focus();
+    }
+
+    function closeRadioPairing() {
+      stopPairingTimer();
+      pairingMask.hidden = true;
+      document.body.style.overflow = '';
+      document.getElementById('open-radio-pairing').focus();
+    }
+
+    async function copyPairingLink() {
+      try {
+        await navigator.clipboard.writeText(pairingLink.value);
+      } catch (_) {
+        pairingLink.focus();
+        pairingLink.select();
+        document.execCommand('copy');
+      }
+      showToast('配对链接已复制');
+    }
+
     themeButtons.forEach((button) => button.addEventListener('click', () => setThemePreference(button.dataset.themePreference)));
     window.addEventListener('tiklocal:theme-changed', (event) => syncThemeButtons(event.detail?.preference));
     window.addEventListener('tiklocal:pwa-status', (event) => renderInstallStatus(event.detail));
@@ -679,6 +904,30 @@
     document.getElementById('close-credentials').addEventListener('click', closeCredentials);
     credentialMask.addEventListener('click', (event) => { if (event.target === credentialMask) closeCredentials(); });
     credentialMask.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCredentials(); });
+    document.getElementById('open-radio-pairing').addEventListener('click', openRadioPairing);
+    document.getElementById('close-radio-pairing').addEventListener('click', closeRadioPairing);
+    pairingMask.addEventListener('click', (event) => { if (event.target === pairingMask) closeRadioPairing(); });
+    pairingMask.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeRadioPairing(); });
+    pairingServerUrl.addEventListener('input', updatePairingWarning);
+    copyPairingButton.addEventListener('click', () => void copyPairingLink());
+    document.getElementById('generate-radio-pairing').addEventListener('click', (event) => {
+      runButton(event.currentTarget, '生成中…', async () => {
+        const payload = await requestJson('/api/radio/pairing-grants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ server_url: pairingServerUrl.value }),
+        });
+        const data = payload.data || {};
+        pairingLink.value = data.pairing_uri || '';
+        pairingQr.src = data.qr_data_uri || '';
+        pairingResult.hidden = false;
+        copyPairingButton.hidden = false;
+        openRadioLink.hidden = false;
+        openRadioLink.href = pairingLink.value;
+        openRadioLink.setAttribute('aria-disabled', 'false');
+        startPairingTimer(data.expires_in);
+      }).catch((error) => showToast(error.message || '配对链接生成失败', 'error'));
+    });
     document.getElementById('upload-credential').addEventListener('click', (event) => {
       const input = document.getElementById('credential-file');
       const file = input.files?.[0];
@@ -695,6 +944,7 @@
     });
 
     loadStats();
+    loadRadioDevices();
     loadDownloadSettings();
   })();
 </script>

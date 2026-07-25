@@ -57,7 +57,10 @@ from tiklocal.services.collections import CollectionStore
 from tiklocal.services.embedded_metadata import read_embedded_generation
 from tiklocal.services.radio import RadioCandidate, RadioProfileStore, RadioService
 from tiklocal.services.auth import AuthStore
+from tiklocal.services.device_auth import DeviceAuthStore
+from tiklocal.services.pairing_grants import PairingGrantStore
 from tiklocal.auth import configure_auth
+from tiklocal.radio_client import radio_artwork_bytes, register_radio_client_routes
 from tiklocal.paths import (
     get_metadata_path,
     get_favorites_path,
@@ -71,6 +74,7 @@ from tiklocal.paths import (
     get_collections_path,
     get_radio_profile_path,
     get_auth_path,
+    get_device_auth_path,
 )
 from tiklocal import view_builders
 
@@ -142,6 +146,7 @@ def create_app(test_config=None):
         VECTOR_INDEX = None,
         AUTH_ENABLED = None,
         AUTH_COOKIE_SECURE = False,
+        DEVICE_AUTH_PATH = None,
         INSTANCE_NAME = None,
         HTTPS_ENABLED = False,
         TLS_CA_CERT_PATH = None,
@@ -167,11 +172,23 @@ def create_app(test_config=None):
     configured_auth = app.config.get('AUTH_ENABLED')
     auth_enabled = not bool(app.config.get('TESTING')) if configured_auth is None else bool(configured_auth)
     auth_store = AuthStore(app.config.get('AUTH_PATH') or get_auth_path())
+    device_auth_store = DeviceAuthStore(
+        app.config.get('DEVICE_AUTH_PATH') or get_device_auth_path()
+    )
+    pairing_grant_store = app.config.get('PAIRING_GRANT_STORE') or PairingGrantStore(
+        ttl_seconds=int(app.config.get('RADIO_PAIRING_GRANT_TTL') or 120),
+    )
     bootstrap = None
     if auth_enabled:
         bootstrap = auth_store.ensure(os.environ.get('TIKLOCAL_AUTH_PASSWORD'))
-    configure_auth(app, auth_store, enabled=auth_enabled)
+    configure_auth(
+        app,
+        auth_store,
+        enabled=auth_enabled,
+        device_auth_store=device_auth_store,
+    )
     app.extensions['auth_bootstrap'] = bootstrap
+    app.extensions['radio_pairing_grants'] = pairing_grant_store
 
     @app.template_global()
     def static_asset(filename: str) -> str:
@@ -245,6 +262,18 @@ def create_app(test_config=None):
         favorite_service,
         radio_profile_store,
         activity_store=activity_store,
+    )
+    register_radio_client_routes(
+        app,
+        app_version=app_version,
+        instance_name=instance_name,
+        auth_store=auth_store,
+        device_auth_store=device_auth_store,
+        pairing_grant_store=pairing_grant_store,
+        library_service=library_service,
+        favorite_service=favorite_service,
+        radio_service=radio_service,
+        thumbnail_service=thumbnail_service,
     )
     vector_index = app.config.get('VECTOR_INDEX') or SQLiteImageVectorStore(app_database)
     image_vector_service = ImageVectorService(library_service, vector_index)
@@ -994,36 +1023,6 @@ def create_app(test_config=None):
             return send_file(io.BytesIO(path), mimetype=mimetype)
         return send_file(path, mimetype=mimetype)
 
-    def _radio_artwork_bytes(uri: str) -> bytes:
-        palettes = [
-            ("#466b61", "#a88756", "#d7d2c4"),
-            ("#5c6750", "#b18462", "#d8d3c8"),
-            ("#57707a", "#9b8257", "#d2d5ce"),
-            ("#675f82", "#9b8b5b", "#d7d1c0"),
-            ("#72634e", "#5f8174", "#d8d4c7"),
-            ("#4f6f7e", "#a36f5d", "#d5d0c4"),
-        ]
-        palette = palettes[sum(uri.encode("utf-8", errors="ignore")) % len(palettes)]
-        size = 512
-        image = Image.new("RGB", (size, size), palette[2])
-        draw = ImageDraw.Draw(image, "RGBA")
-
-        for radius in range(size // 2, 24, -8):
-            idx = (radius // 8) % 2
-            color = palette[idx]
-            alpha = 18 if idx else 26
-            inset = size // 2 - radius
-            draw.ellipse((inset, inset, size - inset, size - inset), fill=color + f"{alpha:02x}")
-
-        draw.ellipse((42, 42, size - 42, size - 42), outline=(36, 36, 31, 38), width=2)
-        draw.ellipse((112, 112, size - 112, size - 112), outline=(70, 107, 97, 34), width=2)
-        draw.ellipse((182, 182, size - 182, size - 182), fill=palette[0], outline=(255, 255, 255, 56), width=2)
-        draw.ellipse((220, 220, size - 220, size - 220), fill=palette[2], outline=(36, 36, 31, 30), width=1)
-
-        output = io.BytesIO()
-        image.save(output, format="PNG", optimize=True)
-        return output.getvalue()
-
     @app.route('/api/radio/artwork')
     def api_radio_artwork():
         uri = library_service.find_existing_uri(unquote(request.args.get('uri') or ''))
@@ -1031,7 +1030,7 @@ def create_app(test_config=None):
             path, mimetype = thumbnail_service.get_thumbnail(uri)
             if not isinstance(path, bytes):
                 return send_file(path, mimetype=mimetype)
-        return send_file(io.BytesIO(_radio_artwork_bytes(uri or "radio")), mimetype='image/png')
+        return send_file(io.BytesIO(radio_artwork_bytes(uri or "radio")), mimetype='image/png')
 
 
     # --- API Routes ---

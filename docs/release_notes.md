@@ -1,5 +1,31 @@
 # Release Notes
 
+## Unreleased
+- 新增独立的 React Native / Expo 客户端 TikLocal Radio：包含编辑式原生播放界面、Demo Signal、后台音频配置、锁屏媒体信息、收藏、有限再听与睡眠定时。
+- 新增 `/api/v1` 原生 Radio 协议：支持访问密码配对、哈希设备令牌、Bearer 认证、真实电台队列、HTTP Range 媒体流、元数据、封面、幂等收藏与收听反馈。
+- 客户端使用 SecureStore 保存单 Server Profile；401 自动清除失效令牌，普通网络错误保留当前队列，并支持随时回退到 Demo Mode。
+- 新增设备令牌生命周期管理：客户端断开时自撤销，Web 设置页可列出并撤销单个 Radio 客户端，重新配对时清理旧令牌。
+- 新增两分钟、单次使用的一次性二维码配对：Web 设置页生成授权，App 扫码后显示目标 Server 并经用户确认兑换；保留粘贴链接和地址密码回退，Server 仅在内存中保存授权哈希。
+- 接入 `expo-camera` 的 QR-only 扫描器；仅在用户主动打开后申请相机权限，不保存图像，Android release APK 已核验没有录音权限。
+- 新增 TikLocal Radio 正式图标、Android adaptive icon 与原生启动页，并完成 iOS / Android 生产 bundle 验证。
+- 完成 Android Debug APK、含生产 Hermes bundle 的本地 release APK 和 release AAB 原生编译；显式移除悬浮窗、外部存储与生物识别等未使用权限。
+- 固化 TikLocal Radio `0.1.0 (1)`、EAS preview / production 构建策略和 iOS 标准加密声明；移除 iOS 未使用的麦克风与 Face ID 用途说明。
+- 收敛 EAS 云构建输入：排除本地原生工程、依赖、测试和商店材料，并增加无需物理设备签名的 iOS Simulator preview profile。
+- 使用官方安全区上下文替换 React Native 已弃用的 `SafeAreaView`；保持单一根 Provider，不增加导航或布局抽象，并完成 Android release 与 iOS Pods 自动链接验证。
+- 补齐 `expo-audio` 要求的直接 `expo-asset` peer dependency，Expo Doctor 20/20 通过。
+- 主 GitHub Actions 新增 TikLocal Radio 静态门禁：锁定 Node.js 22，验证 lockfile 安装、TypeScript、Expo 依赖健康度、双平台 production bundle 与内置音频资源解析；Python 发布构建同步依赖该门禁。
+- 新增 58 项客户端测试并纳入主 CI：覆盖 Radio Session、App 凭证生命周期、冷启动/前台深链、API 协议、SecureStore、扫码权限与 Pairing/Radio 页面语义交互；服务端 119 项回归通过，测试只替换原生边界，不增加业务抽象层或结构 Snapshot。
+- 补齐配对输入、Return/Demo/连接动作、电台与功能按钮的显式无障碍名称，并让播放进度以 progressbar 百分比和时间文本进入无障碍树。
+- 完成 Radio 客户端首轮 code-slim 审计：删除不可达 URL 防御、未使用 Promise 分支和冗余测试包装；确认现有 App/Session/Player/API/Storage 边界及 Screen 内联样式应继续保留。
+- 修复原生客户端连接空音乐库时永久停在 TUNING：改为明确的 `NO AUDIO` 状态、禁用无效操作并清除系统媒体会话；SecureStore 写入失败时尽力撤销刚签发的设备令牌。
+- 新增双平台真机 P0/P1 验收表；后台睡眠定时仍是发布决策门槛，耳机远程切歌已明确排除在 `0.1.x` 承诺之外。
+- 完成 Radio 播放器选型与隔离 PoC：`0.1.x` 保留 `expo-audio`，明确系统/耳机只承诺播放暂停，排除存在开源再分发许可门槛的 RN Track Player v5 与不满足新架构要求的 v4。
+- 新增双语隐私政策、App Store 中英文元数据、审核说明与 Google Play Data Safety 初稿，并将未真机验收的系统体验声明保留为发布门槛。
+- 新增原生 API 安全回归测试，覆盖配对限流、令牌哈希与撤销、改密失效、管理端 CSRF、路径穿越防护、Range、收藏幂等和反馈写入。
+- 闭合 `tiklocal-radio://` 原生配对入口：冷启动与前台事件均只打开并预填配对页，展示目标 Server 后等待用户确认；非法 URL 不改变当前 Radio，最终 Android APK 已核验 scheme intent filter。
+- 区分 iOS Development Build 与独立 Release 安装：新增 `ios:device` / `ios:release` 命令，明确 Development Client 只接受 Metro 地址，避免把 TikLocal Web HTML 误作 JavaScript bundle。
+- 完成 TikLocal Radio iPhone 真机 Release 编译、Personal Team 签名、安装与启动；生产 JavaScript bundle 已内嵌，日常使用不再依赖 Metro。
+
 ## v0.8.37 (2026-07-23)
 - Radio 新增有限“再听”机制，可为当前喜欢的歌曲追加 1–3 次播放，并保持控制区简洁。
 - 新增 `RAIN / BREEZE / OFF` Room 氛围选择：提供本地无声雨夜与午后窗纱循环视频，选择会持久保存并随音乐播放状态同步。

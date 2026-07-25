@@ -1,0 +1,46 @@
+{
+  "name": "tiklocal-radio",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "ios:device": "expo run:ios --device",
+    "ios:release": "expo run:ios --device --configuration Release --no-bundler",
+    "test": "jest --runInBand",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~57.0.8",
+    "expo-asset": "~57.0.7",
+    "expo-audio": "~57.0.3",
+    "expo-build-properties": "~57.0.7",
+    "expo-camera": "~57.0.3",
+    "expo-dev-client": "~57.0.9",
+    "expo-secure-store": "~57.0.1",
+    "expo-splash-screen": "~57.0.5",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "~5.7.0"
+  },
+  "devDependencies": {
+    "@testing-library/react-native": "^14.0.1",
+    "@types/jest": "29.5.14",
+    "@types/react": "~19.2.2",
+    "jest": "~29.7.0",
+    "jest-expo": "~57.0.2",
+    "typescript": "~6.0.3"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "clearMocks": true,
+    "watchman": false,
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/android/",
+      "/ios/"
+    ]
+  }
+}

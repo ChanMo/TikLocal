@@ -22,6 +22,7 @@ pyyaml = "^6.0"
 requests = "^2.32.0"
 pillow = "^11.0.0"
 pytest = "^9.0.2"
+segno = "^1.6.6"
 
 [tool.poetry.extras]
 https = ["cryptography"]

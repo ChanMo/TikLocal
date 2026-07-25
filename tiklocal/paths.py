@@ -73,6 +73,10 @@ def get_auth_path() -> Path:
     return get_data_dir() / 'auth.json'
 
 
+def get_device_auth_path() -> Path:
+    return get_data_dir() / 'radio_devices.json'
+
+
 def get_tls_dir() -> Path:
     d = get_data_dir() / 'tls'
     d.mkdir(parents=True, exist_ok=True)

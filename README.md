@@ -258,6 +258,8 @@ API keys are read from environment variables, preferring `TIKLOCAL_VISION_API_KE
 - Docs index: `docs/README.md`
 - Flow interaction unification: `docs/flow-interaction-unification.md`
 - Media index and local recommendation architecture: `docs/media-index-and-recommendation.md`
+- TikLocal Radio native client architecture: `docs/radio-native-client-architecture.md`
+- TikLocal Radio player selection: `docs/radio-player-selection.md`
 - OpenRouter image-to-video research: `docs/openrouter-image-to-video-research.md`
 - Release notes: `docs/release_notes.md`
 

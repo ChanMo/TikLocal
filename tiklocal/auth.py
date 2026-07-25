@@ -1,5 +1,6 @@
 import datetime
 import secrets
+import threading
 import time
 from collections import defaultdict, deque
 from urllib.parse import urlsplit
@@ -15,18 +16,22 @@ class LoginAttemptLimiter:
         self.limit = limit
         self.window_seconds = window_seconds
         self._attempts: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
 
     def retry_after(self, key: str) -> int:
-        attempts = self._active(key)
-        if len(attempts) < self.limit:
-            return 0
-        return max(1, int(self.window_seconds - (time.monotonic() - attempts[0])))
+        with self._lock:
+            attempts = self._active(key)
+            if len(attempts) < self.limit:
+                return 0
+            return max(1, int(self.window_seconds - (time.monotonic() - attempts[0])))
 
     def record_failure(self, key: str) -> None:
-        self._active(key).append(time.monotonic())
+        with self._lock:
+            self._active(key).append(time.monotonic())
 
     def clear(self, key: str) -> None:
-        self._attempts.pop(key, None)
+        with self._lock:
+            self._attempts.pop(key, None)
 
     def _active(self, key: str) -> deque[float]:
         attempts = self._attempts[key]
@@ -36,7 +41,7 @@ class LoginAttemptLimiter:
         return attempts
 
 
-def configure_auth(app, auth_store, *, enabled: bool) -> None:
+def configure_auth(app, auth_store, *, enabled: bool, device_auth_store=None) -> None:
     app.extensions['auth_store'] = auth_store
     app.extensions['auth_enabled'] = enabled
     limiter = LoginAttemptLimiter()
@@ -103,6 +108,16 @@ def configure_auth(app, auth_store, *, enabled: bool) -> None:
             return {'success': False, 'error': 'Invalid CSRF token'}, 403
         return 'Invalid CSRF token', 403
 
+    def native_token_is_valid() -> bool:
+        authorization = str(request.headers.get('Authorization') or '')
+        scheme, separator, token = authorization.partition(' ')
+        return bool(
+            device_auth_store
+            and separator
+            and scheme.lower() == 'bearer'
+            and device_auth_store.verify(token, auth_revision=auth_store.revision)
+        )
+
     @app.before_request
     def enforce_authentication():
         if request.endpoint in {
@@ -119,6 +134,15 @@ def configure_auth(app, auth_store, *, enabled: bool) -> None:
             if request.method in UNSAFE_METHODS and not csrf_is_valid():
                 return csrf_error_response()
             return None
+        if request.path in {'/api/v1/pair', '/api/v1/pair/claim'}:
+            return None
+        if request.path.startswith('/api/v1/'):
+            if native_token_is_valid():
+                return None
+            return {'success': False, 'error': {
+                'code': 'authentication_required',
+                'message': 'A valid device token is required',
+            }}, 401
         if not is_authenticated():
             return unauthorized_response()
         if request.method in UNSAFE_METHODS and not csrf_is_valid():

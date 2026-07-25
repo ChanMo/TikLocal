@@ -1,0 +1,12 @@
+.expo/
+.expo-shared/
+android/
+ios/
+dist/
+node_modules/
+npm-debug.log*
+coverage/
+store/
+README.md
+**/*.test.ts
+**/*.test.tsx

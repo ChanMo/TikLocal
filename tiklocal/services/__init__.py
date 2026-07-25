@@ -292,14 +292,22 @@ class FavoriteService:
         """Toggle favorite status, returns new state (True=fav, False=unfav)."""
         favs = self.load()
         key = self._normalize(filename)
-        if key in favs:
-            favs.remove(key)
-            is_fav = False
-        else:
+        is_fav = key not in favs
+        return self._save_state(favs, key, is_fav)
+
+    def set_favorite(self, filename: str, is_favorite: bool) -> bool:
+        """Set favorite state idempotently and return the persisted state."""
+        favs = self.load()
+        key = self._normalize(filename)
+        return self._save_state(favs, key, bool(is_favorite))
+
+    def _save_state(self, favs: set[str], key: str, is_favorite: bool) -> bool:
+        if is_favorite:
             favs.add(key)
-            is_fav = True
+        else:
+            favs.discard(key)
         self.save(favs)
-        return is_fav
+        return is_favorite
 
     def is_favorite(self, filename: str) -> bool:
         return self._normalize(filename) in self.load()
