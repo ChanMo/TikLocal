@@ -2,6 +2,16 @@
 
 ## Unreleased
 - 新增独立的 React Native / Expo 客户端 TikLocal Radio：包含编辑式原生播放界面、Demo Signal、后台音频配置、锁屏媒体信息、收藏、有限再听与睡眠定时。
+- TikLocal Radio 新增 iOS 优先的原生页面栈：Connection 使用 Form Sheet，配对改为扫码 / 手动 / 粘贴链接逐步展开并保留系统返回手势；根 Radio 使用独立 Safe Area 顶部，不再受标准导航栏标题与 Server 按钮限制。
+- Radio 首页重构为开放式 Signal Dial：当前 Station 位于左上角并用系统 Action Sheet 切换，SF Symbols 提供 Favorite / Play / Next 与状态图标，Encore、Sleep、Connection 收进右上角菜单；删除巨大方形 Card、Server 重复信息、频道编号、横向 Chip、文字模拟图标和技术页脚。
+- Signal Dial 使用深色唱盘、稀疏频率刻度与曲目 accent，播放时缓慢旋转并尊重系统 Reduce Motion；Loading、Offline、Empty 采用不改变主骨架的专用内容状态。
+- Radio 首页纵向节奏按屏幕高度自适应，并在自定义顶部与 Signal Dial 之间增加 24pt Main 呼吸区；已在 iPhone 17 / iOS 26.5 模拟器完成 Release 构建、安装与实际渲染复核，小屏幕保持紧凑且不引入首屏滚动。
+- 修复通知中心、控制中心、页面返回和前后台切换触发重新 Tune、随机替换队列的问题；正常恢复不再发出网络请求，离线 Retry 在已有队列时也只恢复连接。
+- 新增不含 Token 的本地 Radio 队列快照：冷启动恢复上次 Station、队列、当前曲目和最近历史，使用当前 SecureStore Token 重建媒体 Header；401、Device 变化或 Forget This Server 时自动清理。
+- 修复从 Connection 进入 Change Server 后无法关闭：Pairing modal 现在提供显式 Cancel，返回原页面且不会修改当前连接；已有连接的冷启动深链也保留可取消的 Radio 返回路径。
+- 重构 Radio 连接记忆：SecureStore 支持 `paired` / `known` 两种单 Server 状态并自动迁移旧 Profile；离线、401 和失败重连继续保留地址与名称，只有确认 Forget This Server 才清除。
+- 新增独立 Connection 页面、离线 Retry、破坏性断开确认和 iOS Sleep Timer Action Sheet；移除播放器中的 API / Token 技术文案。
+- 修复已保存 Server 冷启动时的 iOS Release 崩溃：不再向 Expo Audio 的原生 `replace` 传入无效 `null` Source，清空状态改为暂停并移除锁屏控制，并增加 Player 边界回归测试。
 - 新增 `/api/v1` 原生 Radio 协议：支持访问密码配对、哈希设备令牌、Bearer 认证、真实电台队列、HTTP Range 媒体流、元数据、封面、幂等收藏与收听反馈。
 - 客户端使用 SecureStore 保存单 Server Profile；401 自动清除失效令牌，普通网络错误保留当前队列，并支持随时回退到 Demo Mode。
 - 新增设备令牌生命周期管理：客户端断开时自撤销，Web 设置页可列出并撤销单个 Radio 客户端，重新配对时清理旧令牌。
@@ -14,7 +24,7 @@
 - 使用官方安全区上下文替换 React Native 已弃用的 `SafeAreaView`；保持单一根 Provider，不增加导航或布局抽象，并完成 Android release 与 iOS Pods 自动链接验证。
 - 补齐 `expo-audio` 要求的直接 `expo-asset` peer dependency，Expo Doctor 20/20 通过。
 - 主 GitHub Actions 新增 TikLocal Radio 静态门禁：锁定 Node.js 22，验证 lockfile 安装、TypeScript、Expo 依赖健康度、双平台 production bundle 与内置音频资源解析；Python 发布构建同步依赖该门禁。
-- 新增 58 项客户端测试并纳入主 CI：覆盖 Radio Session、App 凭证生命周期、冷启动/前台深链、API 协议、SecureStore、扫码权限与 Pairing/Radio 页面语义交互；服务端 119 项回归通过，测试只替换原生边界，不增加业务抽象层或结构 Snapshot。
+- 新增 73 项客户端测试并纳入主 CI：覆盖 Radio Session、无随机 Tune 的生命周期恢复、本地队列快照、App 凭证生命周期、冷启动/前台深链、API 协议、SecureStore、扫码权限与 Pairing/Radio 页面语义交互；服务端 119 项回归通过，测试只替换原生边界，不增加业务抽象层或结构 Snapshot。
 - 补齐配对输入、Return/Demo/连接动作、电台与功能按钮的显式无障碍名称，并让播放进度以 progressbar 百分比和时间文本进入无障碍树。
 - 完成 Radio 客户端首轮 code-slim 审计：删除不可达 URL 防御、未使用 Promise 分支和冗余测试包装；确认现有 App/Session/Player/API/Storage 边界及 Screen 内联样式应继续保留。
 - 修复原生客户端连接空音乐库时永久停在 TUNING：改为明确的 `NO AUDIO` 状态、禁用无效操作并清除系统媒体会话；SecureStore 写入失败时尽力撤销刚签发的设备令牌。

@@ -1,6 +1,6 @@
 # TikLocal Radio 原生客户端架构
 
-- 状态: 非真机开发与扫码配对已收敛，等待真机验收
+- 状态: iOS 优先的原生导航与连接记忆已落地，等待更新安装与真机验收
 - 更新时间: 2026-07-25
 
 ## 背景/目标
@@ -47,13 +47,19 @@ apps/radio/
 └── src/
     ├── RadioScreen.tsx
     ├── RadioScreen.test.tsx
+    ├── SignalDial.tsx
+    ├── ConnectionScreen.tsx
+    ├── ConnectionScreen.test.tsx
     ├── PairingScreen.tsx
     ├── PairingScreen.test.tsx
     ├── PairingScanner.tsx
     ├── PairingScanner.test.tsx
     ├── radio.ts
     ├── radio.test.ts
+    ├── radioResume.ts
+    ├── radioResume.test.ts
     ├── player.ts
+    ├── player.test.ts
     ├── api.ts
     ├── api.test.ts
     ├── storage.ts
@@ -62,7 +68,7 @@ apps/radio/
     └── theme.ts
 ```
 
-当前共有 10 个业务源码文件和 7 个测试文件。`PairingScanner.tsx` 单独存在，是因为相机权限、扫描生命周期、错误恢复和确认网络目标构成独立交互边界；没有继续拆出 Hook、Repository 或样式文件。
+当前共有 13 个业务源码文件和 10 个测试文件。`ConnectionScreen.tsx` 代表低频连接管理的真实页面边界；`PairingScanner.tsx` 单独存在，是因为相机权限、扫描生命周期、错误恢复和确认网络目标构成独立交互边界；`SignalDial.tsx` 独立承担唱盘动画、频率刻度和 Reduce Motion 生命周期；`radioResume.ts` 是非敏感播放队列的单文件持久化边界。没有继续拆出 Hook、Repository、通用控件或样式文件。
 
 ### 明确不做
 
@@ -84,7 +90,7 @@ apps/radio/
 这些数字是警报线，不是追求拆分的 KPI：
 
 - 首期业务源码约 10–15 个文件以内。
-- `RadioScreen.tsx` 约 150–300 行。
+- `RadioScreen.tsx` 约 350–650 行；视觉常量继续留在页面内，不以移动 StyleSheet 伪装体量下降。
 - `radio.ts` 可容纳 300–500 行的内聚会话逻辑。
 - 其他业务模块通常为 80–250 行。
 - MVP 直接业务依赖约 5 个以内。
@@ -97,15 +103,28 @@ apps/radio/
 
 - 删除 `normalizeBaseUrl` 中 HTTP(S) `URL` 构造成功后再次检查 hostname 的不可达分支。
 - 删除测试 Deferred 中从未使用的 reject 通道、两个无状态 Screen 测试的冗余全局清理，并内联仅调用一次的成功启动 Fetch 包装。
-- 保留 App 的 `profile` / `showPairing` 两个状态：已有 Profile 时仍需进入可取消的配对页，二者不是重复事实来源。
+- 当时保留 App 的 `profile` / `showPairing` 两个状态；后续原生导航落地后由 `StoredConnection` 与 Navigation Stack 替代。
 - 保留 `player.ts`、`api.ts`、`storage.ts` 和 `model.ts`：分别对应原生媒体、Server 协议、安全持久化和共享数据契约，不是薄分层。
 - 保留初次 Tune 与换台的少量相似分支：抽取后需要一个捕获多个 Hook setter、Profile、Player 的回调，反而扩大依赖表和跳转成本。
 - 不拆两个 Screen 的 StyleSheet。当前长文件的大部分体量是只服务本页面的视觉常量；移到独立文件不会减少业务复杂度。
 - 扫码与手动连接共用一个异步连接入口，删除重复 loading / error 处理；`PairingScanner` 只负责权限、扫描与确认，不持有 Profile 或令牌。
 - 用官方 `react-native-safe-area-context` 替换 React Native 已弃用的
-  `SafeAreaView`；只在 App 根部增加 Provider，没有引入导航层、布局 Hook 或页面包装体系。
+  `SafeAreaView`；只在 App 根部增加 Provider。
 
 后续只有在样式出现跨 Screen 真实复用、Radio Session 出现第二个独立生命周期，或单个流程无法一屏连续阅读时再拆分；不以行数越线单独触发重构。
+
+### 2026-07-25 iOS 交互收敛
+
+- 引入 React Navigation Native Stack，仅定义 `Radio`、`Connection`、`Pairing` 三个真实页面；Connection 与 Pairing 使用原生导航栏、返回手势与 Form Sheet，根 Radio 隐藏系统 Header 并自行处理 Safe Area，不建立文件路由或通用导航包装。
+- `PairingScreen` 改为渐进式流程：第一层只显示扫码、手动输入、粘贴链接和 Demo 选择，输入框不再一次性全部铺开；深链仍先展示目标 Server 再确认。
+- 新增独立 Connection 页面，明确展示 Server 名称、地址和 Online / Offline / Authorization Required 状态；重试、换 Server 与忘记 Server 不再共用入口。
+- 忘记 Server 使用系统破坏性确认；Sleep Timer 在 iOS 使用系统 Action Sheet 选择，不再依靠隐含的点击循环。
+- Pairing 仅在导航栈存在上一页时显示显式 Cancel；从 Change Server 进入时返回 Connection，从已连接状态的深链进入时返回 Radio。取消只关闭页面并清理待处理深链，不修改当前 Profile。
+- Radio 左上角只显示 SF Symbol 与当前 Station，点击使用系统 Action Sheet 切换；右上角系统菜单承载 Encore、Sleep Timer 与 Connection，启用后的 Encore / Sleep 才显示小型状态标记。
+- 中心视觉删除无业务含义的方形 Card，改为开放式 Signal Dial：深色唱盘、非完整频率弧线与稀疏刻度直接位于纸张背景，播放时慢速旋转，并跟随系统 Reduce Motion 停止持续动画。
+- 自定义顶部与 Signal Dial 之间保留 24pt Main 呼吸区，不通过增高导航栏或垂直居中制造小屏溢出。
+- Favorite / Play / Next 使用 `expo-symbols` 的原生 SF Symbols 与 44pt 以上点击区域，不再用 `SAVE / PLAY / NEXT` 文本模拟图标。Play 是唯一高权重实心按钮。
+- Radio 正常状态不显示 Server、Demo 来源、Station description、频道编号、ON AIR 或技术页脚；Loading、Offline、Empty 通过曲目区域和右上角状态点表达，只有异常时提供 Connection 恢复入口。正常尺寸以单屏阅读为目标，小屏与大字体仍由纵向 ScrollView 兜底。
 
 ## 接口与边界
 
@@ -118,9 +137,22 @@ apps/radio/
 - `toggleFavorite()`
 - `encore()`
 - `setSleepTimer()`
+- `retry()`
 - `snapshot`
 
 它持有电台、队列索引、收藏和睡眠状态，但不复制 Player 的 `playing`、进度或时长。
+
+`retry()` 只负责恢复失败连接：已有有效队列时重新验证 Stations 并保留当前曲目、索引和播放位置；只有首次启动尚未取得队列时才重新 Tune。Station 切换和队列耗尽是正常状态下仅有的两条新队列入口。
+
+### Radio Resume
+
+`radioResume.ts` 使用 `expo-file-system` 在 App Documents 中保存当前 Station、最多 30 首经过清理的曲目、索引和最近 URI：
+
+- 快照不保存 Token、Authorization Header、密码或 SecureStore Profile。
+- 恢复时使用当前 SecureStore Token 重新附加媒体请求 Header。
+- 快照只在队列、索引、Station 或收藏状态变化时写入，不跟随 250ms 播放进度写盘。
+- Device ID 不匹配、JSON 损坏、401 或 Forget This Server 时删除快照。
+- 冷启动恢复同一队列和曲目，但保持暂停；短暂后台切换继续由原生 Player 维持，不经过文件恢复。
 
 ### Player
 
@@ -129,6 +161,7 @@ apps/radio/
 - 设置后台播放音频模式。
 - 装载当前音轨并暴露原生播放状态。
 - 注册锁屏媒体信息。
+- 清空播放态只暂停 Player 并移除锁屏控制；`AudioPlayer.replace` 只接收真实 `AudioSource`，不得用 `null` 模拟 unload。
 - 不建立通用播放器接口；如果未来确实引入第二个播放器实现，再按差异抽象。
 
 ### Server 与 Storage
@@ -136,7 +169,7 @@ apps/radio/
 第二阶段已经加入：
 
 - `api.ts`：具体的 TikLocal API v1 客户端，不复制 DTO / Entity / ViewModel。
-- `storage.ts`：使用一个 SecureStore JSON 条目保存单 Server Profile 与设备令牌，不按键拆 Repository。
+- `storage.ts`：使用一个 SecureStore JSON 条目保存单 Server 连接，不按键拆 Repository。记录可以是含设备令牌的 `paired`，也可以是只保留地址与名称的 `known`；旧 `server-profile.v1` 会在读取时迁移到 `connection.v2`。
 
 Server 侧没有把原生路由继续塞入 `tiklocal/app.py`；原生 API 边界位于 `tiklocal/radio_client.py`，设备令牌生命周期位于 `tiklocal/services/device_auth.py`，短期一次性授权位于 `tiklocal/services/pairing_grants.py`。
 
@@ -174,7 +207,7 @@ POST   /api/radio/pairing-grants
 ### 连接与状态流
 
 ```text
-SecureStore Profile
+SecureStore Connection + Documents Radio Resume
         ↓
 Web QR → POST /api/v1/pair/claim
         或
@@ -187,10 +220,14 @@ Radio Session → expo-audio
 favorite / feedback
 ```
 
-- 无 Profile 时进入配对页，优先扫码；也可粘贴配对链接、手动输入地址和密码，或选择 Demo Signal。
+- 无连接记录时进入配对页，优先扫码；粘贴链接和手动输入按选择后再展开，也可进入 Demo Radio。
 - 冷启动和前台均监听 `tiklocal-radio://pair`。深链必须先通过与扫码相同的严格解析，只负责打开配对页并显示目标 Server；用户确认前不发出兑换请求，取消后保留原有 Profile。
-- Token 返回 401 时清除 SecureStore 并重新配对。
-- 普通网络错误不清空 Profile，保留当前队列并显示离线状态。
+- Token 返回 401 时只移除失效凭证，保留 Server 地址与名称并进入聚焦的重新授权流程。
+- 普通网络错误不清空连接记录；Radio 与 Connection 页面均明确显示离线且连接已保存，并提供 Retry。
+- 手动连接在地址通过规范化后即记住该地址，即使当次 Server 不可达或密码错误，重新进入也无需再次输入；密码从不保存。
+- 配对新 Server 成功之前保留旧 Profile；只有新 Profile 成功写入 SecureStore 后才切换并尽力撤销旧令牌。
+- 通知中心、控制中心、页面返回及 `inactive/background → active` 不发起 Tune 或连接重试；原生 Player 与内存队列继续作为当前会话。只有明确离线后的用户 Retry 才检查 Server，且已有队列时不替换队列。
+- 只有用户在 Connection 页面确认“Forget This Server”时才删除地址、名称与令牌；Demo 选择不再等同于断开。
 - 收藏先乐观更新，Server 失败时回滚。
 
 ## MVP 范围
@@ -244,6 +281,7 @@ Android 本地发布门槛已经验证：
 ## 风险与权衡
 
 - `expo-audio` 当前能覆盖 MVP，但系统队列、车载或极端后台场景可能暴露平台差异；先用真机验收数据决定是否更换播放器。
+- Native Stack 是当前唯一新增的 UI 基础设施，只承担三个页面的系统导航语义；在出现 Library、Search、Download 等更多顶级区域前，不迁移 Expo Router，也不增加 Tab Bar。
 - 播放器选型已收敛：`0.1.x` 继续使用 `expo-audio`，只承诺系统及耳机播放/暂停，不支持耳机、锁屏或通知的下一首/上一首。RN Track Player v5 存在开源再分发许可门槛，v4 不满足当前新架构与构建要求；详见 `docs/radio-player-selection.md`。
 - 睡眠定时当前依赖 JavaScript timer，后台冻结可能影响触发时间；真机 30 分钟锁屏测试属于 P0，未通过时需移除后台可靠性暗示或改用原生定时能力。
 - Bearer Header 已进入 `expo-audio` 音源，但后台恢复是否始终保留 Header 仍需真机验证；只有验证失败时才引入短期签名 URL。
@@ -262,17 +300,19 @@ Android 本地发布门槛已经验证：
 - 纯状态转换与 API 协议使用确定性测试。
 - 原生 Player 不做大规模 Mock，以 iPhone 真机检查清单为主。
 - 客户端采用 Expo 官方的 `jest-expo` 与 React Native Testing Library，不另建 reducer 或依赖注入层。测试直接运行 `useRadioSession`，只替换原生 Player，并通过 Fetch 替身经过真实 `api.ts`。
-- 当前 58 项客户端测试按现有边界组织：
-  - Radio Session：受保护音源装载、快速切换电台的旧响应隔离、401、离线保留、空库控制和睡眠定时。
-  - App 生命周期：启动恢复、冷启动/前台深链、非法 URL 隔离、SecureStore 读取失败、401 断开、保存失败撤销新令牌、切换 Server、进入 Demo。
+- 当前 73 项客户端测试按现有边界组织：
+  - Radio Session：受保护音源装载、冷启动队列命中、无随机 Tune 的离线重连、快速切换电台的旧响应隔离、401、离线保留、空库控制和睡眠定时。
+  - Player：清空状态不会向原生 `replace` 传入 `null`，避免 Release 启动阶段触发无法捕获的 `RCTFatalException`。
+  - App 生命周期：启动恢复、前后台切换不 Retry、冷启动/前台深链、非法 URL 隔离、旧存储迁移、401 保留 Server、保存失败撤销新令牌、切换 Server、取消切换不修改连接、显式忘记与进入 Demo。
   - Server API：地址与配对链接规范化、一次性授权兑换、协议版本、Bearer Header、曲目映射、收藏/反馈、错误 Envelope、网络失败和 12 秒超时。
-  - Storage：有效 Profile、未存储状态、损坏 JSON、不完整数据，以及单 JSON 条目的保存与清理。
-  - Pairing / Scanner / Radio UI：扫码权限、QR-only、无效码恢复、目标确认、粘贴与手动配对、错误提示、异步禁用、配对导航、电台选择、播放动作、活动状态、空库禁用和播放进度语义。
+  - Storage：`paired` / `known`、旧 Profile 迁移、未存储状态、损坏 JSON、不完整数据、单 SecureStore JSON 条目，以及不含 Token 的队列文件保存、恢复、失效与清理。
+  - Pairing / Scanner / Connection / Radio UI：渐进式输入、扫码权限、QR-only、目标确认、错误恢复、离线连接说明、破坏性确认、左上角电台选择、图标播放动作、更多菜单、系统 Sleep Sheet、空库禁用和播放进度语义。
 - 每个阶段记录源码文件数、直接依赖数和最长文件，判断复杂度是否收敛。
 - 服务端全量回归为 119 项通过；TypeScript strict、Expo 配置、原生工程生成以及 iOS / Android production bundle 均通过。此次 Expo Doctor 在线检查因 Expo API TLS 连接中断未完成，不能作为当前绿色证据。
 - 仓库主 GitHub Actions 的独立 `radio` job 使用 Node.js 22 + `npm ci`、TypeScript、客户端测试、固定版 Expo Doctor、双平台 production bundle 与 Demo 音频资源解析构成无真机静态门禁；Python 发布构建依赖该 job。
-- 当前业务源码为 10 个、共 2676 行；7 个测试文件共 1703 行。新增的 `PairingScanner.tsx` 是相机生命周期边界；扫码、粘贴、深链和手动配对共享连接流程，没有新增 Hook、Repository、依赖注入或共享测试框架。
-- UI 测试只查询 role、accessible name、state、value 和用户可见文本，不保存结构 Snapshot。测试暴露并促成配对输入、自定义按钮与播放进度的显式无障碍语义；布局和视觉状态保持不变。
+- 当前业务源码为 13 个、共 3967 行；10 个测试文件共 2268 行。Signal Dial 因独立动画与 Reduce Motion 生命周期成为唯一视觉文件，Radio Resume 因文件格式校验与凭证剥离成为唯一会话持久化文件；没有新增 Store、Repository、依赖注入、UI Kit 或通用组件目录。新增运行依赖仅为 Expo SDK 57 对应的 `expo-symbols ~57.0.1` 与 `expo-file-system ~57.0.1`。
+- UI 测试只查询 role、accessible name、state、value 和用户可见文本，不保存结构 Snapshot。测试覆盖配对输入、自定义按钮、播放进度、电台 Action Sheet 与取消切换 Server；视觉几何和动画留给 iPhone 体验验收。
+- 2026-07-25 使用 iPhone 17 / iOS 26.5 模拟器完成 Release 原生构建、安装与首页逐像素复核：SF Symbols、Safe Area、Signal Dial、Station 入口与三枚 Transport 控件均正常；高屏幕采用 300pt 拨盘和更舒展的纵向节奏，小屏幕回退为 282pt，避免为了视觉比例制造首屏滚动。模拟器结果只作为布局证据，不替代后台播放、耳机、相机和触感的真机门禁。
 - 客户端正式图标由项目专属视觉稿生成，并接入 iOS App Icon、Android adaptive icon 与原生启动页。
 - Android Debug APK、含生产 bundle 的本地 release APK 和 release AAB 均完成原生编译；加入扫码、安全区和深链处理后再次完成 release APK 编译。最终 APK 已核验 `tiklocal-radio` 的 VIEW/BROWSABLE intent filter，权限仍只有相机而没有录音。
 - iOS Pods 已成功安装 99 个 Pod，包含 Expo Camera 的条码扫描实现和安全区原生模块；完成 Xcode 首次运行与 iOS 平台组件准备后，已使用 Personal Team 在 iPhone 真机完成 Release 编译、签名、安装和进程启动。Release 内嵌生产 JavaScript bundle，不依赖 Metro。
@@ -297,6 +337,9 @@ Android 本地发布门槛已经验证：
 - [x] 为 Radio Session 增加确定性测试，并纳入主 CI。
 - [x] 完成播放器选型，固定 `0.1.x` 的远程媒体能力边界。
 - [x] 修复本机 Xcode 系统组件并完成 iPhone 真机 Release 编译、签名、安装与启动。
+- [x] 将 Radio / Connection / Pairing 收敛为 iOS 原生 Stack，并完成渐进式配对交互。
+- [x] 将 SecureStore 升级为 `paired` / `known` 连接记录，保证离线、401 和失败重连不会反复要求输入地址。
+- [ ] 在 iPhone 安装本次更新，验收自定义 Radio 顶部、SF Symbols、开放式 Signal Dial、更多菜单、异常状态、Pairing Cancel 与 Connection Form Sheet。
 - [ ] 登录 Expo / Apple / Google 账号，关联 EAS project 并建立 preview、TestFlight 与 Play 内测流程。
 - [ ] 按 `apps/radio/store/device-acceptance.md` 完成双平台 P0 验收；远程切歌不属于 `0.1.x` 验收范围。
 

@@ -1,6 +1,6 @@
 # TikLocal Radio
 
-TikLocal 的原生 Radio 伴侣客户端。当前版本可扫描 TikLocal Web 设置页生成的一次性二维码完成单 Server 配对，也保留粘贴配对链接、手动地址与访问密码以及内置 Demo Signal。
+TikLocal 的原生 Radio 伴侣客户端。当前版本使用原生页面栈组织 Radio、连接管理与配对流程，可扫描 TikLocal Web 设置页生成的一次性二维码完成单 Server 配对，也保留渐进式的粘贴链接、手动地址与访问密码以及内置 Demo Radio。
 
 ## 本地运行
 
@@ -44,9 +44,11 @@ Radio，不会显示 Development Client 启动页。
 https://studio-mac.local:8443
 ```
 
-二维码不含访问密码或设备令牌，Server 只在内存中保存一次性授权的哈希。配对成功后，访问密码和一次性授权都不会保存；App 只在 SecureStore 中保存 Server 返回的设备令牌。修改 TikLocal 访问密码会让既有授权与设备令牌失效并要求重新配对。
+二维码不含访问密码或设备令牌，Server 只在内存中保存一次性授权的哈希。配对成功后，访问密码和一次性授权都不会保存；App 在 SecureStore 中保存 Server 地址、名称和返回的设备令牌。修改 TikLocal 访问密码会让设备令牌失效，但 App 会继续记住 Server 地址与名称，只要求重新授权。
 
-切换到 Demo Signal 时，App 会尽力撤销当前设备令牌。也可以在 TikLocal Web 设置页的“Radio 客户端”区域查看并撤销指定设备。
+Server 暂时离线时，App 保留连接并提供重试；连接失败后也会记住格式有效的最近地址。只有在 Connection 页面确认 Forget This Server 才会删除本机连接并尽力撤销设备令牌。也可以在 TikLocal Web 设置页的“Radio 客户端”区域查看并撤销指定设备。
+
+通知中心、控制中心、页面返回或普通前后台切换不会重新 Tune；当前原生播放会话和队列保持不变。进程被终止后的冷启动会从不含凭证的本地快照恢复 Station、队列和当前曲目，并使用 SecureStore 中的当前 Token 重建媒体请求。离线 Retry 在已有队列时只恢复连接，不随机替换队列。
 
 ## 构建分发
 
@@ -98,7 +100,7 @@ npx expo export:embed --platform ios --dev false --entry-file index.ts --bundle-
 npx expo export:embed --platform android --dev false --entry-file index.ts --bundle-output /tmp/tiklocal-radio-android.bundle
 ```
 
-仓库主 CI 会在 Node.js 22 下从 `package-lock.json` 执行 `npm ci`、TypeScript、58 项 App / Session / API / Storage / Screen 测试、固定版本 Expo Doctor，以及带 Demo 音频资源复制的 iOS / Android production bundle。该门禁不需要 Expo、Apple 或 Google 凭据，也不替代真机相机与媒体行为验收。
+仓库主 CI 会在 Node.js 22 下从 `package-lock.json` 执行 `npm ci`、TypeScript、66 项 App / Session / Player / API / Storage / Screen 测试、固定版本 Expo Doctor，以及带 Demo 音频资源复制的 iOS / Android production bundle。该门禁不需要 Expo、Apple 或 Google 凭据，也不替代真机相机与媒体行为验收。
 
 ### Android 本地原生构建
 
@@ -147,7 +149,7 @@ Signing & Capabilities 中选择自己的 Team。若 Xcode 报对应 iOS platfor
 
 会话测试直接运行 `useRadioSession`，只在原生播放器边界使用稳定替身，并通过 Fetch 响应驱动真实 API 客户端。不要为了测试把会话复制成 reducer、Repository 或第二套状态机。
 
-App 测试只替换页面渲染、API 和存储边界，验证 Profile 的拥有权与令牌顺序；Storage 测试直接约束单个 SecureStore JSON 条目。测试文件与其边界对应，不按单个动作继续拆分。
+App 测试只替换页面渲染、API 和存储边界，验证 Profile 的拥有权、令牌顺序和前后台切换不触发 Retry；Storage 测试直接约束单个 SecureStore JSON 条目，Radio Resume 测试约束不含 Token 的队列文件。测试文件与其边界对应，不按单个动作继续拆分。
 
 API 测试直接替换 Fetch，覆盖请求与响应协议，不复制 DTO 或另建假客户端。除超时使用 Jest fake timers 外，测试不依赖真实时钟或网络。
 

@@ -21,6 +21,9 @@
 - [ ] P0 — App 名称、图标、启动页、版本 `0.1.0 (1)` 正确。
 - [ ] P0 — 无 Server 时进入 Demo Signal，三段内置音频均可播放和切换。
 - [ ] P1 — 升级安装后已保存的 Server Profile 仍可使用。
+- [ ] P0 — Radio 使用自定义 Safe Area 顶部，Station 位于左上角且更多菜单可操作；Connection 以 Form Sheet 打开，Change Server 可通过 Cancel 返回且不修改当前连接。
+- [ ] P1 — Favorite / Play / Next 使用清晰的系统图标，Signal Dial 播放时旋转，并在开启 Reduce Motion 后保持静止。
+- [ ] P1 — 正常 Radio 不重复展示 Server；Offline / Empty 状态仍有明确且可点击的 Connection 恢复入口。
 
 ## Server 与网络
 
@@ -63,8 +66,10 @@
 
 - [ ] P0 — 播放、完整听完、跳过、Encore 和收藏反馈进入用户自己的 Server。
 - [ ] P0 — 快速连续点击下一首或切换电台，不出现旧请求覆盖新队列。
-- [ ] P0 — 修改 TikLocal 访问密码后，App 收到 401、清除 Profile 并回到配对页。
-- [ ] P0 — Disconnect / Demo 后设备令牌被撤销；Server 离线时仍能本地断开。
+- [ ] P0 — 修改 TikLocal 访问密码后，App 收到 401、只移除失效令牌，保留 Server 名称与地址并进入重新授权页。
+- [ ] P0 — Server 离线、密码错误或请求超时后再次进入连接流程，最近的合法地址仍已填充。
+- [ ] P0 — Forget This Server 经系统破坏性确认后撤销设备令牌并删除本地记录；Server 离线时仍能本地忘记。
+- [ ] P1 — 进入 Demo 不会隐式撤销或忘记已知 Server。
 - [ ] P0 — Web 设置页撤销当前设备后，App 下一次请求回到配对页。
 - [ ] P1 — 配对新 Server 后旧设备令牌被撤销。
 
