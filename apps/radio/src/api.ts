@@ -45,7 +45,7 @@ export async function pairServer(input: {
   password: string;
   deviceName: string;
 }): Promise<ServerProfile> {
-  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  const baseUrl = normalizeServerUrl(input.baseUrl);
   const data = await request<PairResponse>(baseUrl, "/api/v1/pair", "", {
     method: "POST",
     body: JSON.stringify({
@@ -100,7 +100,7 @@ export function parsePairingUri(value: string): {
   }
   try {
     return {
-      baseUrl: normalizeBaseUrl(serverValues[0]!),
+      baseUrl: normalizeServerUrl(serverValues[0]!),
       grant,
     };
   } catch {
@@ -288,7 +288,7 @@ async function request<T>(
   }
 }
 
-function normalizeBaseUrl(value: string): string {
+export function normalizeServerUrl(value: string): string {
   const trimmed = value.trim().replace(/\/+$/, "");
   if (!trimmed) {
     throw new TikLocalApiError(

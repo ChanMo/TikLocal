@@ -1,13 +1,32 @@
-import { expect, jest, test } from "@jest/globals";
+import { beforeEach, expect, jest, test } from "@jest/globals";
+import { ActionSheetIOS } from "react-native";
 import {
   render,
   screen,
   userEvent,
+  waitFor,
 } from "@testing-library/react-native";
 
 import type { RadioSnapshot, Station, Track } from "./model";
 import type { RadioSession } from "./radio";
 import { RadioScreen } from "./RadioScreen";
+
+jest.mock(
+  "react-native-safe-area-context",
+  () => require("react-native-safe-area-context/jest/mock").default,
+);
+
+const actionSheetChoices: number[] = [];
+
+jest
+  .spyOn(ActionSheetIOS, "showActionSheetWithOptions")
+  .mockImplementation((options, callback) =>
+    callback(actionSheetChoices.shift() ?? options.cancelButtonIndex ?? 0),
+  );
+
+beforeEach(() => {
+  actionSheetChoices.length = 0;
+});
 
 const stations: Station[] = [
   {
@@ -60,6 +79,7 @@ function session(overrides: Partial<RadioSnapshot> = {}): RadioSession {
     play: jest.fn(),
     pause: jest.fn(),
     next: jest.fn(),
+    retry: jest.fn(),
     selectStation: jest.fn(),
     toggleFavorite: jest.fn(),
     encore: jest.fn(),
@@ -67,7 +87,7 @@ function session(overrides: Partial<RadioSnapshot> = {}): RadioSession {
   };
 }
 
-test("exposes station selection, server action, and playback progress", async () => {
+test("exposes station selection and playback progress", async () => {
   const radio = session();
   const onConnectionPress = jest.fn();
   const user = userEvent.setup();
@@ -80,13 +100,10 @@ test("exposes station selection, server action, and playback progress", async ()
 
   expect(screen.getByText("Paper Sun")).toBeOnTheScreen();
   expect(screen.getByText("Field Unit")).toBeOnTheScreen();
-  expect(screen.getByText("STUDIO")).toBeOnTheScreen();
-  expect(
-    screen.getByRole("button", { name: "Daily Signal" }),
-  ).toBeSelected();
-  expect(
-    screen.getByRole("button", { name: "New Air" }),
-  ).not.toBeSelected();
+  expect(screen.queryByText("Studio")).not.toBeOnTheScreen();
+  const stationSelector = screen.getByRole("button", {
+    name: "Choose station, Daily Signal",
+  });
   expect(
     screen.getByRole("progressbar", { name: "Playback progress" }),
   ).toHaveAccessibilityValue({
@@ -96,13 +113,10 @@ test("exposes station selection, server action, and playback progress", async ()
     text: "0:30 of 2:00",
   });
 
-  await user.press(screen.getByRole("button", { name: "New Air" }));
-  await user.press(
-    screen.getByRole("button", { name: "Change TikLocal Server" }),
-  );
-
+  actionSheetChoices.push(1);
+  await user.press(stationSelector);
   expect(radio.selectStation).toHaveBeenCalledWith("recent");
-  expect(onConnectionPress).toHaveBeenCalledTimes(1);
+  expect(onConnectionPress).not.toHaveBeenCalled();
 });
 
 test("routes every paused-state control to the Radio session", async () => {
@@ -114,15 +128,21 @@ test("routes every paused-state control to the Radio session", async () => {
 
   await user.press(screen.getByRole("button", { name: "Play radio" }));
   await user.press(screen.getByRole("button", { name: "Next track" }));
-  await user.press(screen.getByRole("button", { name: "KEEP" }));
-  await user.press(screen.getByRole("button", { name: "ENCORE" }));
-  await user.press(screen.getByRole("button", { name: "SLEEP" }));
+  await user.press(
+    screen.getByRole("button", { name: "Add to Favorites" }),
+  );
+  actionSheetChoices.push(0);
+  await user.press(screen.getByRole("button", { name: "More Radio options" }));
+  actionSheetChoices.push(1, 1);
+  await user.press(screen.getByRole("button", { name: "More Radio options" }));
 
   expect(radio.play).toHaveBeenCalledTimes(1);
   expect(radio.next).toHaveBeenCalledTimes(1);
   expect(radio.toggleFavorite).toHaveBeenCalledTimes(1);
   expect(radio.encore).toHaveBeenCalledTimes(1);
-  expect(radio.setSleepTimer).toHaveBeenCalledWith(30);
+  await waitFor(() =>
+    expect(radio.setSleepTimer).toHaveBeenCalledWith(30),
+  );
 });
 
 test("announces active controls and routes pause", async () => {
@@ -137,13 +157,11 @@ test("announces active controls and routes pause", async () => {
     <RadioScreen radio={radio} onConnectionPress={jest.fn()} />,
   );
 
-  expect(screen.getByRole("button", { name: "KEPT" })).toBeSelected();
   expect(
-    screen.getByRole("button", { name: "ENCORE ×2" }),
+    screen.getByRole("button", { name: "Remove from Favorites" }),
   ).toBeSelected();
-  expect(
-    screen.getByRole("button", { name: "SLEEP 60" }),
-  ).toBeSelected();
+  expect(screen.getByText("Queued ×2")).toBeOnTheScreen();
+  expect(screen.getByText("60 min")).toBeOnTheScreen();
   await user.press(screen.getByRole("button", { name: "Pause radio" }));
 
   expect(radio.pause).toHaveBeenCalledTimes(1);
@@ -161,20 +179,52 @@ test("announces an empty library and disables every playback action", async () =
     <RadioScreen radio={radio} onConnectionPress={jest.fn()} />,
   );
 
-  expect(screen.getByText("NO AUDIO")).toBeOnTheScreen();
+  expect(screen.getByText("Your library is quiet")).toBeOnTheScreen();
+  expect(screen.getByText("Add playable audio in TikLocal")).toBeOnTheScreen();
   expect(
-    screen.getByRole("alert", { name: "No playable audio was found." }),
+    screen.getByRole("alert", { name: "Your library is quiet" }),
   ).toBeOnTheScreen();
   for (const name of [
     "Play radio",
     "Next track",
-    "KEEP",
-    "ENCORE",
-    "SLEEP",
+    "Add to Favorites",
+    "Choose station, Daily Signal",
   ]) {
     expect(screen.getByRole("button", { name })).toBeDisabled();
   }
   expect(
-    screen.getByRole("button", { name: "Change TikLocal Server" }),
+    screen.getByRole("button", { name: "More Radio options" }),
   ).toBeEnabled();
+  expect(
+    screen.getByRole("button", { name: "Open Server connection settings" }),
+  ).toBeEnabled();
+});
+
+test("shows an actionable saved-connection message while offline", async () => {
+  const radio = session({
+    sync: {
+      kind: "offline",
+      message: "TikLocal Server is unavailable.",
+    },
+  });
+  const onConnectionPress = jest.fn();
+  const user = userEvent.setup();
+  await render(
+    <RadioScreen
+      radio={radio}
+      onConnectionPress={onConnectionPress}
+    />,
+  );
+
+  expect(screen.getByText("Signal interrupted")).toBeOnTheScreen();
+  expect(screen.getByText("Your connection is saved")).toBeOnTheScreen();
+  expect(
+    screen.getByText("Connection saved · tap to reconnect"),
+  ).toBeOnTheScreen();
+  await user.press(
+    screen.getByRole("button", {
+      name: "Open Server connection settings",
+    }),
+  );
+  expect(onConnectionPress).toHaveBeenCalledTimes(1);
 });

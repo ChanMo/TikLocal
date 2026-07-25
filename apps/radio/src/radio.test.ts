@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react-native";
 
 import type { ServerProfile, StationId } from "./model";
 import { useRadioSession } from "./radio";
+import type { RadioResume } from "./radioResume";
 
 const mockPlayer = {
   status: {
@@ -22,6 +23,20 @@ const mockPlayer = {
 
 jest.mock("./player", () => ({
   useRadioPlayer: () => mockPlayer,
+}));
+
+const mockLoadRadioResume = jest.fn<
+  (profile: ServerProfile) => Promise<RadioResume | null>
+>();
+const mockSaveRadioResume = jest.fn<
+  (profile: ServerProfile, resume: RadioResume) => Promise<void>
+>();
+
+jest.mock("./radioResume", () => ({
+  loadRadioResume: (profile: ServerProfile) =>
+    mockLoadRadioResume(profile),
+  saveRadioResume: (profile: ServerProfile, resume: RadioResume) =>
+    mockSaveRadioResume(profile, resume),
 }));
 
 const profile: ServerProfile = {
@@ -108,6 +123,8 @@ function installFetch(
 beforeEach(() => {
   jest.useRealTimers();
   jest.clearAllMocks();
+  mockLoadRadioResume.mockResolvedValue(null);
+  mockSaveRadioResume.mockResolvedValue();
 });
 
 test("loads a protected server track and becomes ready", async () => {
@@ -138,6 +155,56 @@ test("loads a protected server track and becomes ready", async () => {
   );
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(onUnauthorized).not.toHaveBeenCalled();
+});
+
+test("restores a saved queue without requesting a new random tune", async () => {
+  const resumedTrack = {
+    id: "resumed-track",
+    uri: "@music/resumed-track.mp3",
+    title: "Resumed Track",
+    artist: "Test Artist",
+    album: "Test Album",
+    source: {
+      uri: "https://radio.test/api/v1/radio/media?uri=resumed-track",
+      headers: { Authorization: "Bearer secret-token" },
+    },
+    accent: "#476F5B",
+    isFavorite: false,
+  };
+  mockLoadRadioResume.mockResolvedValue({
+    stationId: "recent",
+    tracks: [resumedTrack],
+    trackIndex: 0,
+    recentUris: ["@music/previous-track.mp3"],
+  });
+  const fetchMock = installFetch(async (url) => {
+    if (!url.includes("/stations")) {
+      throw new Error(`unexpected request: ${url}`);
+    }
+    return response(stationsPayload());
+  });
+  const onUnauthorized = jest.fn();
+
+  const { result } = await renderHook(() =>
+    useRadioSession(profile, onUnauthorized),
+  );
+
+  await waitFor(() => {
+    expect(result.current.snapshot.track.id).toBe("resumed-track");
+  });
+  expect(result.current.snapshot.station.id).toBe("recent");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(mockPlayer.load).toHaveBeenLastCalledWith(resumedTrack, false);
+  await waitFor(() =>
+    expect(mockSaveRadioResume).toHaveBeenCalledWith(
+      profile,
+      expect.objectContaining({
+        stationId: "recent",
+        tracks: [resumedTrack],
+        trackIndex: 0,
+      }),
+    ),
+  );
 });
 
 test("ignores a slower station response after a newer selection wins", async () => {
@@ -248,6 +315,48 @@ test("keeps the current track when changing station goes offline", async () => {
   });
   expect(result.current.snapshot.track.id).toBe("still-playing");
   expect(result.current.snapshot.station.id).toBe("default");
+});
+
+test("reconnects an offline session without replacing its current queue", async () => {
+  let failStationChange = false;
+  const fetchMock = installFetch(async (url) => {
+    if (url.includes("/stations")) {
+      return response(stationsPayload());
+    }
+    if (url.includes("station=recent") && failStationChange) {
+      throw new TypeError("network down");
+    }
+    return response(tunePayload("default", "keep-this-track"));
+  });
+  const onUnauthorized = jest.fn();
+  const { result } = await renderHook(() =>
+    useRadioSession(profile, onUnauthorized),
+  );
+  await waitFor(() => {
+    expect(result.current.snapshot.track.id).toBe("keep-this-track");
+  });
+  const loadCount = mockPlayer.load.mock.calls.length;
+
+  failStationChange = true;
+  await act(() => result.current.selectStation("recent"));
+  await waitFor(() => {
+    expect(result.current.snapshot.sync.kind).toBe("offline");
+  });
+
+  failStationChange = false;
+  await act(() => result.current.retry());
+  await waitFor(() => {
+    expect(result.current.snapshot.sync.kind).toBe("ready");
+  });
+
+  expect(result.current.snapshot.track.id).toBe("keep-this-track");
+  expect(result.current.snapshot.station.id).toBe("default");
+  expect(mockPlayer.load).toHaveBeenCalledTimes(loadCount);
+  expect(
+    fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes("/api/v1/radio/tune"),
+    ),
+  ).toHaveLength(2);
 });
 
 test("clears the player and blocks controls for an empty library", async () => {

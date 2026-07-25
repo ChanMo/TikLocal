@@ -3,31 +3,54 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
-  StyleSheet,
+  Pressable,
   StatusBar,
+  StyleSheet,
+  Text,
   View,
 } from "react-native";
 import {
-  SafeAreaProvider,
-  SafeAreaView,
-} from "react-native-safe-area-context";
+  NavigationContainer,
+  useNavigationContainerRef,
+} from "@react-navigation/native";
+import {
+  createNativeStackNavigator,
+  type NativeStackScreenProps,
+} from "@react-navigation/native-stack";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import {
   claimPairingGrant,
+  normalizeServerUrl,
   pairServer,
   parsePairingUri,
   revokeServer,
 } from "./src/api";
-import type { ServerProfile } from "./src/model";
+import { ConnectionScreen } from "./src/ConnectionScreen";
+import type {
+  KnownServer,
+  ServerProfile,
+  StoredConnection,
+} from "./src/model";
 import { PairingScreen } from "./src/PairingScreen";
 import { RadioScreen } from "./src/RadioScreen";
 import { useRadioSession } from "./src/radio";
+import { clearRadioResume } from "./src/radioResume";
 import {
-  clearServerProfile,
-  loadServerProfile,
+  clearStoredConnection,
+  loadStoredConnection,
+  saveKnownServer,
   saveServerProfile,
 } from "./src/storage";
 import { colors } from "./src/theme";
+
+type RootStackParamList = {
+  Radio: undefined;
+  Connection: undefined;
+  Pairing: { pairingUri?: string } | undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
@@ -38,19 +61,36 @@ export default function App() {
 }
 
 function AppContent() {
-  const [profile, setProfile] = useState<ServerProfile | null>(null);
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  const [connection, setConnection] = useState<StoredConnection | null>(null);
   const [pendingPairingUri, setPendingPairingUri] = useState<string | null>(
     null,
   );
   const [isBooting, setIsBooting] = useState(true);
-  const [showPairing, setShowPairing] = useState(false);
+  const profile =
+    connection?.kind === "paired" ? connection.profile : null;
 
-  const disconnect = useCallback(() => {
-    setProfile(null);
-    setShowPairing(true);
-    void clearServerProfile();
-  }, []);
-  const radio = useRadioSession(profile, disconnect);
+  const requireAuthorization = useCallback(() => {
+    if (!profile) {
+      return;
+    }
+    const server: KnownServer = {
+      baseUrl: profile.baseUrl,
+      serverName: profile.serverName,
+    };
+    setConnection({ kind: "known", server });
+    clearRadioResume();
+    void saveKnownServer(server).catch(() => {
+      // The in-memory reauthorization flow remains available.
+    });
+    if (navigationRef.isReady()) {
+      navigationRef.reset({
+        index: 0,
+        routes: [{ name: "Pairing" }],
+      });
+    }
+  }, [navigationRef, profile]);
+  const radio = useRadioSession(profile, requireAuthorization);
 
   useEffect(() => {
     let isActive = true;
@@ -62,13 +102,15 @@ function AppContent() {
       }
       receivedPairingUri = pairingUri;
       setPendingPairingUri(pairingUri);
-      setShowPairing(true);
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("Pairing", { pairingUri });
+      }
     });
 
     const restore = async () => {
-      let stored: ServerProfile | null = null;
+      let stored: StoredConnection | null = null;
       try {
-        stored = await loadServerProfile();
+        stored = await loadStoredConnection();
       } catch {
         // Pairing remains available when secure storage cannot be read.
       }
@@ -84,9 +126,8 @@ function AppContent() {
         return;
       }
       const pairingUri = receivedPairingUri || initialPairingUri;
-      setProfile(stored);
+      setConnection(stored);
       setPendingPairingUri(pairingUri);
-      setShowPairing(Boolean(pairingUri) || !stored);
       setIsBooting(false);
     };
     void restore();
@@ -95,7 +136,7 @@ function AppContent() {
       isActive = false;
       subscription.remove();
     };
-  }, []);
+  }, [navigationRef]);
 
   if (isBooting) {
     return (
@@ -106,79 +147,215 @@ function AppContent() {
     );
   }
 
-  if (showPairing) {
-    const activateProfile = async (paired: ServerProfile) => {
-      try {
-        await saveServerProfile(paired);
-      } catch (error) {
-        void revokeServer(paired).catch(() => {
-          // The issued token can still be revoked from TikLocal Settings.
-        });
-        throw error;
-      }
-      if (profile) {
-        void revokeServer(profile).catch(() => {
-          // The old token remains revocable from TikLocal Settings.
-        });
-      }
-      setPendingPairingUri(null);
-      setProfile(paired);
-      setShowPairing(false);
-    };
-    const deviceName = `TikLocal Radio · ${Platform.OS}`;
-    return (
-      <SafeAreaView style={styles.pairing}>
-        <StatusBar barStyle="light-content" />
-        <PairingScreen
-          initialPairingUri={pendingPairingUri || undefined}
-          initialUrl={profile?.baseUrl}
-          onConnect={async ({ baseUrl, password }) => {
-            await activateProfile(await pairServer({
-              baseUrl,
-              password,
-              deviceName,
-            }));
-          }}
-          onClaim={async ({ pairingUri }) => {
-            await activateProfile(await claimPairingGrant({
-              pairingUri,
-              deviceName,
-            }));
-          }}
-          onCancel={
-            profile ? () => {
-              setPendingPairingUri(null);
-              setShowPairing(false);
-            } : undefined
-          }
-          onUseDemo={() => {
-            if (profile) {
-              void revokeServer(profile).catch(() => {
-                // Local disconnect must still succeed while the Server is offline.
-              });
-            }
-            setPendingPairingUri(null);
-            setProfile(null);
-            setShowPairing(false);
-            void clearServerProfile();
-          }}
-        />
-      </SafeAreaView>
-    );
-  }
+  const initialRouteName =
+    connection?.kind === "paired" ? "Radio" : "Pairing";
+
+  const knownServer =
+    connection?.kind === "paired"
+      ? {
+          baseUrl: connection.profile.baseUrl,
+          serverName: connection.profile.serverName,
+        }
+      : connection?.kind === "known"
+        ? connection.server
+        : null;
+
+  const activateProfile = async (paired: ServerProfile) => {
+    try {
+      await saveServerProfile(paired);
+    } catch (error) {
+      void revokeServer(paired).catch(() => {
+        // The issued token can still be revoked from TikLocal Settings.
+      });
+      throw error;
+    }
+    if (profile) {
+      void revokeServer(profile).catch(() => {
+        // The old token remains revocable from TikLocal Settings.
+      });
+    }
+    setPendingPairingUri(null);
+    setConnection({ kind: "paired", profile: paired });
+    navigationRef.reset({
+      index: 0,
+      routes: [{ name: "Radio" }],
+    });
+  };
+
+  const rememberAttempt = async (server: KnownServer) => {
+    if (profile) {
+      return;
+    }
+    setConnection({ kind: "known", server });
+    await saveKnownServer(server);
+  };
+
+  const disconnect = () => {
+    if (profile) {
+      void revokeServer(profile).catch(() => {
+        // Forgetting the local connection must work while the Server is offline.
+      });
+    }
+    setConnection(null);
+    setPendingPairingUri(null);
+    clearRadioResume();
+    void clearStoredConnection().catch(() => {
+      // The current session must still forget the connection immediately.
+    });
+    navigationRef.reset({
+      index: 0,
+      routes: [{ name: "Pairing" }],
+    });
+  };
 
   return (
-    <SafeAreaView style={styles.app}>
+    <NavigationContainer
+      onReady={() => {
+        if (pendingPairingUri) {
+          navigationRef.navigate("Pairing", {
+            pairingUri: pendingPairingUri,
+          });
+        }
+      }}
+      ref={navigationRef}
+    >
       <StatusBar barStyle="dark-content" />
-      <RadioScreen
-        onConnectionPress={() => {
-          setPendingPairingUri(null);
-          setShowPairing(true);
+      <Stack.Navigator
+        initialRouteName={initialRouteName}
+        screenOptions={{
+          contentStyle: { backgroundColor: colors.paper },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colors.paper },
+          headerTintColor: colors.ink,
         }}
-        radio={radio}
-      />
-    </SafeAreaView>
+      >
+        <Stack.Screen
+          name="Radio"
+          options={{ headerShown: false }}
+        >
+          {({ navigation }) => (
+            <RadioScreen
+              onConnectionPress={() => navigation.navigate("Connection")}
+              radio={radio}
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen
+          name="Connection"
+          options={{
+            presentation: Platform.OS === "ios" ? "formSheet" : "card",
+            title: "Connection",
+          }}
+        >
+          {({ navigation }) => (
+            <ConnectionScreen
+              connection={connection}
+              onChangeServer={() => navigation.navigate("Pairing")}
+              onDisconnect={disconnect}
+              onReconnect={() => navigation.navigate("Pairing")}
+              onRetry={radio.retry}
+              sync={radio.snapshot.sync}
+            />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen
+          name="Pairing"
+          options={({ navigation }) => ({
+            contentStyle: { backgroundColor: colors.ink },
+            gestureEnabled: false,
+            headerLeft: navigation.canGoBack()
+              ? () => (
+                  <Pressable
+                    accessibilityLabel="Cancel changing Server"
+                    accessibilityRole="button"
+                    hitSlop={10}
+                    onPress={() => {
+                      setPendingPairingUri(null);
+                      navigation.goBack();
+                    }}
+                  >
+                    <Text style={styles.cancelAction}>Cancel</Text>
+                  </Pressable>
+                )
+              : undefined,
+            headerStyle: { backgroundColor: colors.ink },
+            headerTintColor: colors.white,
+            statusBarStyle: "light",
+            presentation:
+              Platform.OS === "ios" ? "fullScreenModal" : "card",
+            title: "Connect",
+          })}
+        >
+          {({ navigation, route }: PairingScreenProps) => (
+            <PairingScreen
+              initialPairingUri={
+                route.params?.pairingUri
+                || pendingPairingUri
+                || undefined
+              }
+              initialServerName={knownServer?.serverName}
+              initialUrl={knownServer?.baseUrl}
+              onClaim={async ({ pairingUri }) => {
+                const parsed = parsePairingUri(pairingUri);
+                await rememberAttempt({
+                  baseUrl: parsed.baseUrl,
+                  serverName:
+                    knownServer?.baseUrl === parsed.baseUrl
+                      ? knownServer.serverName
+                      : undefined,
+                });
+                await activateProfile(
+                  await claimPairingGrant({
+                    pairingUri,
+                    deviceName: deviceName(),
+                  }),
+                );
+              }}
+              onConnect={async ({ baseUrl, password }) => {
+                const normalizedUrl = normalizeServerUrl(baseUrl);
+                await rememberAttempt({
+                  baseUrl: normalizedUrl,
+                  serverName:
+                    knownServer?.baseUrl === normalizedUrl
+                      ? knownServer.serverName
+                      : undefined,
+                });
+                await activateProfile(
+                  await pairServer({
+                    baseUrl: normalizedUrl,
+                    password,
+                    deviceName: deviceName(),
+                  }),
+                );
+              }}
+              onUseDemo={
+                profile
+                  ? undefined
+                  : () => {
+                      setPendingPairingUri(null);
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: "Radio" }],
+                      });
+                    }
+              }
+            />
+          )}
+        </Stack.Screen>
+      </Stack.Navigator>
+    </NavigationContainer>
   );
+}
+
+type PairingScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  "Pairing"
+>;
+
+function deviceName() {
+  return `TikLocal Radio · ${Platform.OS}`;
 }
 
 function supportedPairingUri(value: string | null): string | null {
@@ -194,18 +371,14 @@ function supportedPairingUri(value: string | null): string | null {
 }
 
 const styles = StyleSheet.create({
-  app: {
-    flex: 1,
-    backgroundColor: colors.paper,
-  },
-  pairing: {
-    flex: 1,
-    backgroundColor: colors.ink,
-  },
   boot: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.ink,
+  },
+  cancelAction: {
+    color: colors.white,
+    fontSize: 16,
   },
 });

@@ -34,40 +34,51 @@ function props() {
     onClaim: jest.fn<
       (input: { pairingUri: string }) => Promise<void>
     >().mockResolvedValue(),
-    onCancel: jest.fn(),
     onUseDemo: jest.fn(),
   };
 }
 
-test("exposes the stored address and explicit return and Demo actions", async () => {
+test("starts with focused connection choices and explains a remembered Server", async () => {
   const callbacks = props();
   const user = userEvent.setup();
   await render(
     <PairingScreen
       {...callbacks}
+      initialServerName="Studio"
       initialUrl="https://studio.local:8443"
     />,
   );
+
+  expect(screen.getByText("Reconnect to Studio.")).toBeOnTheScreen();
+  expect(screen.getByText("https://studio.local:8443")).toBeOnTheScreen();
+  expect(screen.queryByLabelText("Server address")).not.toBeOnTheScreen();
+
+  await user.press(screen.getByRole("button", { name: "Enter Manually" }));
 
   expect(screen.getByLabelText("Server address")).toHaveDisplayValue(
     "https://studio.local:8443",
   );
   expect(screen.getByLabelText("Access password")).toHaveDisplayValue("");
-
-  await user.press(screen.getByRole("button", { name: "Return to radio" }));
-  await user.press(
-    screen.getByRole("button", { name: "Disconnect and use Demo" }),
-  );
-
-  expect(callbacks.onCancel).toHaveBeenCalledTimes(1);
-  expect(callbacks.onUseDemo).toHaveBeenCalledTimes(1);
 });
 
-test("submits a pasted pairing link without manual credentials", async () => {
+test("keeps Demo as a secondary non-destructive choice", async () => {
   const callbacks = props();
   const user = userEvent.setup();
   await render(<PairingScreen {...callbacks} />);
 
+  await user.press(
+    screen.getByRole("button", { name: "Continue with Demo Radio" }),
+  );
+
+  expect(callbacks.onUseDemo).toHaveBeenCalledTimes(1);
+});
+
+test("submits a pairing link from its own progressive step", async () => {
+  const callbacks = props();
+  const user = userEvent.setup();
+  await render(<PairingScreen {...callbacks} />);
+
+  await user.press(screen.getByRole("button", { name: "Paste Pairing Link" }));
   const pairingUri = `tiklocal-radio://pair?server=studio.local&grant=tlpg_${"a".repeat(43)}&v=1`;
   await user.paste(screen.getByLabelText("Pairing link"), pairingUri);
   await user.press(screen.getByRole("button", { name: "Use pairing link" }));
@@ -76,7 +87,7 @@ test("submits a pasted pairing link without manual credentials", async () => {
   expect(callbacks.onConnect).not.toHaveBeenCalled();
 });
 
-test("shows and updates the target of a deep-linked pairing request", async () => {
+test("shows and updates a deep-linked Server before explicit confirmation", async () => {
   const callbacks = props();
   const user = userEvent.setup();
   const firstPairingUri = `tiklocal-radio://pair?server=${encodeURIComponent(
@@ -92,12 +103,7 @@ test("shows and updates the target of a deep-linked pairing request", async () =
     />,
   );
 
-  expect(screen.getByLabelText("Pairing link")).toHaveDisplayValue(
-    firstPairingUri,
-  );
-  expect(
-    screen.getByText("TARGET SERVER · https://first.local:8443"),
-  ).toBeOnTheScreen();
+  expect(screen.getByText("https://first.local:8443")).toBeOnTheScreen();
   expect(callbacks.onClaim).not.toHaveBeenCalled();
 
   await view.rerender(
@@ -106,20 +112,17 @@ test("shows and updates the target of a deep-linked pairing request", async () =
       initialPairingUri={nextPairingUri}
     />,
   );
-  expect(screen.getByLabelText("Pairing link")).toHaveDisplayValue(
-    nextPairingUri,
-  );
-  expect(
-    screen.getByText("TARGET SERVER · http://next.local:8765"),
-  ).toBeOnTheScreen();
+  expect(screen.getByText("http://next.local:8765")).toBeOnTheScreen();
 
-  await user.press(screen.getByRole("button", { name: "Use pairing link" }));
+  await user.press(
+    screen.getByRole("button", { name: "Confirm Server connection" }),
+  );
   expect(callbacks.onClaim).toHaveBeenCalledWith({
     pairingUri: nextPairingUri,
   });
 });
 
-test("opens and closes the QR scanner from an explicit action", async () => {
+test("opens and closes the QR scanner from the primary action", async () => {
   const callbacks = props();
   const user = userEvent.setup();
   await render(<PairingScreen {...callbacks} />);
@@ -133,86 +136,60 @@ test("opens and closes the QR scanner from an explicit action", async () => {
   expect(screen.queryByText("Scan without typing.")).not.toBeOnTheScreen();
 });
 
-test("disables both pairing actions while a link is being claimed", async () => {
+test("submits credentials once and keeps the remembered address on error", async () => {
   const connection = deferred();
   const callbacks = props();
-  callbacks.onClaim.mockReturnValue(connection.promise);
+  callbacks.onConnect.mockReturnValueOnce(connection.promise);
   const user = userEvent.setup();
-  await render(<PairingScreen {...callbacks} />);
-
-  const claim = screen.getByRole("button", { name: "Use pairing link" });
-  const manual = screen.getByRole("button", {
-    name: "Open private frequency",
-  });
-  await user.press(claim);
-
-  expect(claim).toBeDisabled();
-  expect(manual).toBeDisabled();
-  await user.press(claim);
-  expect(callbacks.onClaim).toHaveBeenCalledTimes(1);
-
-  await act(async () => {
-    connection.resolve();
-    await connection.promise;
-  });
-  await waitFor(() => {
-    expect(claim).toBeEnabled();
-    expect(manual).toBeEnabled();
-  });
-});
-
-test("submits typed credentials once and disables the action while pending", async () => {
-  const connection = deferred();
-  const callbacks = props();
-  callbacks.onConnect.mockReturnValue(connection.promise);
-  const user = userEvent.setup();
-  await render(<PairingScreen {...callbacks} />);
-
-  await user.paste(
-    screen.getByLabelText("Server address"),
-    "studio.local:8443",
+  await render(
+    <PairingScreen
+      {...callbacks}
+      initialUrl="https://studio.local"
+    />,
   );
+  await user.press(screen.getByRole("button", { name: "Enter Manually" }));
   await user.paste(
     screen.getByLabelText("Access password"),
     "access-password",
   );
   const connect = screen.getByRole("button", {
-    name: "Open private frequency",
+    name: "Connect to TikLocal Server",
   });
 
   await user.press(connect);
-
-  expect(callbacks.onConnect).toHaveBeenCalledWith({
-    baseUrl: "studio.local:8443",
-    password: "access-password",
-  });
   expect(connect).toBeDisabled();
   await user.press(connect);
   expect(callbacks.onConnect).toHaveBeenCalledTimes(1);
+  expect(callbacks.onConnect).toHaveBeenCalledWith({
+    baseUrl: "https://studio.local",
+    password: "access-password",
+  });
 
   await act(async () => {
     connection.resolve();
     await connection.promise;
   });
-  await waitFor(() => {
-    expect(connect).toBeEnabled();
-  });
+  await waitFor(() => expect(connect).toBeEnabled());
 });
 
-test("shows a structured TikLocal error without losing the entered address", async () => {
+test("shows a structured error without losing the entered address", async () => {
   const callbacks = props();
   callbacks.onConnect.mockRejectedValue(
-    new TikLocalApiError("The access password is incorrect", "invalid_password", 401),
+    new TikLocalApiError(
+      "The access password is incorrect",
+      "invalid_password",
+      401,
+    ),
   );
   const user = userEvent.setup();
   await render(<PairingScreen {...callbacks} />);
+  await user.press(screen.getByRole("button", { name: "Enter Manually" }));
   await user.paste(
     screen.getByLabelText("Server address"),
     "https://studio.local",
   );
-
   await user.press(
-    screen.getByRole("button", { name: "Open private frequency" }),
+    screen.getByRole("button", { name: "Connect to TikLocal Server" }),
   );
 
   expect(
@@ -223,21 +200,4 @@ test("shows a structured TikLocal error without losing the entered address", asy
   expect(screen.getByLabelText("Server address")).toHaveDisplayValue(
     "https://studio.local",
   );
-});
-
-test("uses a stable message for an unexpected connection failure", async () => {
-  const callbacks = props();
-  callbacks.onConnect.mockRejectedValue(new Error("keychain failure"));
-  const user = userEvent.setup();
-  await render(<PairingScreen {...callbacks} />);
-
-  await user.press(
-    screen.getByRole("button", { name: "Open private frequency" }),
-  );
-
-  expect(
-    await screen.findByRole("alert", {
-      name: "The private frequency could not be opened.",
-    }),
-  ).toBeOnTheScreen();
 });

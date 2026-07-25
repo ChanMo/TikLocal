@@ -18,6 +18,10 @@ import type {
   Track,
 } from "./model";
 import { useRadioPlayer } from "./player";
+import {
+  loadRadioResume,
+  saveRadioResume,
+} from "./radioResume";
 
 const demoStations: Station[] = [
   {
@@ -92,6 +96,7 @@ export type RadioSession = {
   play(): void;
   pause(): void;
   next(): void;
+  retry(): void;
   selectStation(stationId: StationId): void;
   toggleFavorite(): void;
   encore(): void;
@@ -163,8 +168,39 @@ export function useRadioSession(
     }
 
     setSync({ kind: "loading", message: "Tuning your library" });
-    void Promise.all([api.stations(), api.tune("default")])
-      .then(([nextStations, tuned]) => {
+    setTracks([emptyTrack]);
+    setTrackIndex(0);
+    clear();
+    void loadRadioResume(profile)
+      .then(async (resumed) => {
+        if (version !== requestVersion.current) {
+          return;
+        }
+        if (resumed) {
+          recentUris.current = resumed.recentUris;
+          setStationId(resumed.stationId);
+          setTracks(resumed.tracks);
+          setTrackIndex(resumed.trackIndex);
+          setEncoreCount(0);
+          setSync({ kind: "ready", serverName: profile.serverName });
+          load(resumed.tracks[resumed.trackIndex]!, false);
+          try {
+            const nextStations = await api.stations();
+            if (version === requestVersion.current) {
+              setStations(nextStations);
+            }
+          } catch (error) {
+            if (version === requestVersion.current) {
+              handleApiError(error);
+            }
+          }
+          return;
+        }
+
+        const [nextStations, tuned] = await Promise.all([
+          api.stations(),
+          api.tune("default"),
+        ]);
         if (version !== requestVersion.current) {
           return;
         }
@@ -179,7 +215,6 @@ export function useRadioSession(
             serverName: profile.serverName,
             message: "No playable audio was found on this TikLocal Server.",
           });
-          clear();
           return;
         }
         setStations(nextStations);
@@ -196,6 +231,20 @@ export function useRadioSession(
         }
       });
   }, [api, clear, handleApiError, load, profile]);
+
+  useEffect(() => {
+    if (!profile || sync.kind !== "ready") {
+      return;
+    }
+    void saveRadioResume(profile, {
+      stationId,
+      tracks,
+      trackIndex,
+      recentUris: recentUris.current,
+    }).catch(() => {
+      // Playback must remain usable when the optional resume file cannot be written.
+    });
+  }, [profile, stationId, sync.kind, trackIndex, tracks]);
 
   const tuneStation = useCallback(
     async (nextStationId: StationId, shouldPlay: boolean) => {
@@ -376,6 +425,38 @@ export function useRadioSession(
     [pause],
   );
 
+  const retry = useCallback(() => {
+    const hasQueue = tracks.some((track) => track.id !== emptyTrack.id);
+    if (!api || !profile || !hasQueue) {
+      void tuneStation(stationId, false);
+      return;
+    }
+
+    const version = ++requestVersion.current;
+    setSync({ kind: "loading", message: "Reconnecting" });
+    void api
+      .stations()
+      .then((nextStations) => {
+        if (version !== requestVersion.current) {
+          return;
+        }
+        setStations(nextStations);
+        setSync({ kind: "ready", serverName: profile.serverName });
+      })
+      .catch((error) => {
+        if (version === requestVersion.current) {
+          handleApiError(error);
+        }
+      });
+  }, [
+    api,
+    handleApiError,
+    profile,
+    stationId,
+    tracks,
+    tuneStation,
+  ]);
+  const canPlay = sync.kind === "ready" || sync.kind === "demo";
   const station = stations.find((item) => item.id === stationId) ?? stations[0]!;
   const snapshot: RadioSnapshot = {
     station,
@@ -383,8 +464,8 @@ export function useRadioSession(
     track: currentTrack,
     playback: playbackStateFrom(status),
     sync,
-    currentTime: status.currentTime,
-    duration: status.duration,
+    currentTime: canPlay ? status.currentTime : 0,
+    duration: canPlay ? status.duration : 0,
     isFavorite: currentTrack.isFavorite,
     encoreCount,
     sleepMinutes,
@@ -393,7 +474,7 @@ export function useRadioSession(
   return {
     snapshot,
     play: () => {
-      if (sync.kind === "empty") {
+      if (!canPlay) {
         return;
       }
       sendFeedback(currentTrack, "play");
@@ -401,25 +482,28 @@ export function useRadioSession(
     },
     pause,
     next: () => {
-      if (sync.kind !== "empty") {
+      if (canPlay) {
         moveNext(true);
       }
     },
+    retry,
     selectStation: (nextStationId) => {
-      void tuneStation(nextStationId, status.playing);
+      if (sync.kind !== "empty" && sync.kind !== "offline") {
+        void tuneStation(nextStationId, status.playing);
+      }
     },
     toggleFavorite: () => {
-      if (sync.kind !== "empty") {
+      if (canPlay) {
         toggleFavorite();
       }
     },
     encore: () => {
-      if (sync.kind !== "empty") {
+      if (canPlay) {
         setEncoreCount((count) => Math.min(3, count + 1));
       }
     },
     setSleepTimer: (minutes) => {
-      if (sync.kind !== "empty") {
+      if (canPlay) {
         setSleepTimer(minutes);
       }
     },

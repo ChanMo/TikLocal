@@ -1,10 +1,15 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import * as SecureStore from "expo-secure-store";
 
-import type { ServerProfile } from "./model";
+import type {
+  KnownServer,
+  ServerProfile,
+  StoredConnection,
+} from "./model";
 import {
-  clearServerProfile,
-  loadServerProfile,
+  clearStoredConnection,
+  loadStoredConnection,
+  saveKnownServer,
   saveServerProfile,
 } from "./storage";
 
@@ -14,12 +19,17 @@ jest.mock("expo-secure-store", () => ({
   setItemAsync: jest.fn(),
 }));
 
-const PROFILE_KEY = "tiklocal.radio.server-profile.v1";
+const CONNECTION_KEY = "tiklocal.radio.connection.v2";
+const LEGACY_PROFILE_KEY = "tiklocal.radio.server-profile.v1";
 const profile: ServerProfile = {
   baseUrl: "https://radio.test",
   serverName: "Studio",
   deviceId: "device-1",
   token: "secret-token",
+};
+const knownServer: KnownServer = {
+  baseUrl: "https://radio.test",
+  serverName: "Studio",
 };
 const getItem = jest.mocked(SecureStore.getItemAsync);
 const setItem = jest.mocked(SecureStore.setItemAsync);
@@ -32,43 +42,82 @@ beforeEach(() => {
   deleteItem.mockResolvedValue();
 });
 
-test("returns a complete stored profile without rewriting it", async () => {
-  getItem.mockResolvedValue(JSON.stringify(profile));
+test.each<StoredConnection>([
+  { kind: "paired", profile },
+  { kind: "known", server: knownServer },
+])("restores a valid $kind connection", async (connection) => {
+  getItem.mockResolvedValueOnce(JSON.stringify(connection));
 
-  await expect(loadServerProfile()).resolves.toEqual(profile);
+  await expect(loadStoredConnection()).resolves.toEqual(connection);
 
-  expect(getItem).toHaveBeenCalledWith(PROFILE_KEY);
+  expect(getItem).toHaveBeenCalledWith(CONNECTION_KEY);
   expect(deleteItem).not.toHaveBeenCalled();
 });
 
-test("returns null when no profile has been stored", async () => {
-  await expect(loadServerProfile()).resolves.toBeNull();
+test("returns null when no connection has been stored", async () => {
+  await expect(loadStoredConnection()).resolves.toBeNull();
 
+  expect(getItem).toHaveBeenNthCalledWith(1, CONNECTION_KEY);
+  expect(getItem).toHaveBeenNthCalledWith(2, LEGACY_PROFILE_KEY);
   expect(deleteItem).not.toHaveBeenCalled();
 });
 
 test.each([
   ["invalid JSON", "{not-json"],
   [
-    "an incomplete profile",
+    "an incomplete paired connection",
     JSON.stringify({
-      baseUrl: profile.baseUrl,
-      serverName: profile.serverName,
-      deviceId: profile.deviceId,
+      kind: "paired",
+      profile: {
+        baseUrl: profile.baseUrl,
+        serverName: profile.serverName,
+      },
     }),
   ],
 ])("removes %s instead of restoring it", async (_label, stored) => {
-  getItem.mockResolvedValue(stored);
+  getItem.mockResolvedValueOnce(stored);
 
-  await expect(loadServerProfile()).resolves.toBeNull();
+  await expect(loadStoredConnection()).resolves.toBeNull();
 
-  expect(deleteItem).toHaveBeenCalledWith(PROFILE_KEY);
+  expect(deleteItem).toHaveBeenCalledWith(CONNECTION_KEY);
 });
 
-test("uses one JSON entry for save and clear", async () => {
-  await saveServerProfile(profile);
-  await clearServerProfile();
+test("migrates a legacy profile into the paired connection record", async () => {
+  getItem
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce(JSON.stringify(profile));
 
-  expect(setItem).toHaveBeenCalledWith(PROFILE_KEY, JSON.stringify(profile));
-  expect(deleteItem).toHaveBeenCalledWith(PROFILE_KEY);
+  await expect(loadStoredConnection()).resolves.toEqual({
+    kind: "paired",
+    profile,
+  });
+
+  expect(setItem).toHaveBeenCalledWith(
+    CONNECTION_KEY,
+    JSON.stringify({ kind: "paired", profile }),
+  );
+  expect(deleteItem).toHaveBeenCalledWith(LEGACY_PROFILE_KEY);
+});
+
+test("stores paired and remembered Server states without saving a password", async () => {
+  await saveServerProfile(profile);
+  await saveKnownServer(knownServer);
+
+  expect(setItem).toHaveBeenNthCalledWith(
+    1,
+    CONNECTION_KEY,
+    JSON.stringify({ kind: "paired", profile }),
+  );
+  expect(setItem).toHaveBeenNthCalledWith(
+    2,
+    CONNECTION_KEY,
+    JSON.stringify({ kind: "known", server: knownServer }),
+  );
+});
+
+test("clears current and legacy connection records", async () => {
+  await clearStoredConnection();
+
+  expect(deleteItem).toHaveBeenCalledWith(CONNECTION_KEY);
+  expect(deleteItem).toHaveBeenCalledWith(LEGACY_PROFILE_KEY);
 });

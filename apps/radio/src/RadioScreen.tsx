@@ -1,14 +1,21 @@
+import { SymbolView } from "expo-symbols";
 import {
+  ActionSheetIOS,
+  ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { SleepMinutes, Station } from "./model";
 import type { RadioSession } from "./radio";
-import { colors, radii } from "./theme";
+import { SignalDial } from "./SignalDial";
+import { colors } from "./theme";
 
 type RadioScreenProps = {
   radio: RadioSession;
@@ -17,285 +24,428 @@ type RadioScreenProps = {
 
 export function RadioScreen({ radio, onConnectionPress }: RadioScreenProps) {
   const { snapshot } = radio;
+  const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
   const isPlaying = snapshot.playback.kind === "playing";
   const isBuffering = snapshot.playback.kind === "buffering";
-  const isPlayable = snapshot.sync.kind !== "empty";
-  const connectionLabel =
-    snapshot.sync.kind === "ready"
-      ? snapshot.sync.serverName
-      : snapshot.sync.kind === "loading"
-        ? "TUNING"
-        : snapshot.sync.kind === "empty"
-          ? "NO AUDIO"
-          : snapshot.sync.kind === "offline"
-            ? "OFFLINE"
-            : "DEMO SIGNAL";
+  const isPlayable =
+    snapshot.sync.kind === "ready" || snapshot.sync.kind === "demo";
+  const hasConnectionIssue =
+    snapshot.sync.kind === "offline" || snapshot.sync.kind === "empty";
   const progress =
     snapshot.duration > 0
       ? Math.min(snapshot.currentTime / snapshot.duration, 1)
       : 0;
+  const display = displayTrack(snapshot);
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.masthead}>
-        <View>
-          <Text style={styles.eyebrow}>TIKLOCAL / PRIVATE FREQUENCY</Text>
-          <Text style={styles.brand}>Radio</Text>
-        </View>
+    <View style={styles.screen}>
+      <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <Pressable
-          accessibilityLabel="Change TikLocal Server"
+          accessibilityLabel={`Choose station, ${snapshot.station.name}`}
           accessibilityRole="button"
-          onPress={onConnectionPress}
-          style={({ pressed }) => [styles.onAir, pressed && styles.pressed]}
+          accessibilityState={{ disabled: !isPlayable, expanded: false }}
+          disabled={!isPlayable}
+          onPress={() =>
+            openStationPicker(
+              snapshot.station,
+              snapshot.stations,
+              radio.selectStation,
+            )
+          }
+          style={({ pressed }) => [
+            styles.stationButton,
+            pressed && styles.pressed,
+            !isPlayable && styles.controlDisabled,
+          ]}
         >
-          <View style={styles.onAirDot} />
-          <Text numberOfLines={1} style={styles.onAirText}>
-            {connectionLabel.toUpperCase()}
+          <SymbolView
+            name="dot.radiowaves.left.and.right"
+            size={18}
+            tintColor={colors.moss}
+            weight="semibold"
+          />
+          <Text numberOfLines={1} style={styles.stationName}>
+            {snapshot.station.name}
           </Text>
+          <SymbolView
+            name="chevron.down"
+            size={11}
+            tintColor={colors.inkMuted}
+            weight="bold"
+          />
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel="More Radio options"
+          accessibilityRole="button"
+          hitSlop={6}
+          onPress={() =>
+            openRadioMenu({
+              isPlayable,
+              onConnectionPress,
+              radio,
+            })
+          }
+          style={({ pressed }) => [
+            styles.moreButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <SymbolView
+            name="ellipsis.circle"
+            size={25}
+            tintColor={colors.ink}
+            weight="medium"
+          />
+          {snapshot.sync.kind === "loading" ? (
+            <ActivityIndicator
+              color={colors.brass}
+              size="small"
+              style={styles.menuStatus}
+            />
+          ) : hasConnectionIssue ? (
+            <View style={styles.menuIssueDot} />
+          ) : null}
         </Pressable>
       </View>
 
       <ScrollView
-        horizontal
-        contentContainerStyle={styles.stations}
-        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, 16) },
+        ]}
+        showsVerticalScrollIndicator={false}
       >
-        {snapshot.stations.map((station) => (
-          <StationPill
-            key={station.id}
-            station={station}
-            selected={station.id === snapshot.station.id}
-            onPress={() => radio.selectStation(station.id)}
-          />
-        ))}
-      </ScrollView>
+        <SignalDial
+          accent={snapshot.track.accent}
+          isPlaying={isPlaying}
+          size={Math.min(width - 64, height >= 800 ? 300 : 282)}
+        />
 
-      <View style={styles.stationNote}>
-        <Text style={styles.stationNumber}>
-          CH {String(snapshot.stations.indexOf(snapshot.station) + 1).padStart(2, "0")}
-        </Text>
-        <Text style={styles.stationDescription}>{snapshot.station.description}</Text>
-      </View>
-
-      <View style={[styles.signalCard, { borderColor: snapshot.track.accent }]}>
-        <View style={styles.signalGrid}>
-          <View
-            style={[
-              styles.orbit,
-              styles.orbitOuter,
-              { borderColor: snapshot.track.accent },
-            ]}
-          />
-          <View style={[styles.orbit, styles.orbitMiddle]} />
-          <View
-            style={[
-              styles.record,
-              isPlaying && styles.recordActive,
-              { backgroundColor: snapshot.track.accent },
-            ]}
+        <View style={styles.nowPlaying}>
+          <Text
+            accessibilityRole={hasConnectionIssue ? "alert" : undefined}
+            numberOfLines={1}
+            style={styles.title}
           >
-            <View style={styles.recordLine} />
-            <View style={styles.recordLineSmall} />
-            <View style={styles.label}>
-              <Text style={styles.labelMark}>TL</Text>
-              <Text style={styles.labelIndex}>
-                {String(
-                  snapshot.stations.indexOf(snapshot.station) + 1,
-                ).padStart(2, "0")}
+            {display.title}
+          </Text>
+          <Text numberOfLines={1} style={styles.artist}>
+            {display.artist}
+          </Text>
+          {snapshot.encoreCount > 0 || snapshot.sleepMinutes > 0 ? (
+            <View style={styles.activeStates}>
+              {snapshot.encoreCount > 0 ? (
+                <ActiveState
+                  kind="encore"
+                  label={`Queued ×${snapshot.encoreCount}`}
+                />
+              ) : null}
+              {snapshot.sleepMinutes > 0 ? (
+                <ActiveState
+                  kind="sleep"
+                  label={`${snapshot.sleepMinutes} min`}
+                />
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        {isPlayable ? (
+          <View style={styles.progressBlock}>
+            <View
+              accessible
+              accessibilityLabel="Playback progress"
+              accessibilityRole="progressbar"
+              accessibilityValue={{
+                min: 0,
+                max: 100,
+                now: Math.round(progress * 100),
+                text: `${formatTime(snapshot.currentTime)} of ${formatTime(snapshot.duration)}`,
+              }}
+              style={styles.progressTrack}
+            >
+              <View
+                style={[
+                  styles.progressValue,
+                  {
+                    width: `${progress * 100}%`,
+                    backgroundColor: snapshot.track.accent,
+                  },
+                ]}
+              />
+            </View>
+            <View style={styles.timeRow}>
+              <Text style={styles.time}>
+                {formatTime(snapshot.currentTime)}
+              </Text>
+              <Text style={styles.time}>
+                {isBuffering ? "Tuning…" : formatTime(snapshot.duration)}
               </Text>
             </View>
           </View>
-          <View style={styles.signalRule} />
-          <Text style={styles.signalType}>LOCAL TRANSMISSION</Text>
-        </View>
-      </View>
+        ) : (
+          <View style={styles.progressPlaceholder} />
+        )}
 
-      <View style={styles.nowPlaying}>
-        <Text style={styles.album}>{snapshot.track.album.toUpperCase()}</Text>
-        <Text style={styles.title}>{snapshot.track.title}</Text>
-        <Text style={styles.artist}>{snapshot.track.artist}</Text>
-      </View>
-
-      <View style={styles.progressBlock}>
-        <View
-          accessible
-          accessibilityLabel="Playback progress"
-          accessibilityRole="progressbar"
-          accessibilityValue={{
-            min: 0,
-            max: 100,
-            now: Math.round(progress * 100),
-            text: `${formatTime(snapshot.currentTime)} of ${formatTime(snapshot.duration)}`,
-          }}
-          style={styles.progressTrack}
-        >
-          <View
-            style={[
-              styles.progressValue,
-              {
-                width: `${progress * 100}%`,
-                backgroundColor: snapshot.track.accent,
-              },
-            ]}
+        <View style={styles.transport}>
+          <IconControl
+            active={snapshot.isFavorite}
+            accessibilityLabel={
+              snapshot.isFavorite
+                ? "Remove from Favorites"
+                : "Add to Favorites"
+            }
+            disabled={!isPlayable}
+            kind="favorite"
+            onPress={radio.toggleFavorite}
+          />
+          <IconControl
+            accessibilityLabel={isPlaying ? "Pause radio" : "Play radio"}
+            disabled={!isPlayable}
+            kind={isPlaying ? "pause" : "play"}
+            onPress={isPlaying ? radio.pause : radio.play}
+            primary
+          />
+          <IconControl
+            accessibilityLabel="Next track"
+            disabled={!isPlayable}
+            kind="next"
+            onPress={radio.next}
           />
         </View>
-        <View style={styles.timeRow}>
-          <Text style={styles.time}>{formatTime(snapshot.currentTime)}</Text>
-          <Text style={styles.time}>
-            {isBuffering ? "TUNING…" : formatTime(snapshot.duration)}
+
+        {snapshot.playback.kind === "error" ? (
+          <Text accessibilityRole="alert" style={styles.error}>
+            Playback interrupted · tap Play to try again
           </Text>
-        </View>
-      </View>
-
-      <View style={styles.transport}>
-        <Pressable
-          accessibilityLabel={
-            isPlaying ? "Pause radio" : "Play radio"
-          }
-          accessibilityRole="button"
-          disabled={!isPlayable}
-          onPress={isPlaying ? radio.pause : radio.play}
-          style={({ pressed }) => [
-            styles.playButton,
-            pressed && styles.pressed,
-            !isPlayable && styles.disabled,
-          ]}
-        >
-          <Text style={styles.playIcon}>
-            {isPlaying ? "Ⅱ" : "▶"}
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel="Next track"
-          accessibilityRole="button"
-          disabled={!isPlayable}
-          onPress={radio.next}
-          style={({ pressed }) => [
-            styles.nextButton,
-            pressed && styles.pressed,
-            !isPlayable && styles.disabled,
-          ]}
-        >
-          <Text style={styles.nextIcon}>→</Text>
-          <Text style={styles.nextLabel}>NEXT</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.actions}>
-        <ActionButton
-          active={snapshot.isFavorite}
-          disabled={!isPlayable}
-          label={snapshot.isFavorite ? "KEPT" : "KEEP"}
-          mark={snapshot.isFavorite ? "♥" : "♡"}
-          onPress={radio.toggleFavorite}
-        />
-        <ActionButton
-          active={snapshot.encoreCount > 0}
-          disabled={!isPlayable}
-          label={snapshot.encoreCount > 0 ? `ENCORE ×${snapshot.encoreCount}` : "ENCORE"}
-          mark="↺"
-          onPress={radio.encore}
-        />
-        <ActionButton
-          active={snapshot.sleepMinutes > 0}
-          disabled={!isPlayable}
-          label={
-            snapshot.sleepMinutes > 0
-              ? `SLEEP ${snapshot.sleepMinutes}`
-              : "SLEEP"
-          }
-          mark="◷"
-          onPress={() =>
-            radio.setSleepTimer(nextSleepMinutes(snapshot.sleepMinutes))
-          }
-        />
-      </View>
-
-      {snapshot.playback.kind === "error" ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          Signal interrupted: {snapshot.playback.message}
-        </Text>
-      ) : snapshot.sync.kind === "offline" || snapshot.sync.kind === "empty" ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {snapshot.sync.message}
-        </Text>
-      ) : (
-        <Text style={styles.footer}>
-          {snapshot.sync.kind === "ready"
-            ? "PRIVATE LIBRARY · DEVICE TOKEN · API V1"
-            : "ORIGINAL DEMO AUDIO · NATIVE BACKGROUND READY"}
-        </Text>
-      )}
-    </ScrollView>
+        ) : hasConnectionIssue ? (
+          <Pressable
+            accessibilityLabel="Open Server connection settings"
+            accessibilityRole="button"
+            onPress={onConnectionPress}
+            style={({ pressed }) => [
+              styles.errorAction,
+              pressed && styles.pressed,
+            ]}
+          >
+            <SymbolView
+              name={
+                snapshot.sync.kind === "offline"
+                  ? "wifi.slash"
+                  : "exclamationmark.circle"
+              }
+              size={13}
+              tintColor={colors.signal}
+              weight="semibold"
+            />
+            <Text style={styles.error}>
+              {snapshot.sync.kind === "offline"
+                ? "Connection saved · tap to reconnect"
+                : "Open Connection"}
+            </Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
-function StationPill({
-  station,
-  selected,
-  onPress,
-}: {
-  station: Station;
-  selected: boolean;
-  onPress(): void;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={station.name}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.stationPill, selected && styles.stationPillSelected]}
-    >
-      <Text
-        style={[
-          styles.stationPillText,
-          selected && styles.stationPillTextSelected,
-        ]}
-      >
-        {station.name}
-      </Text>
-    </Pressable>
-  );
-}
+type ControlKind = "favorite" | "play" | "pause" | "next";
 
-function ActionButton({
-  active,
+function IconControl({
+  accessibilityLabel,
+  active = false,
   disabled,
-  label,
-  mark,
+  kind,
   onPress,
+  primary = false,
 }: {
-  active: boolean;
-  disabled?: boolean;
-  label: string;
-  mark: string;
+  accessibilityLabel: string;
+  active?: boolean;
+  disabled: boolean;
+  kind: ControlKind;
   onPress(): void;
+  primary?: boolean;
 }) {
+  const name =
+    kind === "favorite"
+      ? active
+        ? "heart.fill"
+        : "heart"
+      : kind === "play"
+        ? "play.fill"
+        : kind === "pause"
+          ? "pause.fill"
+          : "forward.end.fill";
   return (
     <Pressable
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.actionButton,
-        active && styles.actionButtonActive,
-        pressed && styles.pressed,
-        disabled && styles.disabled,
+        styles.control,
+        primary && styles.controlPrimary,
+        active && styles.controlActive,
+        pressed && styles.controlPressed,
+        disabled && styles.controlDisabled,
       ]}
     >
-      <Text style={[styles.actionMark, active && styles.actionTextActive]}>
-        {mark}
-      </Text>
-      <Text style={[styles.actionLabel, active && styles.actionTextActive]}>
-        {label}
-      </Text>
+      <SymbolView
+        animationSpec={
+          active
+            ? {
+                effect: { type: "bounce", wholeSymbol: true },
+                repeatCount: 1,
+              }
+            : undefined
+        }
+        name={name}
+        size={primary ? 28 : 23}
+        tintColor={primary || active ? colors.white : colors.ink}
+        weight="semibold"
+      />
     </Pressable>
+  );
+}
+
+function ActiveState({
+  kind,
+  label,
+}: {
+  kind: "encore" | "sleep";
+  label: string;
+}) {
+  return (
+    <View style={styles.activeState}>
+      <SymbolView
+        name={kind === "encore" ? "repeat.1" : "moon.zzz"}
+        size={12}
+        tintColor={colors.moss}
+        weight="semibold"
+      />
+      <Text style={styles.activeStateText}>{label}</Text>
+    </View>
+  );
+}
+
+function displayTrack(snapshot: RadioSession["snapshot"]) {
+  switch (snapshot.sync.kind) {
+    case "loading":
+      return {
+        title: "Tuning in",
+        artist: "Finding a frequency in your library",
+      };
+    case "offline":
+      return {
+        title: "Signal interrupted",
+        artist: "Your connection is saved",
+      };
+    case "empty":
+      return {
+        title: "Your library is quiet",
+        artist: "Add playable audio in TikLocal",
+      };
+    default:
+      return {
+        title: snapshot.track.title,
+        artist: snapshot.track.artist,
+      };
+  }
+}
+
+function openRadioMenu({
+  isPlayable,
+  onConnectionPress,
+  radio,
+}: {
+  isPlayable: boolean;
+  onConnectionPress(): void;
+  radio: RadioSession;
+}) {
+  const { snapshot } = radio;
+  const encoreLabel =
+    snapshot.encoreCount > 0
+      ? `Play Again · ${snapshot.encoreCount} queued`
+      : "Play Again";
+  const sleepLabel =
+    snapshot.sleepMinutes > 0
+      ? `Sleep Timer · ${snapshot.sleepMinutes} min`
+      : "Sleep Timer";
+  ActionSheetIOS.showActionSheetWithOptions(
+    {
+      cancelButtonIndex: 3,
+      disabledButtonIndices: isPlayable ? [] : [0, 1],
+      options: [encoreLabel, sleepLabel, "Connection", "Cancel"],
+      title: "Radio",
+    },
+    (index) => {
+      if (index === 0) {
+        radio.encore();
+      } else if (index === 1) {
+        requestAnimationFrame(() =>
+          openSleepTimer(snapshot.sleepMinutes, radio.setSleepTimer),
+        );
+      } else if (index === 2) {
+        onConnectionPress();
+      }
+    },
+  );
+}
+
+function openStationPicker(
+  current: Station,
+  stations: Station[],
+  selectStation: RadioSession["selectStation"],
+) {
+  if (Platform.OS !== "ios") {
+    const currentIndex = stations.findIndex(({ id }) => id === current.id);
+    const next = stations[(currentIndex + 1) % stations.length];
+    if (next) {
+      selectStation(next.id);
+    }
+    return;
+  }
+  ActionSheetIOS.showActionSheetWithOptions(
+    {
+      cancelButtonIndex: stations.length,
+      options: [...stations.map(({ name }) => name), "Cancel"],
+      title: "Choose a Station",
+    },
+    (index) => {
+      const station = stations[index];
+      if (station && station.id !== current.id) {
+        selectStation(station.id);
+      }
+    },
+  );
+}
+
+function openSleepTimer(
+  current: SleepMinutes,
+  setSleepTimer: (minutes: SleepMinutes) => void,
+) {
+  const values: SleepMinutes[] = [0, 30, 60, 120];
+  if (Platform.OS !== "ios") {
+    const currentIndex = values.indexOf(current);
+    setSleepTimer(values[(currentIndex + 1) % values.length] ?? 0);
+    return;
+  }
+  ActionSheetIOS.showActionSheetWithOptions(
+    {
+      cancelButtonIndex: 4,
+      options: ["Off", "30 Minutes", "1 Hour", "2 Hours", "Cancel"],
+      title: "Sleep Timer",
+    },
+    (index) => {
+      const minutes = values[index];
+      if (minutes !== undefined) {
+        setSleepTimer(minutes);
+      }
+    },
   );
 }
 
@@ -308,217 +458,100 @@ function formatTime(value: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function nextSleepMinutes(current: SleepMinutes): SleepMinutes {
-  const values: SleepMinutes[] = [0, 30, 60, 120];
-  const currentIndex = values.indexOf(current);
-  return values[(currentIndex + 1) % values.length] ?? 0;
-}
-
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 22,
-    paddingTop: 18,
-    paddingBottom: 38,
+  screen: {
+    flex: 1,
+    backgroundColor: colors.paper,
   },
-  masthead: {
+  topBar: {
+    minHeight: 54,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
     justifyContent: "space-between",
+    paddingHorizontal: 16,
+    backgroundColor: colors.paper,
   },
-  eyebrow: {
-    color: colors.inkMuted,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1.7,
-  },
-  brand: {
-    color: colors.ink,
-    fontFamily: "Georgia",
-    fontSize: 40,
-    lineHeight: 46,
-  },
-  onAir: {
-    maxWidth: 150,
+  stationButton: {
+    maxWidth: "78%",
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    borderColor: colors.line,
-    borderWidth: 1,
-    borderRadius: radii.pill,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    gap: 9,
+    paddingHorizontal: 6,
   },
-  onAirDot: {
+  stationName: {
+    flexShrink: 1,
+    color: colors.ink,
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  moreButton: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuStatus: {
+    position: "absolute",
+    right: 3,
+    bottom: 3,
+    transform: [{ scale: 0.55 }],
+  },
+  menuIssueDot: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
     width: 7,
     height: 7,
+    borderColor: colors.paper,
+    borderWidth: 1.5,
     borderRadius: 4,
     backgroundColor: colors.signal,
   },
-  onAirText: {
-    flexShrink: 1,
-    color: colors.ink,
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 1,
-  },
-  stations: {
-    gap: 8,
-    paddingVertical: 18,
-  },
-  stationPill: {
-    borderColor: colors.line,
-    borderWidth: 1,
-    borderRadius: radii.pill,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-  },
-  stationPillSelected: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
-  },
-  stationPillText: {
-    color: colors.inkMuted,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  stationPillTextSelected: {
-    color: colors.white,
-  },
-  stationNote: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  stationNumber: {
-    color: colors.signal,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
-  stationDescription: {
-    color: colors.inkMuted,
-    fontSize: 11,
-  },
-  signalCard: {
-    height: 292,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderRadius: radii.card,
-    backgroundColor: colors.paperRaised,
-  },
-  signalGrid: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  orbit: {
-    position: "absolute",
-    borderRadius: radii.pill,
-    borderWidth: 1,
-  },
-  orbitOuter: {
-    width: 350,
-    height: 350,
-    opacity: 0.22,
-  },
-  orbitMiddle: {
-    width: 250,
-    height: 250,
-    borderColor: colors.line,
-  },
-  record: {
-    width: 184,
-    height: 184,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 92,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.18,
-    shadowRadius: 22,
-    elevation: 8,
-    transform: [{ rotate: "-6deg" }],
-  },
-  recordActive: {
-    transform: [{ rotate: "4deg" }, { scale: 1.02 }],
-  },
-  recordLine: {
-    position: "absolute",
-    width: 148,
-    height: 148,
-    borderColor: "rgba(255,255,255,0.28)",
-    borderWidth: 1,
-    borderRadius: 74,
-  },
-  recordLineSmall: {
-    position: "absolute",
-    width: 116,
-    height: 116,
-    borderColor: "rgba(255,255,255,0.22)",
-    borderWidth: 1,
-    borderRadius: 58,
-  },
-  label: {
-    width: 76,
-    height: 76,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 38,
-    backgroundColor: colors.paper,
-  },
-  labelMark: {
-    color: colors.ink,
-    fontFamily: "Georgia",
-    fontSize: 25,
-    fontWeight: "700",
-  },
-  labelIndex: {
-    color: colors.inkMuted,
-    fontSize: 8,
-    fontWeight: "800",
-    letterSpacing: 2,
-  },
-  signalRule: {
-    position: "absolute",
-    right: 20,
-    bottom: 25,
-    width: 42,
-    height: 1,
-    backgroundColor: colors.ink,
-  },
-  signalType: {
-    position: "absolute",
-    left: 20,
-    bottom: 20,
-    color: colors.inkMuted,
-    fontSize: 8,
-    fontWeight: "800",
-    letterSpacing: 1.5,
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 24,
   },
   nowPlaying: {
-    alignItems: "center",
-    paddingTop: 22,
-  },
-  album: {
-    color: colors.signal,
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 1.6,
+    minHeight: 65,
+    paddingTop: 18,
   },
   title: {
-    marginTop: 5,
     color: colors.ink,
-    fontFamily: "Georgia",
-    fontSize: 31,
-    lineHeight: 38,
+    fontSize: 29,
+    fontWeight: "700",
+    letterSpacing: -0.7,
   },
   artist: {
-    marginTop: 2,
+    marginTop: 4,
     color: colors.inkMuted,
-    fontSize: 13,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  activeStates: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 9,
+  },
+  activeState: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  activeStateText: {
+    color: colors.moss,
+    fontSize: 11,
+    fontWeight: "600",
   },
   progressBlock: {
-    marginTop: 20,
+    marginTop: 24,
+  },
+  progressPlaceholder: {
+    height: 37,
+    marginTop: 24,
   },
   progressTrack: {
     height: 3,
@@ -537,102 +570,65 @@ const styles = StyleSheet.create({
   },
   time: {
     color: colors.inkMuted,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.7,
+    fontSize: 10,
+    fontVariant: ["tabular-nums"],
   },
   transport: {
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 18,
-  },
-  playButton: {
-    width: 72,
-    height: 72,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 36,
-    backgroundColor: colors.ink,
+    gap: 32,
+    marginTop: 30,
   },
-  playIcon: {
-    marginLeft: 2,
-    color: colors.white,
-    fontSize: 22,
-  },
-  nextButton: {
-    height: 54,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderColor: colors.ink,
-    borderWidth: 1,
-    borderRadius: radii.pill,
-    paddingHorizontal: 18,
-  },
-  nextIcon: {
-    color: colors.ink,
-    fontSize: 21,
-  },
-  nextLabel: {
-    color: colors.ink,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 22,
-  },
-  actionButton: {
-    flex: 1,
-    minHeight: 62,
+  control: {
+    width: 56,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
     borderColor: colors.line,
     borderWidth: 1,
-    borderRadius: radii.control,
-    backgroundColor: "rgba(250,246,236,0.58)",
+    borderRadius: 28,
+    backgroundColor: colors.paperRaised,
   },
-  actionButtonActive: {
-    backgroundColor: colors.moss,
+  controlPrimary: {
+    width: 72,
+    height: 72,
+    borderColor: colors.ink,
+    borderRadius: 36,
+    backgroundColor: colors.ink,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 9 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  controlActive: {
     borderColor: colors.moss,
+    backgroundColor: colors.moss,
   },
-  actionMark: {
-    color: colors.ink,
-    fontSize: 17,
+  controlPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.94 }],
   },
-  actionLabel: {
-    marginTop: 3,
-    color: colors.inkMuted,
-    fontSize: 8,
-    fontWeight: "900",
-    letterSpacing: 1,
+  controlDisabled: {
+    opacity: 0.32,
   },
-  actionTextActive: {
-    color: colors.white,
-  },
-  pressed: {
-    opacity: 0.7,
-    transform: [{ scale: 0.98 }],
-  },
-  disabled: {
-    opacity: 0.42,
+  errorAction: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 10,
   },
   error: {
-    marginTop: 18,
     color: colors.signal,
     fontSize: 11,
+    fontWeight: "600",
     textAlign: "center",
   },
-  footer: {
-    marginTop: 20,
-    color: colors.inkMuted,
-    fontSize: 8,
-    fontWeight: "700",
-    letterSpacing: 1.2,
-    textAlign: "center",
+  pressed: {
+    opacity: 0.58,
   },
 });

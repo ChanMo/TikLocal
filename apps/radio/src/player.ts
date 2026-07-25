@@ -39,7 +39,6 @@ export function useRadioPlayer(initialTrack: Track) {
   const pause = useCallback(() => player.pause(), [player]);
   const clear = useCallback(() => {
     player.pause();
-    player.replace(null);
     player.clearLockScreenControls();
   }, [player]);
   const replay = useCallback(() => {

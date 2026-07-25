@@ -1,8 +1,21 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
-import { act, render, waitFor } from "@testing-library/react-native";
-import { Linking } from "react-native";
+import {
+  act,
+  render,
+  screen,
+  userEvent,
+  waitFor,
+} from "@testing-library/react-native";
+import {
+  AppState,
+  type AppStateStatus,
+  Linking,
+} from "react-native";
 
-import type { ServerProfile } from "./src/model";
+import type {
+  ServerProfile,
+  StoredConnection,
+} from "./src/model";
 import App from "./App";
 
 jest.mock(
@@ -12,15 +25,23 @@ jest.mock(
 
 type PairingProps = {
   initialPairingUri?: string;
+  initialServerName?: string;
   initialUrl?: string;
   onConnect(input: { baseUrl: string; password: string }): Promise<void>;
   onClaim(input: { pairingUri: string }): Promise<void>;
-  onCancel?(): void;
-  onUseDemo(): void;
+  onUseDemo?(): void;
 };
 
 type RadioProps = {
   onConnectionPress(): void;
+};
+
+type ConnectionProps = {
+  connection: StoredConnection | null;
+  onChangeServer(): void;
+  onDisconnect(): void;
+  onReconnect(): void;
+  onRetry(): void;
 };
 
 const mockPairServer = jest.fn<
@@ -39,13 +60,18 @@ const mockClaimPairingGrant = jest.fn<
 const mockRevokeServer = jest.fn<
   (profile: ServerProfile) => Promise<void>
 >();
-const mockClearServerProfile = jest.fn<() => Promise<void>>();
-const mockLoadServerProfile = jest.fn<
-  () => Promise<ServerProfile | null>
+const mockClearStoredConnection = jest.fn<() => Promise<void>>();
+const mockLoadStoredConnection = jest.fn<
+  () => Promise<StoredConnection | null>
+>();
+const mockSaveKnownServer = jest.fn<
+  (server: { baseUrl: string; serverName?: string }) => Promise<void>
 >();
 const mockSaveServerProfile = jest.fn<
   (profile: ServerProfile) => Promise<void>
 >();
+const mockClearRadioResume = jest.fn();
+const mockRetry = jest.fn();
 const mockUseRadioSession = jest.fn<
   (
     profile: ServerProfile | null,
@@ -54,9 +80,10 @@ const mockUseRadioSession = jest.fn<
 >();
 let mockPairingProps: PairingProps | null = null;
 let mockRadioProps: RadioProps | null = null;
+let mockConnectionProps: ConnectionProps | null = null;
 let mockUnauthorized: (() => void) | null = null;
-let mockUrlListener: ((event: { url: string }) => void) | null = null;
-let mockVisibleScreen: "boot" | "pairing" | "radio" = "boot";
+let mockUrlListeners: Array<(event: { url: string }) => void> = [];
+let mockVisibleScreen: "boot" | "pairing" | "radio" | "connection" = "boot";
 const mockRemoveUrlListener = jest.fn();
 const mockGetInitialURL = jest.spyOn(Linking, "getInitialURL");
 const mockAddUrlListener = jest.spyOn(Linking, "addEventListener");
@@ -66,6 +93,9 @@ jest.mock("./src/api", () => ({
     pairingUri: string;
     deviceName: string;
   }) => mockClaimPairingGrant(input),
+  normalizeServerUrl: (value: string) =>
+    jest.requireActual<typeof import("./src/api")>("./src/api")
+      .normalizeServerUrl(value),
   pairServer: (input: {
     baseUrl: string;
     password: string;
@@ -78,8 +108,10 @@ jest.mock("./src/api", () => ({
 }));
 
 jest.mock("./src/storage", () => ({
-  clearServerProfile: () => mockClearServerProfile(),
-  loadServerProfile: () => mockLoadServerProfile(),
+  clearStoredConnection: () => mockClearStoredConnection(),
+  loadStoredConnection: () => mockLoadStoredConnection(),
+  saveKnownServer: (server: { baseUrl: string; serverName?: string }) =>
+    mockSaveKnownServer(server),
   saveServerProfile: (profile: ServerProfile) =>
     mockSaveServerProfile(profile),
 }));
@@ -89,6 +121,10 @@ jest.mock("./src/radio", () => ({
     profile: ServerProfile | null,
     onUnauthorized: () => void,
   ) => mockUseRadioSession(profile, onUnauthorized),
+}));
+
+jest.mock("./src/radioResume", () => ({
+  clearRadioResume: () => mockClearRadioResume(),
 }));
 
 jest.mock("./src/PairingScreen", () => ({
@@ -107,6 +143,14 @@ jest.mock("./src/RadioScreen", () => ({
   },
 }));
 
+jest.mock("./src/ConnectionScreen", () => ({
+  ConnectionScreen: (props: ConnectionProps) => {
+    mockConnectionProps = props;
+    mockVisibleScreen = "connection";
+    return null;
+  },
+}));
+
 const oldProfile: ServerProfile = {
   baseUrl: "https://old-radio.test",
   serverName: "Old Studio",
@@ -120,6 +164,10 @@ const newProfile: ServerProfile = {
   deviceId: "new-device",
   token: "new-token",
 };
+const oldConnection: StoredConnection = {
+  kind: "paired",
+  profile: oldProfile,
+};
 const pairingUri = `tiklocal-radio://pair?server=${encodeURIComponent(
   "https://new-radio.test",
 )}&grant=tlpg_${"a".repeat(43)}&v=1`;
@@ -128,103 +176,94 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockPairingProps = null;
   mockRadioProps = null;
+  mockConnectionProps = null;
   mockUnauthorized = null;
-  mockUrlListener = null;
+  mockUrlListeners = [];
   mockVisibleScreen = "boot";
   mockGetInitialURL.mockResolvedValue(null);
   mockAddUrlListener.mockImplementation((_type, listener) => {
-    mockUrlListener = listener;
+    mockUrlListeners.push(listener);
     return {
       remove: mockRemoveUrlListener,
     } as unknown as ReturnType<typeof Linking.addEventListener>;
   });
-  mockClearServerProfile.mockResolvedValue(undefined);
-  mockLoadServerProfile.mockResolvedValue(null);
+  mockClearStoredConnection.mockResolvedValue(undefined);
+  mockLoadStoredConnection.mockResolvedValue(null);
+  mockSaveKnownServer.mockResolvedValue(undefined);
   mockSaveServerProfile.mockResolvedValue(undefined);
   mockPairServer.mockResolvedValue(newProfile);
   mockClaimPairingGrant.mockResolvedValue(newProfile);
   mockRevokeServer.mockResolvedValue(undefined);
+  mockClearRadioResume.mockReturnValue(undefined);
   mockUseRadioSession.mockImplementation(
-    (_profile: ServerProfile | null, onUnauthorized: () => void) => {
+    (profile: ServerProfile | null, onUnauthorized: () => void) => {
       mockUnauthorized = onUnauthorized;
-      return {};
+      return {
+        snapshot: {
+          sync: profile
+            ? { kind: "ready", serverName: profile.serverName }
+            : { kind: "demo" },
+        },
+        retry: mockRetry,
+      };
     },
   );
 });
 
-test("opens an initial pairing deep link for explicit confirmation", async () => {
-  mockLoadServerProfile.mockResolvedValue(oldProfile);
+test("opens an initial pairing deep link while preserving the current Server", async () => {
+  const user = userEvent.setup();
+  mockLoadStoredConnection.mockResolvedValue(oldConnection);
   mockGetInitialURL.mockResolvedValue(pairingUri);
 
   await render(<App />);
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("pairing");
-  });
+  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
 
   expect(mockPairingProps!.initialPairingUri).toBe(pairingUri);
+  expect(mockPairingProps!.initialServerName).toBe("Old Studio");
   expect(mockPairingProps!.initialUrl).toBe(oldProfile.baseUrl);
   expect(mockClaimPairingGrant).not.toHaveBeenCalled();
 
-  await act(() => mockPairingProps!.onClaim({ pairingUri }));
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
-  });
-  expect(mockSaveServerProfile).toHaveBeenCalledWith(newProfile);
-  expect(mockRevokeServer).toHaveBeenCalledWith(oldProfile);
-
-  await act(() => mockRadioProps!.onConnectionPress());
-  expect(mockPairingProps!.initialPairingUri).toBeUndefined();
+  await user.press(
+    screen.getByRole("button", { name: "Cancel changing Server" }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: "Cancel changing Server" }),
+    ).not.toBeOnTheScreen(),
+  );
+  expect(mockSaveServerProfile).not.toHaveBeenCalled();
+  expect(mockRevokeServer).not.toHaveBeenCalled();
 });
 
 test("handles a foreground pairing link and ignores unsupported URLs", async () => {
-  mockLoadServerProfile.mockResolvedValue(oldProfile);
+  mockLoadStoredConnection.mockResolvedValue(oldConnection);
   await render(<App />);
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
+
+  await act(() => {
+    mockUrlListeners.forEach((listener) => listener({ url: pairingUri }));
   });
-
-  await act(() => mockUrlListener?.({ url: pairingUri }));
-  expect(mockVisibleScreen).toBe("pairing");
-  expect(mockPairingProps!.initialPairingUri).toBe(pairingUri);
-  expect(mockClaimPairingGrant).not.toHaveBeenCalled();
-
-  await act(() => mockPairingProps!.onCancel?.());
-  expect(mockVisibleScreen).toBe("radio");
-
-  await act(() => mockUrlListener?.({ url: "https://malicious.test/pair" }));
-  expect(mockVisibleScreen).toBe("radio");
-});
-
-test("stores a profile claimed from a pairing link", async () => {
-  await render(<App />);
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("pairing");
-  });
-
-  await act(() =>
-    mockPairingProps!.onClaim({
-      pairingUri: "tiklocal-radio://pair?redacted",
-    }),
+  await waitFor(() =>
+    expect(mockPairingProps?.initialPairingUri).toBe(pairingUri),
   );
 
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
+  await act(() => mockPairingProps!.onClaim({ pairingUri }));
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
+
+  await act(() => {
+    mockUrlListeners.forEach((listener) =>
+      listener({ url: "https://malicious.test/pair" }),
+    );
   });
-  expect(mockClaimPairingGrant).toHaveBeenCalledWith({
-    pairingUri: "tiklocal-radio://pair?redacted",
-    deviceName: expect.stringContaining("TikLocal Radio"),
-  });
-  expect(mockSaveServerProfile).toHaveBeenCalledWith(newProfile);
+  expect(mockVisibleScreen).toBe("radio");
 });
 
-test("restores a stored server profile at startup", async () => {
-  mockLoadServerProfile.mockResolvedValue(oldProfile);
+test("restores a paired Server directly into Radio", async () => {
+  mockLoadStoredConnection.mockResolvedValue(oldConnection);
 
   await render(<App />);
 
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
-  });
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
   expect(mockUseRadioSession).toHaveBeenLastCalledWith(
     oldProfile,
     expect.any(Function),
@@ -232,52 +271,80 @@ test("restores a stored server profile at startup", async () => {
   expect(mockPairingProps).toBeNull();
 });
 
-test("falls back to pairing when secure storage cannot be read", async () => {
-  mockLoadServerProfile.mockRejectedValue(new Error("keychain unavailable"));
+test("does not retune when the app leaves and returns to active state", async () => {
+  const listeners: Array<(state: AppStateStatus) => void> = [];
+  const appStateListener = jest
+    .spyOn(AppState, "addEventListener")
+    .mockImplementation((_type, listener) => {
+      listeners.push(listener);
+      return { remove: jest.fn() };
+    });
+  mockLoadStoredConnection.mockResolvedValue(oldConnection);
+
+  await render(<App />);
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
+  await act(() => {
+    listeners.forEach((listener) => listener("inactive"));
+    listeners.forEach((listener) => listener("active"));
+    listeners.forEach((listener) => listener("background"));
+    listeners.forEach((listener) => listener("active"));
+  });
+
+  expect(mockRetry).not.toHaveBeenCalled();
+  appStateListener.mockRestore();
+});
+
+test("restores a known Server into a focused reauthorization flow", async () => {
+  mockLoadStoredConnection.mockResolvedValue({
+    kind: "known",
+    server: {
+      baseUrl: oldProfile.baseUrl,
+      serverName: oldProfile.serverName,
+    },
+  });
 
   await render(<App />);
 
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("pairing");
-  });
+  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
+  expect(mockPairingProps!.initialServerName).toBe("Old Studio");
+  expect(mockPairingProps!.initialUrl).toBe(oldProfile.baseUrl);
   expect(mockUseRadioSession).toHaveBeenLastCalledWith(
     null,
     expect.any(Function),
   );
 });
 
-test("clears the stored profile when the Radio session reports 401", async () => {
-  mockLoadServerProfile.mockResolvedValue(oldProfile);
+test("keeps the Server identity when the device key becomes unauthorized", async () => {
+  mockLoadStoredConnection.mockResolvedValue(oldConnection);
   await render(<App />);
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
-  });
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
 
   await act(() => mockUnauthorized?.());
 
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("pairing");
+  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
+  expect(mockSaveKnownServer).toHaveBeenCalledWith({
+    baseUrl: oldProfile.baseUrl,
+    serverName: oldProfile.serverName,
   });
-  expect(mockClearServerProfile).toHaveBeenCalledTimes(1);
+  expect(mockClearStoredConnection).not.toHaveBeenCalled();
+  expect(mockPairingProps!.initialUrl).toBe(oldProfile.baseUrl);
   expect(mockUseRadioSession).toHaveBeenLastCalledWith(
     null,
     expect.any(Function),
   );
 });
 
-test("revokes a newly issued token when secure storage rejects it", async () => {
+test("remembers a manual address even when secure profile storage later fails", async () => {
   const storageError = new Error("secure storage is full");
   mockSaveServerProfile.mockRejectedValue(storageError);
   await render(<App />);
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("pairing");
-  });
+  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
 
   let caught: unknown;
   await act(async () => {
     try {
       await mockPairingProps!.onConnect({
-        baseUrl: "https://new-radio.test",
+        baseUrl: "new-radio.test",
         password: "access-password",
       });
     } catch (error) {
@@ -286,30 +353,47 @@ test("revokes a newly issued token when secure storage rejects it", async () => 
   });
 
   expect(caught).toBe(storageError);
+  expect(mockSaveKnownServer).toHaveBeenCalledWith({
+    baseUrl: "http://new-radio.test",
+    serverName: undefined,
+  });
   expect(mockPairServer).toHaveBeenCalledWith({
-    baseUrl: "https://new-radio.test",
+    baseUrl: "http://new-radio.test",
     password: "access-password",
     deviceName: expect.stringContaining("TikLocal Radio"),
   });
   expect(mockRevokeServer).toHaveBeenCalledWith(newProfile);
   expect(mockVisibleScreen).toBe("pairing");
-  expect(mockUseRadioSession).toHaveBeenLastCalledWith(
-    null,
-    expect.any(Function),
-  );
 });
 
-test("stores the new profile before revoking the previous server", async () => {
-  mockLoadServerProfile.mockResolvedValue(oldProfile);
+test("keeps the old connection until a replacement is stored", async () => {
+  const user = userEvent.setup();
+  mockLoadStoredConnection.mockResolvedValue(oldConnection);
   await render(<App />);
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
-  });
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
 
   await act(() => mockRadioProps!.onConnectionPress());
-  expect(mockVisibleScreen).toBe("pairing");
-  expect(mockPairingProps!.initialUrl).toBe(oldProfile.baseUrl);
-  expect(mockPairingProps!.onCancel).toEqual(expect.any(Function));
+  await waitFor(() => expect(mockVisibleScreen).toBe("connection"));
+  await act(() => mockConnectionProps!.onChangeServer());
+  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
+
+  await user.press(
+    screen.getByRole("button", { name: "Cancel changing Server" }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: "Cancel changing Server" }),
+    ).not.toBeOnTheScreen(),
+  );
+  expect(mockSaveServerProfile).not.toHaveBeenCalled();
+  expect(mockRevokeServer).not.toHaveBeenCalled();
+
+  await act(() => mockConnectionProps!.onChangeServer());
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Cancel changing Server" }),
+    ).toBeOnTheScreen(),
+  );
 
   await act(() =>
     mockPairingProps!.onConnect({
@@ -318,37 +402,40 @@ test("stores the new profile before revoking the previous server", async () => {
     }),
   );
 
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
-  });
-  expect(mockSaveServerProfile).toHaveBeenCalledWith(newProfile);
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
+  expect(mockSaveKnownServer).not.toHaveBeenCalled();
   expect(mockSaveServerProfile.mock.invocationCallOrder[0]).toBeLessThan(
     mockRevokeServer.mock.invocationCallOrder[0]!,
   );
   expect(mockRevokeServer).toHaveBeenCalledWith(oldProfile);
-  expect(mockUseRadioSession).toHaveBeenLastCalledWith(
-    newProfile,
-    expect.any(Function),
-  );
 });
 
-test("disconnects locally and revokes the old token when entering Demo", async () => {
-  mockLoadServerProfile.mockResolvedValue(oldProfile);
+test("forgets a Server only after the explicit disconnect action", async () => {
+  mockLoadStoredConnection.mockResolvedValue(oldConnection);
   await render(<App />);
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
-  });
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
   await act(() => mockRadioProps!.onConnectionPress());
+  await waitFor(() => expect(mockVisibleScreen).toBe("connection"));
 
-  await act(() => mockPairingProps!.onUseDemo());
+  await act(() => mockConnectionProps!.onDisconnect());
 
-  await waitFor(() => {
-    expect(mockVisibleScreen).toBe("radio");
-  });
+  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
   expect(mockRevokeServer).toHaveBeenCalledWith(oldProfile);
-  expect(mockClearServerProfile).toHaveBeenCalledTimes(1);
+  expect(mockClearStoredConnection).toHaveBeenCalledTimes(1);
+  expect(mockClearRadioResume).toHaveBeenCalledTimes(1);
   expect(mockUseRadioSession).toHaveBeenLastCalledWith(
     null,
     expect.any(Function),
   );
+});
+
+test("enters Demo without creating or clearing a Server record", async () => {
+  await render(<App />);
+  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
+
+  await act(() => mockPairingProps!.onUseDemo?.());
+
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
+  expect(mockSaveKnownServer).not.toHaveBeenCalled();
+  expect(mockClearStoredConnection).not.toHaveBeenCalled();
 });

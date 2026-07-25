@@ -34,6 +34,15 @@ export type ServerProfile = {
   token: string;
 };
 
+export type KnownServer = {
+  baseUrl: string;
+  serverName?: string;
+};
+
+export type StoredConnection =
+  | { kind: "paired"; profile: ServerProfile }
+  | { kind: "known"; server: KnownServer };
+
 export type PlaybackState =
   | { kind: "paused" }
   | { kind: "buffering" }
