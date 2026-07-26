@@ -394,7 +394,7 @@ test("clears the player and blocks controls for an empty library", async () => {
   expect(mockPlayer.play).not.toHaveBeenCalled();
   expect(mockPlayer.load).toHaveBeenCalledTimes(loadCalls);
   expect(result.current.snapshot.encoreCount).toBe(0);
-  expect(result.current.snapshot.sleepMinutes).toBe(0);
+  expect(result.current.snapshot.sleepEndsAt).toBeNull();
 });
 
 test("pauses and clears the sleep timer when it expires", async () => {
@@ -406,13 +406,15 @@ test("pauses and clears the sleep timer when it expires", async () => {
   );
 
   await act(() => result.current.setSleepTimer(30));
-  expect(result.current.snapshot.sleepMinutes).toBe(30);
+  expect(result.current.snapshot.sleepEndsAt).toBe(
+    Date.now() + 30 * 60 * 1000,
+  );
 
   await act(() => {
     jest.advanceTimersByTime(30 * 60 * 1000);
   });
   expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
-  expect(result.current.snapshot.sleepMinutes).toBe(0);
+  expect(result.current.snapshot.sleepEndsAt).toBeNull();
 
   await unmount();
   jest.useRealTimers();

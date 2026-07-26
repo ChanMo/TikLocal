@@ -66,5 +66,5 @@ export type RadioSnapshot = {
   duration: number;
   isFavorite: boolean;
   encoreCount: number;
-  sleepMinutes: SleepMinutes;
+  sleepEndsAt: number | null;
 };

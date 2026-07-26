@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { AppState } from "react-native";
 
 import { createRadioApi, TikLocalApiError } from "./api";
 import type {
@@ -112,13 +113,12 @@ export function useRadioSession(
   const [tracks, setTracks] = useState(demoTracks);
   const [trackIndex, setTrackIndex] = useState(0);
   const [encoreCount, setEncoreCount] = useState(0);
-  const [sleepMinutes, setSleepMinutesState] = useState<SleepMinutes>(0);
+  const [sleepEndsAt, setSleepEndsAt] = useState<number | null>(null);
   const [sync, setSync] = useState<SyncState>(
     profile
       ? { kind: "loading", message: "Opening private frequency" }
       : { kind: "demo" },
   );
-  const sleepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handledFinish = useRef(false);
   const recentUris = useRef<string[]>([]);
   const requestVersion = useRef(0);
@@ -364,14 +364,36 @@ export function useRadioSession(
     status.didJustFinish,
   ]);
 
-  useEffect(
-    () => () => {
-      if (sleepTimer.current) {
-        clearTimeout(sleepTimer.current);
+  useEffect(() => {
+    if (sleepEndsAt === null) {
+      return;
+    }
+    const remaining = sleepEndsAt - Date.now();
+    if (remaining <= 0) {
+      pause();
+      setSleepEndsAt(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      pause();
+      setSleepEndsAt(null);
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [pause, sleepEndsAt]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (
+        state === "active" &&
+        sleepEndsAt !== null &&
+        sleepEndsAt <= Date.now()
+      ) {
+        pause();
+        setSleepEndsAt(null);
       }
-    },
-    [],
-  );
+    });
+    return () => subscription.remove();
+  }, [pause, sleepEndsAt]);
 
   const toggleFavorite = useCallback(() => {
     const desired = !currentTrack.isFavorite;
@@ -408,21 +430,11 @@ export function useRadioSession(
 
   const setSleepTimer = useCallback(
     (minutes: SleepMinutes) => {
-      if (sleepTimer.current) {
-        clearTimeout(sleepTimer.current);
-        sleepTimer.current = null;
-      }
-      setSleepMinutesState(minutes);
-
-      if (minutes > 0) {
-        sleepTimer.current = setTimeout(() => {
-          pause();
-          setSleepMinutesState(0);
-          sleepTimer.current = null;
-        }, minutes * 60 * 1000);
-      }
+      setSleepEndsAt(
+        minutes > 0 ? Date.now() + minutes * 60 * 1000 : null,
+      );
     },
-    [pause],
+    [],
   );
 
   const retry = useCallback(() => {
@@ -468,7 +480,7 @@ export function useRadioSession(
     duration: canPlay ? status.duration : 0,
     isFavorite: currentTrack.isFavorite,
     encoreCount,
-    sleepMinutes,
+    sleepEndsAt,
   };
 
   return {

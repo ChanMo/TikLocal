@@ -68,7 +68,7 @@ function snapshot(overrides: Partial<RadioSnapshot> = {}): RadioSnapshot {
     duration: 120,
     isFavorite: false,
     encoreCount: 0,
-    sleepMinutes: 0,
+    sleepEndsAt: null,
     ...overrides,
   };
 }
@@ -133,7 +133,7 @@ test("routes every paused-state control to the Radio session", async () => {
   );
   actionSheetChoices.push(0);
   await user.press(screen.getByRole("button", { name: "More Radio options" }));
-  actionSheetChoices.push(1, 1);
+  actionSheetChoices.push(1, 0);
   await user.press(screen.getByRole("button", { name: "More Radio options" }));
 
   expect(radio.play).toHaveBeenCalledTimes(1);
@@ -146,11 +146,13 @@ test("routes every paused-state control to the Radio session", async () => {
 });
 
 test("announces active controls and routes pause", async () => {
+  const now = new Date("2026-07-26T22:00:00+08:00").getTime();
+  const dateNow = jest.spyOn(Date, "now").mockReturnValue(now);
   const radio = session({
     playback: { kind: "playing" },
     isFavorite: true,
     encoreCount: 2,
-    sleepMinutes: 60,
+    sleepEndsAt: now + 60 * 60 * 1000,
   });
   const user = userEvent.setup();
   await render(
@@ -162,9 +164,17 @@ test("announces active controls and routes pause", async () => {
   ).toBeSelected();
   expect(screen.getByText("Queued ×2")).toBeOnTheScreen();
   expect(screen.getByText("60 min")).toBeOnTheScreen();
+  actionSheetChoices.push(3);
+  await user.press(
+    screen.getByRole("button", {
+      name: /Sleep timer, 60 minutes remaining/,
+    }),
+  );
+  expect(radio.setSleepTimer).toHaveBeenCalledWith(0);
   await user.press(screen.getByRole("button", { name: "Pause radio" }));
 
   expect(radio.pause).toHaveBeenCalledTimes(1);
+  dateNow.mockRestore();
 });
 
 test("announces an empty library and disables every playback action", async () => {

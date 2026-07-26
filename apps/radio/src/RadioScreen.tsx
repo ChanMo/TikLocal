@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { SymbolView } from "expo-symbols";
 import {
   ActionSheetIOS,
@@ -37,6 +38,7 @@ export function RadioScreen({ radio, onConnectionPress }: RadioScreenProps) {
       ? Math.min(snapshot.currentTime / snapshot.duration, 1)
       : 0;
   const display = displayTrack(snapshot);
+  const sleepRemaining = useSleepRemaining(snapshot.sleepEndsAt);
 
   return (
     <View style={styles.screen}>
@@ -134,7 +136,7 @@ export function RadioScreen({ radio, onConnectionPress }: RadioScreenProps) {
           <Text numberOfLines={1} style={styles.artist}>
             {display.artist}
           </Text>
-          {snapshot.encoreCount > 0 || snapshot.sleepMinutes > 0 ? (
+          {snapshot.encoreCount > 0 || sleepRemaining > 0 ? (
             <View style={styles.activeStates}>
               {snapshot.encoreCount > 0 ? (
                 <ActiveState
@@ -142,11 +144,24 @@ export function RadioScreen({ radio, onConnectionPress }: RadioScreenProps) {
                   label={`Queued ×${snapshot.encoreCount}`}
                 />
               ) : null}
-              {snapshot.sleepMinutes > 0 ? (
-                <ActiveState
-                  kind="sleep"
-                  label={`${snapshot.sleepMinutes} min`}
-                />
+              {sleepRemaining > 0 ? (
+                <Pressable
+                  accessibilityLabel={`Sleep timer, ${formatSleepAccessibility(sleepRemaining)} remaining, stops at ${formatSleepEnd(snapshot.sleepEndsAt!)}`}
+                  accessibilityRole="button"
+                  hitSlop={12}
+                  onPress={() =>
+                    openSleepTimer(
+                      snapshot.sleepEndsAt,
+                      radio.setSleepTimer,
+                    )
+                  }
+                  style={({ pressed }) => pressed && styles.pressed}
+                >
+                  <ActiveState
+                    kind="sleep"
+                    label={formatSleepRemaining(sleepRemaining)}
+                  />
+                </Pressable>
               ) : null}
             </View>
           ) : null}
@@ -372,8 +387,10 @@ function openRadioMenu({
       ? `Play Again · ${snapshot.encoreCount} queued`
       : "Play Again";
   const sleepLabel =
-    snapshot.sleepMinutes > 0
-      ? `Sleep Timer · ${snapshot.sleepMinutes} min`
+    snapshot.sleepEndsAt !== null
+      ? `Sleep Timer · ${formatSleepRemaining(
+          Math.max(0, snapshot.sleepEndsAt - Date.now()),
+        )}`
       : "Sleep Timer";
   ActionSheetIOS.showActionSheetWithOptions(
     {
@@ -387,7 +404,7 @@ function openRadioMenu({
         radio.encore();
       } else if (index === 1) {
         requestAnimationFrame(() =>
-          openSleepTimer(snapshot.sleepMinutes, radio.setSleepTimer),
+          openSleepTimer(snapshot.sleepEndsAt, radio.setSleepTimer),
         );
       } else if (index === 2) {
         onConnectionPress();
@@ -425,20 +442,40 @@ function openStationPicker(
 }
 
 function openSleepTimer(
-  current: SleepMinutes,
+  endsAt: number | null,
   setSleepTimer: (minutes: SleepMinutes) => void,
 ) {
-  const values: SleepMinutes[] = [0, 30, 60, 120];
+  const isActive = endsAt !== null && endsAt > Date.now();
+  const values: SleepMinutes[] = isActive
+    ? [30, 60, 120, 0]
+    : [30, 60, 120];
   if (Platform.OS !== "ios") {
-    const currentIndex = values.indexOf(current);
-    setSleepTimer(values[(currentIndex + 1) % values.length] ?? 0);
+    if (!isActive) {
+      setSleepTimer(30);
+      return;
+    }
+    const remainingMinutes = Math.ceil(
+      (endsAt - Date.now()) / 60_000,
+    );
+    setSleepTimer(
+      remainingMinutes <= 30
+        ? 60
+        : remainingMinutes <= 60
+          ? 120
+          : 0,
+    );
     return;
   }
+  const options = isActive
+    ? ["30 Minutes", "1 Hour", "2 Hours", "Turn Off", "Cancel"]
+    : ["30 Minutes", "1 Hour", "2 Hours", "Cancel"];
   ActionSheetIOS.showActionSheetWithOptions(
     {
-      cancelButtonIndex: 4,
-      options: ["Off", "30 Minutes", "1 Hour", "2 Hours", "Cancel"],
-      title: "Sleep Timer",
+      cancelButtonIndex: options.length - 1,
+      options,
+      title: isActive
+        ? `${formatSleepRemaining(endsAt - Date.now())} remaining · Stops at ${formatSleepEnd(endsAt)}`
+        : "Stop playback after",
     },
     (index) => {
       const minutes = values[index];
@@ -447,6 +484,46 @@ function openSleepTimer(
       }
     },
   );
+}
+
+function useSleepRemaining(endsAt: number | null) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (endsAt === null) {
+      return;
+    }
+    setTick((tick) => tick + 1);
+    const timer = setInterval(
+      () => setTick((tick) => tick + 1),
+      60_000,
+    );
+    return () => clearInterval(timer);
+  }, [endsAt]);
+
+  return endsAt === null ? 0 : Math.max(0, endsAt - Date.now());
+}
+
+function formatSleepRemaining(milliseconds: number) {
+  if (milliseconds < 60_000) {
+    return "<1 min";
+  }
+  return `${Math.ceil(milliseconds / 60_000)} min`;
+}
+
+function formatSleepAccessibility(milliseconds: number) {
+  if (milliseconds < 60_000) {
+    return "less than 1 minute";
+  }
+  const minutes = Math.ceil(milliseconds / 60_000);
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+function formatSleepEnd(endsAt: number) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(endsAt);
 }
 
 function formatTime(value: number) {
@@ -544,6 +621,7 @@ const styles = StyleSheet.create({
   activeStateText: {
     color: colors.moss,
     fontSize: 11,
+    fontVariant: ["tabular-nums"],
     fontWeight: "600",
   },
   progressBlock: {
