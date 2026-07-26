@@ -2,7 +2,7 @@
 
 - 适用版本: `0.1.0 (1)`
 - 状态: 待执行
-- 更新时间: 2026-07-25
+- 更新时间: 2026-07-26
 
 ## 发布判定
 
@@ -14,10 +14,18 @@
 - 当前 SDK 没有向该播放器暴露耳机“下一首 / 上一首”回调。`0.1.x` 已决定只支持系统和耳机播放/暂停；远程切歌不属于本次验收与发布承诺。
 - 睡眠定时目前依赖 JavaScript timer，必须验证 App 长时间进入后台后能否按时暂停；未通过时不得把它作为可靠的后台能力宣传。
 
+本轮 Android 验收固定使用正式签名产物
+`dist/android/TikLocal-Radio-0.1.0-android.apk`，APK SHA-256 为
+`8d2a73f80e04dd0b434c9192495100d17ad9980ace119da94e0a7b283e4aced4`，签名证书
+SHA-256 为
+`eb883956d85ee395938d63aeccf2294426490475db3df62942a15c962e4db483`。
+若设备已安装 Debug 签名的同包名 App，首次切换必须卸载旧版，因此该次操作不计入
+“升级保留 Profile”验收；后续正式签名版本之间才能验证覆盖升级。
+
 ## 构建与首次启动
 
 - [ ] P0 — iOS TestFlight / preview build 可安装、冷启动且不依赖 Metro。
-- [ ] P0 — Android preview APK 可安装、冷启动且不依赖 Metro。
+- [ ] P0 — Android 正式签名 Release APK 可安装、冷启动且不依赖 Metro。
 - [ ] P0 — App 名称、图标、启动页、版本 `0.1.0 (1)` 正确。
 - [ ] P0 — 无 Server 时进入 Demo Signal，三段内置音频均可播放和切换。
 - [ ] P1 — 升级安装后已保存的 Server Profile 仍可使用。

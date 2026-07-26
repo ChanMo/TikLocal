@@ -117,7 +117,7 @@ sdkmanager --sdk_root="$ANDROID_HOME" \
   "ndk;27.1.12297006" "cmake;3.22.1"
 ```
 
-生成并验证本地安装包：
+生成并验证未接入正式凭据的本地安装包：
 
 ```bash
 npx expo prebuild --clean --no-install --platform android
@@ -125,7 +125,34 @@ cd android
 NODE_ENV=production ./gradlew :app:assembleRelease :app:bundleRelease
 ```
 
-生成物位于 `android/app/build/outputs/apk/release/` 与 `android/app/build/outputs/bundle/release/`。生成工程默认用 Android Debug 证书签署 release 产物，仅用于本地验证，不能提交商店；正式签名使用 EAS production profile 或独立 keystore。
+生成物位于 `android/app/build/outputs/apk/release/` 与
+`android/app/build/outputs/bundle/release/`。CNG 生成工程默认用 Android Debug
+证书签署 release 产物，仅用于本地验证，不能公开分发或提交商店。
+
+2026-07-26 已在当前发布机建立 TikLocal Radio 专用的独立 keystore，密码保存在
+macOS Keychain，密钥文件保存在仓库外：
+
+```text
+~/Library/Application Support/TikLocal/signing/tiklocal-radio-release.jks
+```
+
+由该密钥签署的 `0.1.0 (1)` APK / AAB 已完成构建和签名验证，便于辨识的副本位于：
+
+```text
+dist/android/TikLocal-Radio-0.1.0-android.apk
+dist/android/TikLocal-Radio-0.1.0-android.aab
+```
+
+APK 证书 SHA-256 为
+`eb883956d85ee395938d63aeccf2294426490475db3df62942a15c962e4db483`。
+正式分发前必须安全备份 keystore；后续升级必须继续使用同一密钥。设备若已安装相同
+包名的 Debug 签名版本，需要先卸载再安装本次正式签名 APK；此操作会清除 App 本地
+数据。
+
+当前签名接线只存在于被 Git 忽略的本机生成工程中，执行
+`npx expo prebuild --clean` 会覆盖它。它足以验证本次正式包，但还不是仓库可重复的
+发布流程；真机验收通过后，应将不含密钥和密码的签名接线收敛为受版本控制的构建
+脚本或 Expo config plugin，再进行下一次正式打包。`dist/` 同样不进入版本控制。
 
 `app.config.ts` 会阻止悬浮窗、外部存储、生物识别和录音等未使用权限。扫码只申请相机权限；修改权限后必须重新 `prebuild`，并以最终 APK / AAB 的 merged Manifest 为准。
 

@@ -1,7 +1,7 @@
 # TikLocal Radio 原生客户端架构
 
-- 状态: iOS 优先的原生导航与连接记忆已落地，等待更新安装与真机验收
-- 更新时间: 2026-07-25
+- 状态: 原生导航、连接记忆与 Android 正式签名构建已落地，等待双平台真机验收
+- 更新时间: 2026-07-26
 
 ## 背景/目标
 
@@ -256,7 +256,7 @@ favorite / feedback
 - App 初始版本：`0.1.0 (1)`，本地配置作为首版 seed；EAS production 使用远端版本源并自动递增 build version。
 - Server 与 App 独立版本，协议使用 `/api/v1` 演进。
 
-开发使用 Expo Development Build；内部测试使用 EAS `preview`；无设备签名的 iOS 静态安装检查可使用 `preview-simulator`；正式发布使用 TestFlight / App Store 与 Android APK / Google Play。
+开发使用 Expo Development Build；内部测试使用 EAS `preview`；无设备签名的 iOS 静态安装检查可使用 `preview-simulator`。正式发布可使用 TestFlight / App Store 与 Google Play；Android 还可用项目自有的长期密钥签署 APK，作为无需商店账号的直接分发渠道。
 
 本地真机有两种明确模式：
 
@@ -276,7 +276,10 @@ Android 本地发布门槛已经验证：
 - JDK 17、SDK / target 36、Build Tools 36.0.0、NDK 27.1.12297006、CMake 3.22.1。
 - `assembleDebug`、`assembleRelease` 与 `bundleRelease` 均通过。
 - 本地 release APK 内含 Hermes bundle 与 Demo 音频，可脱离 Metro 启动。
-- 本地 APK / AAB 使用仓库生成工程中的 Android Debug 证书，只用于编译与安装验证；商店发布必须交给 EAS 或正式 keystore 重新签名。
+- 早期本地 APK / AAB 使用生成工程中的 Android Debug 证书，只用于编译与安装验证。
+- 2026-07-26 已在仓库外建立 TikLocal Radio 专用的 4096-bit RSA keystore，密码由 macOS Keychain 保存；`0.1.0 (1)` APK 使用 APK Signature Scheme v2 验证通过，AAB 也通过 JAR 签名验证。
+- 正式证书 SHA-256 为 `eb883956d85ee395938d63aeccf2294426490475db3df62942a15c962e4db483`，有效期至 2053-12-11。后续直接分发和升级必须保持同一签名身份。
+- 本次正式签名接线位于被 Git 忽略的生成工程，`prebuild --clean` 会覆盖它；真机验收通过后再将无秘密的签名配置收敛为可重复构建入口。keystore、密码和产物继续留在版本控制之外。
 
 ## 风险与权衡
 
@@ -315,6 +318,7 @@ Android 本地发布门槛已经验证：
 - 2026-07-25 使用 iPhone 17 / iOS 26.5 模拟器完成 Release 原生构建、安装与首页逐像素复核：SF Symbols、Safe Area、Signal Dial、Station 入口与三枚 Transport 控件均正常；高屏幕采用 300pt 拨盘和更舒展的纵向节奏，小屏幕回退为 282pt，避免为了视觉比例制造首屏滚动。模拟器结果只作为布局证据，不替代后台播放、耳机、相机和触感的真机门禁。
 - 客户端正式图标由项目专属视觉稿生成，并接入 iOS App Icon、Android adaptive icon 与原生启动页。
 - Android Debug APK、含生产 bundle 的本地 release APK 和 release AAB 均完成原生编译；加入扫码、安全区和深链处理后再次完成 release APK 编译。最终 APK 已核验 `tiklocal-radio` 的 VIEW/BROWSABLE intent filter，权限仍只有相机而没有录音。
+- Android `0.1.0 (1)` 已使用项目专用长期密钥构建正式签名 APK / AAB：包名、版本、minSdk 24、targetSdk 36、单一签名者及证书指纹均已核验；APK / AAB 分别约 105 MB / 69 MB。该结果证明构建与签名链路，不替代 Android 真机安装和系统媒体验收。
 - iOS Pods 已成功安装 99 个 Pod，包含 Expo Camera 的条码扫描实现和安全区原生模块；完成 Xcode 首次运行与 iOS 平台组件准备后，已使用 Personal Team 在 iPhone 真机完成 Release 编译、签名、安装和进程启动。Release 内嵌生产 JavaScript bundle，不依赖 Metro。
 
 ## 后续事项
@@ -332,6 +336,7 @@ Android 本地发布门槛已经验证：
 - [x] 补充设备列表、自撤销与浏览器单设备撤销入口。
 - [x] 接入正式图标、Android adaptive icon 与原生启动页。
 - [x] 完成 Android Debug / release APK 与 release AAB 原生编译和权限核验。
+- [x] 建立 Android 长期 Release 密钥并完成 `0.1.0 (1)` 正式签名 APK / AAB 构建验证。
 - [x] 固化首版版本号、EAS profiles、加密声明、双语隐私政策与商店文案草案。
 - [x] 将 Radio 类型、Expo 依赖健康度和双平台 production bundle 纳入主 CI。
 - [x] 为 Radio Session 增加确定性测试，并纳入主 CI。
@@ -340,6 +345,8 @@ Android 本地发布门槛已经验证：
 - [x] 将 Radio / Connection / Pairing 收敛为 iOS 原生 Stack，并完成渐进式配对交互。
 - [x] 将 SecureStore 升级为 `paired` / `known` 连接记录，保证离线、401 和失败重连不会反复要求输入地址。
 - [ ] 在 iPhone 安装本次更新，验收自定义 Radio 顶部、SF Symbols、开放式 Signal Dial、更多菜单、异常状态、Pairing Cancel 与 Connection Form Sheet。
+- [ ] 在 Android 真机安装正式签名 `0.1.0 (1)` APK，并按验收清单记录冷启动、连接与系统媒体行为。
+- [ ] 将 Android 正式签名接线从本机生成工程收敛为不含秘密、受版本控制的可重复构建入口。
 - [ ] 登录 Expo / Apple / Google 账号，关联 EAS project 并建立 preview、TestFlight 与 Play 内测流程。
 - [ ] 按 `apps/radio/store/device-acceptance.md` 完成双平台 P0 验收；远程切歌不属于 `0.1.x` 验收范围。
 

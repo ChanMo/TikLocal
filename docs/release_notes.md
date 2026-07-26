@@ -19,6 +19,7 @@
 - 接入 `expo-camera` 的 QR-only 扫描器；仅在用户主动打开后申请相机权限，不保存图像，Android release APK 已核验没有录音权限。
 - 新增 TikLocal Radio 正式图标、Android adaptive icon 与原生启动页，并完成 iOS / Android 生产 bundle 验证。
 - 完成 Android Debug APK、含生产 Hermes bundle 的本地 release APK 和 release AAB 原生编译；显式移除悬浮窗、外部存储与生物识别等未使用权限。
+- 建立 TikLocal Radio 专用的长期 Android Release 密钥，并完成 `0.1.0 (1)` 正式签名 APK / AAB 构建与证书验证；密钥位于仓库外、密码由 macOS Keychain 保存，真机安装与系统媒体行为仍作为发布门槛。
 - 固化 TikLocal Radio `0.1.0 (1)`、EAS preview / production 构建策略和 iOS 标准加密声明；移除 iOS 未使用的麦克风与 Face ID 用途说明。
 - 收敛 EAS 云构建输入：排除本地原生工程、依赖、测试和商店材料，并增加无需物理设备签名的 iOS Simulator preview profile。
 - 使用官方安全区上下文替换 React Native 已弃用的 `SafeAreaView`；保持单一根 Provider，不增加导航或布局抽象，并完成 Android release 与 iOS Pods 自动链接验证。
