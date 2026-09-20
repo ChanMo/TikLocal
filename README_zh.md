@@ -16,6 +16,30 @@ TikLocal 的主要功能包括：
 * 支持多个媒体源与 URL 下载，并合并为一个统一的本地媒体库。
 * 支持 **浅色和暗色模式**，满足您的个人喜好。
 
+## 截图
+
+TikLocal 以手机端体验为主，因此每个页面都先展示手机截图，桌面截图放在旁边作为参考。
+
+### Flow —— 类 Tiktok 上下滑动流
+
+<img src="docs/screenshots/flow-mobile.png" alt="手机端 TikLocal Flow 页面，展示全屏上下滑动的视频流，右侧有点赞/收藏/详情等操作按钮" width="280" />　<img src="docs/screenshots/flow-desktop.png" alt="桌面端 TikLocal Flow 页面，展示同样的滑动流，左侧带有侧边栏导航" width="480" />
+
+*类似 Tiktok 的视频/图片混合滑动流，支持手动滑动切换与条内操作。*
+
+### Radio —— 氛围电台播放器
+
+<img src="docs/screenshots/radio-mobile.png" alt="手机端 TikLocal Radio 页面，展示黑胶唱片风格的播放界面，背景是动态的雨滴窗景" width="280" />　<img src="docs/screenshots/radio-desktop.png" alt="桌面端 TikLocal Radio 页面，展示同样的黑胶唱片播放界面，布局更宽" width="480" />
+
+*带黑胶唱片可视化效果的氛围音频播放器，支持房间背景（雨声/微风）与本地曲目列表。*
+
+### Library —— 类 Pinterest 网格 + 时间线
+
+<img src="docs/screenshots/library-mobile.png" alt="手机端 TikLocal Library 页面，展示按年/月组织的时间线，以及 Pinterest 风格的图片和视频缩略图网格" width="280" />　<img src="docs/screenshots/library-desktop.png" alt="桌面端 TikLocal Library 页面，展示同样的年/月时间线网格，布局更宽" width="480" />
+
+*以年/月时间线组织的 Pinterest 式网格布局，方便浏览多年积累的媒体库。*
+
+> **说明：** 以上截图中展示的内容（渐变色图片、抽象动态片段与氛围音效）均为仅用于生成截图的合成示例素材，并非作者的真实文件；TikLocal 本身不会附带或要求任何内置媒体库。
+
 ## 使用场景
 
 TikLocal 适用于以下场景：
