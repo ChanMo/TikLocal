@@ -77,7 +77,7 @@ test("normalizes a local address and pairs without an Authorization header", asy
     pairServer({
       baseUrl: "  studio.local:8443/// ",
       password: "access-password",
-      deviceName: "TikLocal Radio · ios",
+      deviceName: "LumaFold · ios",
     }),
   ).resolves.toEqual({
     baseUrl: "http://studio.local:8443",
@@ -98,7 +98,7 @@ test("normalizes a local address and pairs without an Authorization header", asy
       },
       body: JSON.stringify({
         password: "access-password",
-        device_name: "TikLocal Radio · ios",
+        device_name: "LumaFold · ios",
       }),
     }),
   );
@@ -135,7 +135,7 @@ test("parses and claims a single-use pairing link", async () => {
   });
   await expect(claimPairingGrant({
     pairingUri,
-    deviceName: "TikLocal Radio · ios",
+    deviceName: "LumaFold · ios",
   })).resolves.toEqual({
     baseUrl: "https://studio.local:8443",
     serverName: "Living Room",
@@ -149,7 +149,7 @@ test("parses and claims a single-use pairing link", async () => {
     method: "POST",
     body: JSON.stringify({
       grant,
-      device_name: "TikLocal Radio · ios",
+      device_name: "LumaFold · ios",
     }),
     headers: {
       Accept: "application/json",

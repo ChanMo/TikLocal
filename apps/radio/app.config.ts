@@ -2,21 +2,32 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "TikLocal Radio",
+  name: "LumaFold",
   slug: "tiklocal-radio",
   version: "0.1.0",
-  icon: "./assets/icon.png",
+  icon: "./assets/lumafold-icon.png",
   orientation: "portrait",
   scheme: "tiklocal-radio",
   plugins: [
     "expo-asset",
+    "expo-document-picker",
+    [
+      "expo-image-picker",
+      {
+        microphonePermission: false,
+        photosPermission:
+          "LumaFold imports only the photos and videos you choose for your private offline Flow.",
+      },
+    ],
+    "expo-sqlite",
+    "expo-video",
     [
       "expo-splash-screen",
       {
-        image: "./assets/icon.png",
-        imageWidth: 240,
+        image: "./assets/lumafold-foreground.png",
+        imageWidth: 220,
         resizeMode: "contain",
-        backgroundColor: "#0B211C",
+        backgroundColor: "#17231D",
       },
     ],
     [
@@ -46,7 +57,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-camera",
       {
         cameraPermission:
-          "TikLocal Radio uses the camera only to scan a pairing QR code.",
+          "LumaFold uses the camera only to scan a TikLocal Server pairing QR code.",
+        microphonePermission: false,
         recordAudioAndroid: false,
         barcodeScannerEnabled: true,
       },
@@ -61,7 +73,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     infoPlist: {
       NSLocalNetworkUsageDescription:
-        "TikLocal Radio connects to the TikLocal Server on your local network.",
+        "LumaFold connects to the TikLocal Server on your local network.",
       NSAppTransportSecurity: {
         NSAllowsLocalNetworking: true,
       },
@@ -80,8 +92,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "android.permission.RECORD_AUDIO",
     ],
     adaptiveIcon: {
-      foregroundImage: "./assets/icon.png",
-      backgroundColor: "#0B211C",
+      foregroundImage: "./assets/lumafold-foreground.png",
+      backgroundColor: "#17231D",
     },
   },
 });

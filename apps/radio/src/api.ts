@@ -63,7 +63,7 @@ export function parsePairingUri(value: string): {
   const candidate = value.trim();
   if (!candidate || candidate.length > 1200) {
     throw new TikLocalApiError(
-      "Paste a valid TikLocal Radio pairing link.",
+      "Paste a valid TikLocal Server pairing link.",
       "invalid_pairing_link",
       400,
     );
@@ -73,7 +73,7 @@ export function parsePairingUri(value: string): {
     url = new URL(candidate);
   } catch {
     throw new TikLocalApiError(
-      "Paste a valid TikLocal Radio pairing link.",
+      "Paste a valid TikLocal Server pairing link.",
       "invalid_pairing_link",
       400,
     );
@@ -93,7 +93,7 @@ export function parsePairingUri(value: string): {
     || !/^tlpg_[A-Za-z0-9_-]{43}$/.test(grant)
   ) {
     throw new TikLocalApiError(
-      "This is not a supported TikLocal Radio pairing link.",
+      "This is not a supported TikLocal Server pairing link.",
       "invalid_pairing_link",
       400,
     );

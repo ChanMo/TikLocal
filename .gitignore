@@ -162,6 +162,10 @@ cython_debug/
 
 node_modules/
 
+# Expo CNG output; local module native sources under apps/radio/modules stay tracked.
+/apps/radio/android/
+/apps/radio/ios/
+
 .DS_Store
 default/
 

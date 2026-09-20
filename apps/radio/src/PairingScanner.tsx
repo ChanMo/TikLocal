@@ -40,7 +40,7 @@ export function PairingScanner({
       setPairingUri(data);
       setServerUrl(parsed.baseUrl);
     } catch {
-      setScanError("This QR code is not a TikLocal Radio pairing link.");
+      setScanError("This QR code is not a TikLocal Server pairing link.");
     }
   };
 
@@ -99,8 +99,8 @@ export function PairingScanner({
 
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.kicker}>TIKLOCAL / QR PATCH</Text>
-            <Text style={styles.heading}>Pair this Radio</Text>
+            <Text style={styles.kicker}>LUMAFOLD / QR PAIRING</Text>
+            <Text style={styles.heading}>Pair a TikLocal Server</Text>
           </View>
           <Pressable
             accessibilityLabel="Close scanner"

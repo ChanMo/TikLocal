@@ -1,13 +1,15 @@
 # TikLocal Radio 原生客户端架构
 
-- 状态: 原生导航、连接记忆与 Android 正式签名构建已落地，等待双平台真机验收
-- 更新时间: 2026-07-26
+- 状态: Radio 边界已落地并继续作为本地优先 App 的可选 Server 能力，等待双平台真机验收
+- 更新时间: 2026-08-25
+
+> 2026-08-25 起，原生客户端已增加无需 Server 的媒体导入、SQLite 索引与离线 Flow；2026-08-26 起使用 LumaFold 作为可调整的消费端工作品牌。本文件继续约束 Radio、连接和播放器边界；更广义的产品入口、品牌兼容边界与本地数据架构见 `docs/native-local-app-architecture.md`。
 
 ## 背景/目标
 
 Radio 是 TikLocal 日常使用频率最高、也最依赖系统媒体能力的模式。PWA 可以覆盖浏览器内体验，但无法稳定获得原生后台播放、耳机控制、锁屏媒体信息和后续车载能力。
 
-本方案新增独立的 React Native 客户端 **TikLocal Radio**。它是 TikLocal Server 的原生伴侣，不是完整 Web 产品的移植：
+本方案最初新增独立的 React Native 客户端 **TikLocal Radio**；当前 Radio 已成为 LumaFold 内连接 TikLocal Server 的可选模块，而不是 App 的唯一产品身份：
 
 - Server 继续负责媒体索引、选曲、推荐、收藏与反馈。
 - App 负责播放队列、系统媒体会话、连接状态和移动端交互。
@@ -249,7 +251,7 @@ favorite / feedback
 
 ## 版本与发布
 
-- 产品名：`TikLocal Radio`
+- 当前用户可见工作品牌：`LumaFold`；原 `TikLocal Radio` 名称继续描述 Radio 模块与历史构建。
 - Expo slug：`tiklocal-radio`
 - URL scheme：`tiklocal-radio://`
 - iOS Bundle ID / Android Application ID：`com.chanmo.tiklocal.radio`

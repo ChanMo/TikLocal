@@ -1,6 +1,8 @@
-# TikLocal Radio
+# LumaFold 原生 App
 
-TikLocal 的原生 Radio 伴侣客户端。当前版本使用原生页面栈组织 Radio、连接管理与配对流程，可扫描 TikLocal Web 设置页生成的一次性二维码完成单 Server 配对，也保留渐进式的粘贴链接、手动地址与访问密码以及内置 Demo Radio。
+LumaFold 是 TikLocal 项目的本地优先消费端品牌。当前版本打开后直接进入私人 Flow，可从 Photos 或 Files 导入图片和视频，在 App 沙盒内建立离线副本与 SQLite 索引，并纵向浏览和播放；无需账号、网络或 TikLocal Server。
+
+App 使用 `Flow / Library / Music / Settings` 四个顶层空间。Flow 与 Library 是照片和视频主产品；原有 Radio 位于次级 Music 空间，连接管理在 Settings 中表现为可选 TikLocal Folder Source。Music 可扫描 TikLocal Web 设置页生成的一次性二维码完成单 Server 配对，也保留渐进式的粘贴链接、手动地址与访问密码以及内置 Demo Signal。当前用户可见名称与候选图标使用 LumaFold；bundle identifier、Expo slug、URL Scheme、数据库与配对协议继续沿用原内部标识，避免品牌试用阶段触发数据迁移。
 
 ## 本地运行
 
@@ -19,15 +21,17 @@ JavaScript bundle；之后日常开发必须先启动 Metro：
 npm start
 ```
 
-在手机打开 TikLocal Radio 后，从 Expo Development Client 选择自动发现的 Metro
+在手机打开 LumaFold 后，从 Expo Development Client 选择自动发现的 Metro
 开发服务器。该界面的 URL 是 JavaScript 开发服务器，通常使用 `8081` 端口；不要
 在这里输入 TikLocal Server 地址，否则 HTML 会被当作 JavaScript bundle，并出现
 `Expected MIME-Type ... but got text/html`。
 
-进入真正的 TikLocal Radio 配对页后，才输入或扫描 TikLocal Server 地址，例如
+进入真正的 LumaFold 配对页后，才输入或扫描 TikLocal Server 地址，例如
 `http://192.168.0.128:8888`。
 
-原生模块或 `app.config.ts` 发生变化后，需要重新执行 `npm run ios:device`。
+原生模块或 `app.config.ts` 发生变化后，需要重新执行 `npm run ios:device`。本地
+`tiklocal-storage` Expo Module 只承载必须下沉原生的 backup exclusion 和视频帧生成；
+SQLite、导入与文件生命周期仍由单一 TypeScript 资料库模块负责。
 
 如果希望像普通 App 一样独立启动、不依赖 Metro，安装本地 Release：
 
@@ -35,8 +39,15 @@ npm start
 npm run ios:release
 ```
 
-Release 会把生产 JavaScript bundle 和 Demo 音频嵌入 App；安装后直接进入 TikLocal
-Radio，不会显示 Development Client 启动页。
+Release 会把生产 JavaScript bundle 和 Demo 音频嵌入 App；安装后直接进入 LumaFold
+Flow，不会显示 Development Client 启动页。
+
+Flow 从 Photos 或 Files 复制用户明确选择的图片与视频到 App 私有目录，并使用
+SQLite 保存本地清单。资料库会显示实际占用空间；长按项目可多选删除，Clear 可清空
+全部 App 副本，两者都不会删除 Photos 或 Files 中的原件。iOS 会将媒体副本目录标记
+为不进入 iCloud 设备备份；SQLite 索引和偏好仍可能随系统备份。视频导入时生成本地
+预览图，旧记录会逐项补齐；多项目导入显示确定进度，复制前按已知大小保留 128 MB
+设备空间安全余量。
 
 首次进入 Radio 配对页时，优先在 TikLocal Web 设置页生成两分钟有效的一次性二维码并扫描。App 会显示目标 Server，确认后才兑换设备令牌；也可粘贴配对链接，或手动输入 Server 地址和访问密码，例如：
 
@@ -100,7 +111,10 @@ npx expo export:embed --platform ios --dev false --entry-file index.ts --bundle-
 npx expo export:embed --platform android --dev false --entry-file index.ts --bundle-output /tmp/tiklocal-radio-android.bundle
 ```
 
-仓库主 CI 会在 Node.js 22 下从 `package-lock.json` 执行 `npm ci`、TypeScript、66 项 App / Session / Player / API / Storage / Screen 测试、固定版本 Expo Doctor，以及带 Demo 音频资源复制的 iOS / Android production bundle。该门禁不需要 Expo、Apple 或 Google 凭据，也不替代真机相机与媒体行为验收。
+仓库主 CI 会在 Node.js 22 下从 `package-lock.json` 执行 `npm ci`、TypeScript、客户端
+自动化测试、固定版本 Expo Doctor，以及带 Demo 音频资源复制的 iOS / Android
+production bundle。该门禁不需要 Expo、Apple 或 Google 凭据，也不替代真机相机、
+媒体导入、删除与播放行为验收。
 
 ### Android 本地原生构建
 

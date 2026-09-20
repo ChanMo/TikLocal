@@ -71,6 +71,8 @@ const mockSaveServerProfile = jest.fn<
   (profile: ServerProfile) => Promise<void>
 >();
 const mockClearRadioResume = jest.fn();
+const mockCountLocalMedia = jest.fn<() => Promise<number>>();
+const mockInitializeLocalLibrary = jest.fn<() => Promise<void>>();
 const mockRetry = jest.fn();
 const mockUseRadioSession = jest.fn<
   (
@@ -83,7 +85,12 @@ let mockRadioProps: RadioProps | null = null;
 let mockConnectionProps: ConnectionProps | null = null;
 let mockUnauthorized: (() => void) | null = null;
 let mockUrlListeners: Array<(event: { url: string }) => void> = [];
-let mockVisibleScreen: "boot" | "pairing" | "radio" | "connection" = "boot";
+let mockVisibleScreen:
+  | "boot"
+  | "flow"
+  | "pairing"
+  | "radio"
+  | "connection" = "boot";
 const mockRemoveUrlListener = jest.fn();
 const mockGetInitialURL = jest.spyOn(Linking, "getInitialURL");
 const mockAddUrlListener = jest.spyOn(Linking, "addEventListener");
@@ -125,6 +132,30 @@ jest.mock("./src/radio", () => ({
 
 jest.mock("./src/radioResume", () => ({
   clearRadioResume: () => mockClearRadioResume(),
+}));
+
+jest.mock("./src/localLibrary", () => ({
+  countLocalMedia: () => mockCountLocalMedia(),
+  initializeLocalLibrary: () => mockInitializeLocalLibrary(),
+}));
+
+jest.mock("./src/FlowScreen", () => ({
+  FlowScreen: () => {
+    mockVisibleScreen = "flow";
+    return null;
+  },
+}));
+
+jest.mock("./src/LocalLibraryScreen", () => ({
+  LocalLibraryScreen: () => null,
+}));
+
+jest.mock("./src/LocalFlowScreen", () => ({
+  LocalFlowScreen: () => null,
+}));
+
+jest.mock("./src/SettingsScreen", () => ({
+  SettingsScreen: () => null,
 }));
 
 jest.mock("./src/PairingScreen", () => ({
@@ -195,6 +226,8 @@ beforeEach(() => {
   mockClaimPairingGrant.mockResolvedValue(newProfile);
   mockRevokeServer.mockResolvedValue(undefined);
   mockClearRadioResume.mockReturnValue(undefined);
+  mockCountLocalMedia.mockResolvedValue(0);
+  mockInitializeLocalLibrary.mockResolvedValue(undefined);
   mockUseRadioSession.mockImplementation(
     (profile: ServerProfile | null, onUnauthorized: () => void) => {
       mockUnauthorized = onUnauthorized;
@@ -238,6 +271,8 @@ test("opens an initial pairing deep link while preserving the current Server", a
 test("handles a foreground pairing link and ignores unsupported URLs", async () => {
   mockLoadStoredConnection.mockResolvedValue(oldConnection);
   await render(<App />);
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
   await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
 
   await act(() => {
@@ -258,11 +293,13 @@ test("handles a foreground pairing link and ignores unsupported URLs", async () 
   expect(mockVisibleScreen).toBe("radio");
 });
 
-test("restores a paired Server directly into Radio", async () => {
+test("restores a paired TikLocal source without blocking the local Flow", async () => {
   mockLoadStoredConnection.mockResolvedValue(oldConnection);
 
   await render(<App />);
 
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
   await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
   expect(mockUseRadioSession).toHaveBeenLastCalledWith(
     oldProfile,
@@ -282,6 +319,8 @@ test("does not retune when the app leaves and returns to active state", async ()
   mockLoadStoredConnection.mockResolvedValue(oldConnection);
 
   await render(<App />);
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
   await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
   await act(() => {
     listeners.forEach((listener) => listener("inactive"));
@@ -294,7 +333,7 @@ test("does not retune when the app leaves and returns to active state", async ()
   appStateListener.mockRestore();
 });
 
-test("restores a known Server into a focused reauthorization flow", async () => {
+test("keeps a known TikLocal source optional until the user reconnects", async () => {
   mockLoadStoredConnection.mockResolvedValue({
     kind: "known",
     server: {
@@ -305,6 +344,11 @@ test("restores a known Server into a focused reauthorization flow", async () => 
 
   await render(<App />);
 
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
+  await act(() => mockRadioProps!.onConnectionPress());
+  await waitFor(() => expect(mockVisibleScreen).toBe("connection"));
+  await act(() => mockConnectionProps!.onReconnect());
   await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
   expect(mockPairingProps!.initialServerName).toBe("Old Studio");
   expect(mockPairingProps!.initialUrl).toBe(oldProfile.baseUrl);
@@ -317,6 +361,8 @@ test("restores a known Server into a focused reauthorization flow", async () => 
 test("keeps the Server identity when the device key becomes unauthorized", async () => {
   mockLoadStoredConnection.mockResolvedValue(oldConnection);
   await render(<App />);
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
   await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
 
   await act(() => mockUnauthorized?.());
@@ -338,6 +384,12 @@ test("remembers a manual address even when secure profile storage later fails", 
   const storageError = new Error("secure storage is full");
   mockSaveServerProfile.mockRejectedValue(storageError);
   await render(<App />);
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
+  await act(() => mockRadioProps!.onConnectionPress());
+  await waitFor(() => expect(mockVisibleScreen).toBe("connection"));
+  await act(() => mockConnectionProps!.onChangeServer());
   await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
 
   let caught: unknown;
@@ -360,7 +412,7 @@ test("remembers a manual address even when secure profile storage later fails", 
   expect(mockPairServer).toHaveBeenCalledWith({
     baseUrl: "http://new-radio.test",
     password: "access-password",
-    deviceName: expect.stringContaining("TikLocal Radio"),
+    deviceName: expect.stringContaining("LumaFold"),
   });
   expect(mockRevokeServer).toHaveBeenCalledWith(newProfile);
   expect(mockVisibleScreen).toBe("pairing");
@@ -370,6 +422,8 @@ test("keeps the old connection until a replacement is stored", async () => {
   const user = userEvent.setup();
   mockLoadStoredConnection.mockResolvedValue(oldConnection);
   await render(<App />);
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
   await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
 
   await act(() => mockRadioProps!.onConnectionPress());
@@ -413,13 +467,15 @@ test("keeps the old connection until a replacement is stored", async () => {
 test("forgets a Server only after the explicit disconnect action", async () => {
   mockLoadStoredConnection.mockResolvedValue(oldConnection);
   await render(<App />);
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
   await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
   await act(() => mockRadioProps!.onConnectionPress());
   await waitFor(() => expect(mockVisibleScreen).toBe("connection"));
 
   await act(() => mockConnectionProps!.onDisconnect());
 
-  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
   expect(mockRevokeServer).toHaveBeenCalledWith(oldProfile);
   expect(mockClearStoredConnection).toHaveBeenCalledTimes(1);
   expect(mockClearRadioResume).toHaveBeenCalledTimes(1);
@@ -431,11 +487,15 @@ test("forgets a Server only after the explicit disconnect action", async () => {
 
 test("enters Demo without creating or clearing a Server record", async () => {
   await render(<App />);
-  await waitFor(() => expect(mockVisibleScreen).toBe("pairing"));
-
-  await act(() => mockPairingProps!.onUseDemo?.());
-
+  await waitFor(() => expect(mockVisibleScreen).toBe("flow"));
+  await openMusic();
   await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
   expect(mockSaveKnownServer).not.toHaveBeenCalled();
   expect(mockClearStoredConnection).not.toHaveBeenCalled();
 });
+
+async function openMusic() {
+  const user = userEvent.setup();
+  await user.press(screen.getByText("Music"));
+  await waitFor(() => expect(mockVisibleScreen).toBe("radio"));
+}

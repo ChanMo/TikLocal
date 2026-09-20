@@ -76,7 +76,7 @@ export function PairingScreen({
       setError(
         caught instanceof TikLocalApiError
           ? caught.message
-          : "TikLocal Radio could not connect to this Server.",
+          : "LumaFold could not connect to this Server.",
       );
     } finally {
       setIsConnecting(false);
@@ -101,7 +101,7 @@ export function PairingScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.intro}>
-          <Text style={styles.kicker}>TIKLOCAL RADIO</Text>
+          <Text style={styles.kicker}>LUMAFOLD / TIKLOCAL SERVER</Text>
           <Text style={styles.title}>
             {step === "confirm"
               ? "Confirm this Server."
@@ -111,7 +111,7 @@ export function PairingScreen({
           </Text>
           <Text style={styles.description}>
             {step === "choice"
-              ? "Pair once, then TikLocal Radio will remember this Server and connect automatically."
+              ? "Pair once, then LumaFold will remember this Server and connect automatically."
               : step === "manual"
                 ? "Enter the address shown by TikLocal and your access password. The password is used once and never saved."
                 : step === "link"

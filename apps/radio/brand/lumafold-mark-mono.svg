@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">LumaFold monochrome mark</title>
+  <desc id="desc">A monochrome pair of folded forms around a memory core.</desc>
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <circle cx="640" cy="500" r="102" fill="#000000"/>
+  <path fill="#000000" d="M575 120c50-30 115-25 160 10l55 45c40 33 35 95-10 123L510 470c-35 22-42 65-14 94l134 136c37 38 26 101-20 126l-140 79c-43 24-96 12-126-24L190 692c-26-32-40-72-40-114V410c0-62 32-120 86-151L575 120Z"/>
+  <path fill="#000000" d="M760 320c40-33 98-26 130 16l39 52c23 30 35 67 35 104v150c0 47-23 91-63 117L635 933c-39 26-91 16-118-22-28-40-19-92 20-119l159-111c39-27 39-85-1-112l-75-52c-36-25-35-79 3-101l137-96Z"/>
+</svg>

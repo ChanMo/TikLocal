@@ -11,12 +11,15 @@ import {
 } from "react-native";
 import {
   NavigationContainer,
+  type NavigatorScreenParams,
   useNavigationContainerRef,
 } from "@react-navigation/native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import {
   createNativeStackNavigator,
   type NativeStackScreenProps,
 } from "@react-navigation/native-stack";
+import { SymbolView } from "expo-symbols";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import {
@@ -27,6 +30,12 @@ import {
   revokeServer,
 } from "./src/api";
 import { ConnectionScreen } from "./src/ConnectionScreen";
+import {
+  countLocalMedia,
+  initializeLocalLibrary,
+} from "./src/localLibrary";
+import { FlowScreen } from "./src/FlowScreen";
+import { LocalLibraryScreen } from "./src/LocalLibraryScreen";
 import type {
   KnownServer,
   ServerProfile,
@@ -36,6 +45,7 @@ import { PairingScreen } from "./src/PairingScreen";
 import { RadioScreen } from "./src/RadioScreen";
 import { useRadioSession } from "./src/radio";
 import { clearRadioResume } from "./src/radioResume";
+import { SettingsScreen } from "./src/SettingsScreen";
 import {
   clearStoredConnection,
   loadStoredConnection,
@@ -45,12 +55,20 @@ import {
 import { colors } from "./src/theme";
 
 type RootStackParamList = {
-  Radio: undefined;
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Connection: undefined;
   Pairing: { pairingUri?: string } | undefined;
 };
 
+type MainTabParamList = {
+  Flow: undefined;
+  Library: undefined;
+  Music: undefined;
+  Settings: undefined;
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function App() {
   return (
@@ -66,6 +84,7 @@ function AppContent() {
   const [pendingPairingUri, setPendingPairingUri] = useState<string | null>(
     null,
   );
+  const [localMediaCount, setLocalMediaCount] = useState(0);
   const [isBooting, setIsBooting] = useState(true);
   const profile =
     connection?.kind === "paired" ? connection.profile : null;
@@ -109,11 +128,24 @@ function AppContent() {
 
     const restore = async () => {
       let stored: StoredConnection | null = null;
-      try {
-        stored = await loadStoredConnection();
-      } catch {
-        // Pairing remains available when secure storage cannot be read.
-      }
+      let mediaCount = 0;
+      await Promise.all([
+        loadStoredConnection()
+          .then((value) => {
+            stored = value;
+          })
+          .catch(() => {
+            // Local and Demo modes remain available without secure storage.
+          }),
+        initializeLocalLibrary()
+          .then(() => countLocalMedia())
+          .then((value) => {
+            mediaCount = value;
+          })
+          .catch(() => {
+            // The Library screen provides a visible error if opened.
+          }),
+      ]);
       let initialPairingUri: string | null = null;
       try {
         initialPairingUri = supportedPairingUri(
@@ -127,6 +159,7 @@ function AppContent() {
       }
       const pairingUri = receivedPairingUri || initialPairingUri;
       setConnection(stored);
+      setLocalMediaCount(mediaCount);
       setPendingPairingUri(pairingUri);
       setIsBooting(false);
     };
@@ -146,9 +179,6 @@ function AppContent() {
       </View>
     );
   }
-
-  const initialRouteName =
-    connection?.kind === "paired" ? "Radio" : "Pairing";
 
   const knownServer =
     connection?.kind === "paired"
@@ -178,7 +208,7 @@ function AppContent() {
     setConnection({ kind: "paired", profile: paired });
     navigationRef.reset({
       index: 0,
-      routes: [{ name: "Radio" }],
+      routes: [{ name: "Main", params: { screen: "Music" } }],
     });
   };
 
@@ -204,7 +234,7 @@ function AppContent() {
     });
     navigationRef.reset({
       index: 0,
-      routes: [{ name: "Pairing" }],
+      routes: [{ name: "Main", params: { screen: "Music" } }],
     });
   };
 
@@ -221,7 +251,7 @@ function AppContent() {
     >
       <StatusBar barStyle="dark-content" />
       <Stack.Navigator
-        initialRouteName={initialRouteName}
+        initialRouteName="Main"
         screenOptions={{
           contentStyle: { backgroundColor: colors.paper },
           headerShadowVisible: false,
@@ -229,13 +259,13 @@ function AppContent() {
           headerTintColor: colors.ink,
         }}
       >
-        <Stack.Screen
-          name="Radio"
-          options={{ headerShown: false }}
-        >
+        <Stack.Screen name="Main" options={{ headerShown: false }}>
           {({ navigation }) => (
-            <RadioScreen
-              onConnectionPress={() => navigation.navigate("Connection")}
+            <MainTabs
+              connection={connection}
+              mediaCount={localMediaCount}
+              onCountChange={setLocalMediaCount}
+              onOpenTikLocalSource={() => navigation.navigate("Connection")}
               radio={radio}
             />
           )}
@@ -245,7 +275,7 @@ function AppContent() {
           name="Connection"
           options={{
             presentation: Platform.OS === "ios" ? "formSheet" : "card",
-            title: "Connection",
+            title: "TikLocal Source",
           }}
         >
           {({ navigation }) => (
@@ -337,7 +367,9 @@ function AppContent() {
                       setPendingPairingUri(null);
                       navigation.reset({
                         index: 0,
-                        routes: [{ name: "Radio" }],
+                        routes: [
+                          { name: "Main", params: { screen: "Music" } },
+                        ],
                       });
                     }
               }
@@ -349,13 +381,159 @@ function AppContent() {
   );
 }
 
+function MainTabs({
+  connection,
+  mediaCount,
+  onCountChange,
+  onOpenTikLocalSource,
+  radio,
+}: {
+  connection: StoredConnection | null;
+  mediaCount: number;
+  onCountChange(count: number): void;
+  onOpenTikLocalSource(): void;
+  radio: ReturnType<typeof useRadioSession>;
+}) {
+  const [flowRefreshToken, setFlowRefreshToken] = useState(0);
+  const [requestedItemId, setRequestedItemId] = useState<string>();
+
+  return (
+    <Tab.Navigator
+      initialRouteName="Flow"
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: colors.signal,
+        tabBarInactiveTintColor: colors.inkMuted,
+        tabBarHideOnKeyboard: true,
+        tabBarIcon: ({ color, focused }) => (
+          <TabIcon color={color} focused={focused} route={route.name} />
+        ),
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "700",
+        },
+        tabBarStyle: {
+          backgroundColor: colors.paperRaised,
+          borderTopColor: colors.line,
+        },
+      })}
+    >
+      <Tab.Screen
+        listeners={{
+          focus: () =>
+            StatusBar.setBarStyle(
+              mediaCount > 0 ? "light-content" : "dark-content",
+            ),
+          tabPress: () => setFlowRefreshToken((value) => value + 1),
+        }}
+        name="Flow"
+      >
+        {() => (
+          <FlowScreen
+            onCountChange={onCountChange}
+            refreshToken={flowRefreshToken}
+            requestedItemId={requestedItemId}
+          />
+        )}
+      </Tab.Screen>
+      <Tab.Screen
+        listeners={{ focus: () => StatusBar.setBarStyle("dark-content") }}
+        name="Library"
+      >
+        {({ navigation }) => (
+          <LocalLibraryScreen
+            onCountChange={onCountChange}
+            onOpenFlow={(items, initialIndex = 0) => {
+              setRequestedItemId(items[initialIndex]?.id);
+              setFlowRefreshToken((value) => value + 1);
+              navigation.navigate("Flow");
+            }}
+          />
+        )}
+      </Tab.Screen>
+      <Tab.Screen
+        listeners={{ focus: () => StatusBar.setBarStyle("dark-content") }}
+        name="Music"
+      >
+        {() => (
+          <RadioScreen
+            onConnectionPress={onOpenTikLocalSource}
+            radio={radio}
+          />
+        )}
+      </Tab.Screen>
+      <Tab.Screen
+        listeners={{ focus: () => StatusBar.setBarStyle("dark-content") }}
+        name="Settings"
+      >
+        {() => (
+          <SettingsScreen
+            connection={connection}
+            mediaCount={mediaCount}
+            onOpenTikLocalSource={onOpenTikLocalSource}
+          />
+        )}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+}
+
+function TabIcon({
+  color,
+  focused,
+  route,
+}: {
+  color: string;
+  focused: boolean;
+  route: keyof MainTabParamList;
+}) {
+  if (route === "Flow") {
+    return (
+      <SymbolView
+        name={focused ? "rectangle.stack.fill" : "rectangle.stack"}
+        size={22}
+        tintColor={color}
+        weight="semibold"
+      />
+    );
+  }
+  if (route === "Library") {
+    return (
+      <SymbolView
+        name={focused ? "photo.on.rectangle.angled" : "photo.on.rectangle"}
+        size={21}
+        tintColor={color}
+        weight="semibold"
+      />
+    );
+  }
+  if (route === "Music") {
+    return (
+      <SymbolView
+        name="music.note"
+        size={21}
+        tintColor={color}
+        weight={focused ? "bold" : "medium"}
+      />
+    );
+  }
+  return (
+    <SymbolView
+      name={focused ? "gearshape.fill" : "gearshape"}
+      size={21}
+      tintColor={color}
+      weight="semibold"
+    />
+  );
+}
+
 type PairingScreenProps = NativeStackScreenProps<
   RootStackParamList,
   "Pairing"
 >;
 
 function deviceName() {
-  return `TikLocal Radio · ${Platform.OS}`;
+  return `LumaFold · ${Platform.OS}`;
 }
 
 function supportedPairingUri(value: string | null): string | null {

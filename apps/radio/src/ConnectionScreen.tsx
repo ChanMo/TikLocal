@@ -42,8 +42,8 @@ export function ConnectionScreen({
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.intro}>
-        TikLocal Radio connects directly to one private library on your
-        network.
+        Add one private TikLocal folder as an optional music source. Your local
+        Flow works without it.
       </Text>
 
       <View style={styles.serverCard}>
@@ -54,10 +54,10 @@ export function ConnectionScreen({
           </Text>
         </View>
         <Text style={styles.serverName}>
-          {server?.serverName || (server ? "TikLocal Server" : "Demo Radio")}
+          {server?.serverName || (server ? "TikLocal Folder" : "No Source")}
         </Text>
         <Text numberOfLines={2} style={styles.serverAddress}>
-          {server?.baseUrl || "Built-in audio · no Server connected"}
+          {server?.baseUrl || "Built-in demo music remains available"}
         </Text>
       </View>
 
@@ -134,7 +134,7 @@ export function ConnectionScreen({
             onPress={() => {
               Alert.alert(
                 "Forget this Server?",
-                "TikLocal Radio will remove this device connection. You can pair it again later.",
+                "LumaFold will remove this device connection. You can pair it again later.",
                 [
                   { text: "Cancel", style: "cancel" },
                   {

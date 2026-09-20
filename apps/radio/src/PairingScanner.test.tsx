@@ -111,13 +111,13 @@ test("pauses on an unrelated QR code and allows scanning again", async () => {
 
   expect(
     await screen.findByRole("alert", {
-      name: "This QR code is not a TikLocal Radio pairing link.",
+      name: "This QR code is not a TikLocal Server pairing link.",
     }),
   ).toBeOnTheScreen();
   await user.press(
     screen.getByRole("button", { name: "Scan another code" }),
   );
   expect(
-    screen.queryByText("This QR code is not a TikLocal Radio pairing link."),
+    screen.queryByText("This QR code is not a TikLocal Server pairing link."),
   ).not.toBeOnTheScreen();
 });

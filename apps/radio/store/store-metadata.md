@@ -1,16 +1,17 @@
-# TikLocal Radio 商店元数据草案
+# LumaFold 商店元数据草案
 
-- 状态: 文案与隐私答案已准备，等待真机验收、公开隐私 URL 与签名账号
-- 更新时间: 2026-07-25
+- 状态：LumaFold 工作品牌已接入；名称与 Logo 仍可调整，等待最终可用性确认
+- 更新时间：2026-08-26
 
 ## 产品标识
 
-- App Name: `TikLocal Radio`
+- 当前 App Name: `LumaFold`
+- 建议发布名: `LumaFold`（正式使用前仍需完成 App Store 与商标可用性确认）
 - Bundle ID / Application ID: `com.chanmo.tiklocal.radio`
 - Version: `0.1.0`
 - iOS Build Number / Android Version Code: `1`
-- Primary Category: Music
-- Secondary Category: Utilities
+- 建议 Primary Category: Photo & Video
+- 建议 Secondary Category: Utilities
 - Suggested age rating: 4+ / Everyone
 - Copyright: 待发布账号主体确认
 
@@ -18,84 +19,85 @@
 
 ### 副标题
 
-你的私人本地电台
+私密、离线的个人影像 Flow
 
 ### 推广文本
 
-连接自己的 TikLocal Server，让本地音乐变成无需反复选择的私人电台。也可直接使用内置 Demo Signal 体验。
+从照片或文件导入你自己的图片和视频，在 iPhone 上建立无需账号、网络或 Server 的私人离线 Flow。
 
 ### 关键词
 
-本地音乐,私人电台,自托管,音乐播放,局域网,音频,收藏,后台播放
+本地相册,离线视频,私人媒体,影像浏览,照片整理,视频播放,本地优先,隐私
 
 ### 描述
 
-TikLocal Radio 是 TikLocal Server 的原生 Radio 伴侣。
-
-它不试图把完整媒体库塞进手机，而是把你自己的本地音乐整理成一个低决策、可持续收听的私人电台。
+LumaFold 把你主动选择的图片和视频变成一个安静、私密、随时可用的个人 Flow。
 
 主要能力：
 
-- 连接用户自己运行的 TikLocal Server
-- 默认、最近添加与收藏倾向电台
-- 播放、暂停、下一首、收藏与有限再听
-- 睡眠定时与断线状态提示
-- 安全保存可撤销设备令牌
-- 无需 Server 即可使用 Demo Signal
+- 从系统 Photos 或 Files 明确选择并导入图片与视频
+- 在 App 私有空间保存离线副本，不依赖原资源持续可用
+- 使用带视频预览的网格资料库浏览，并通过纵向 Flow 连续观看
+- 多项目导入显示进度，并在空间不足前给出明确提示
+- 在资料库中查看占用空间，选择删除或清空 App 管理的副本
+- 无需账号、网络或 TikLocal Server
+- 可选连接用户自行运行的 TikLocal Server，使用 Radio 与 Demo Signal
 
-你的媒体和收听反馈保留在你自己的 TikLocal Server。App 不包含广告、第三方分析或跨 App 追踪。
-
-> 发布前验收门槛：只有在真机通过锁屏、后台音频和耳机播放/暂停测试后，才在描述中增加这些系统体验声明。`0.1.x` 不支持耳机、锁屏或通知的下一首/上一首；App 内“下一首”不受影响。
+导入媒体留在设备上，不会上传给 TikLocal 项目。删除 App 内条目只移除 LumaFold
+管理的副本，不会删除 Photos 或 Files 中的原件。App 不包含广告、第三方分析或跨
+App 追踪。
 
 ## App Store — en-US
 
 ### Subtitle
 
-Your private local radio
+Your private offline media flow
 
 ### Promotional text
 
-Connect to your own TikLocal Server and turn a local music library into a calm, low-decision radio. Demo Signal works without a server.
+Import your own photos and videos into a private, offline flow that needs no account, network, or server.
 
 ### Keywords
 
-local music,private radio,self hosted,audio,personal music,LAN,favorites,radio
+offline photos,local video,private media,photo viewer,media flow,local first,privacy
 
 ### Description
 
-TikLocal Radio is the native Radio companion for TikLocal Server.
-
-Instead of putting another full library manager on your phone, it turns your own local music into a low-decision station designed for continuous listening.
+LumaFold turns photos and videos you explicitly choose into a calm, private,
+always-available personal flow.
 
 Highlights:
 
-- Connect to a TikLocal Server you operate
-- Default, Recently Added, and Favorites-oriented stations
-- Play, pause, next, favorite, and limited encore
-- Sleep timer and clear connection status
-- Revocable device credentials stored securely
-- A bundled Demo Signal that works without a server
+- Import photos and videos through the system Photos or Files picker
+- Keep managed offline copies in the app's private storage
+- Browse a visual library with video previews and watch a continuous vertical Flow
+- See multi-item import progress and receive a clear warning before storage runs out
+- See storage usage, select items to delete, or clear managed copies
+- Works without an account, network connection, or TikLocal Server
+- Optionally connect to a TikLocal Server you operate for Radio; Demo Signal is bundled
 
-Your media and listening feedback remain on your own TikLocal Server. The app contains no ads, third-party analytics, or cross-app tracking.
-
-> Release gate: mention lock-screen controls, background audio, and headset play/pause only after they pass physical-device acceptance. Version 0.1.x does not support next/previous from a headset, lock screen, or media notification; the in-app Next action is unaffected.
+Imported media stays on the device and is not uploaded to the TikLocal project.
+Deleting an item removes only LumaFold's managed copy, not the original in
+Photos or Files. The app contains no ads, third-party analytics, or cross-app
+tracking.
 
 ## App Review Notes
 
-TikLocal Radio normally connects to a TikLocal Server on the user's local
-network. Review does not require a server:
+Review of the primary local experience does not require an account, network, or
+TikLocal Server:
 
-1. Launch the app.
-2. Choose **Use Demo Signal** on the pairing screen.
-3. The bundled station supports playback, pause, next, favorite, encore, and
-   sleep-timer interactions without an account or network service.
+1. Launch the app and open **My Flow**.
+2. Choose **Photos** or **Files** and select test images or videos with the
+   system picker. Permissions are requested only after that explicit action.
+3. Imported items appear in the local grid. Choose **Play all** to enter the
+   offline vertical Flow.
+4. Touch and hold an item to select and delete it. **Clear** removes all copies
+   managed by LumaFold; neither action deletes the original selected item.
 
-The real-server flow accepts an address for a user-operated TikLocal instance.
-The access password is exchanged once for a revocable device token and is not
-stored by the app. The optional camera scanner reads only QR codes created by
-TikLocal's web settings, is opened by an explicit user action, and does not
-save images. Reviewers can use Demo Signal or manual pairing without granting
-camera permission.
+The optional Radio section can be reviewed without a server by choosing
+**Demo Signal**. Real-server pairing connects only to a user-operated TikLocal
+instance. The optional camera scanner reads a one-time QR code created by that
+server, is opened by explicit user action, and does not save images.
 
 ## App Privacy — 初步答案
 
@@ -107,21 +109,19 @@ camera permission.
 - Advertising: None
 - Third-party analytics: None
 
-说明：Server 地址、设备凭证、媒体请求、收藏和收听反馈只在用户设备与用户自有
-TikLocal Server 之间处理，不传输给 TikLocal 项目或其他开发者服务。
-
-最终填写 App Store Connect 时仍应以当时二进制中的 SDK 和网络端点重新核对。
+用户选择的媒体、设备内 SQLite 索引，以及用户设备与自有 TikLocal Server 之间的
+Radio 数据均不传输给 TikLocal 项目。App Store Connect 中的“收集”以开发者或第三方
+接收数据为边界；提交前仍需按最终二进制中的 SDK、网络端点和付费组件重新核对。
 
 ## Google Play Data Safety — 初步答案
 
 - Does the app collect or share user data with the developer or third parties? No
 - Ads: No
 - Account creation: No
-- User deletion request: 不适用开发者后台；App 可断开并撤销设备，Server 数据由用户自行管理
-- Data in transit: HTTPS 可用；用户也可主动选择可信局域网 HTTP，隐私政策已披露
+- User deletion request: 不适用开发者后台；用户可删除本地副本、断开并撤销设备
+- Data in transit: HTTPS 可用；用户也可主动连接可信局域网中的自有 HTTP Server
 
-最终填写 Play Console 时不要声称“所有流量始终加密”，因为产品明确支持用户控制的
-局域网 HTTP。
+不要声称“所有流量始终加密”，因为可选 Radio 明确支持用户控制的局域网 HTTP。
 
 ## URL
 
@@ -132,14 +132,14 @@ TikLocal Server 之间处理，不传输给 TikLocal 项目或其他开发者服
 
 ## 截图计划
 
-至少准备以下状态，且所有系统体验声明以真机结果为准：
+至少准备以下真实 App 状态，避免使用私人文件名或敏感媒体：
 
-1. Radio 主界面与正在播放状态。
-2. 电台切换。
-3. 收藏、Encore 与睡眠定时。
-4. Server 扫码与手动配对界面（真机验收后使用扫描画面）。
-5. Demo Signal / 离线可体验说明。
-6. 真机锁屏媒体面板（仅在验收通过后使用）。
+1. 本地优先 Home 与 My Flow 入口。
+2. 空资料库及 Photos / Files 导入入口。
+3. 已导入媒体的网格资料库与空间统计。
+4. 图片与视频混合的纵向离线 Flow。
+5. 长按选择、删除和清空副本的确认界面。
+6. 可选 Radio / Demo Signal，作为次要能力放在最后。
 
-不要在商店截图中展示可兑换的真实二维码、配对链接、Server 地址、访问密码、设备
-令牌或私人媒体文件名。
+正式提交前必须再次确认 LumaFold 名称、图标、截图标题和商店分类；TikLocal 只作为
+开源项目与用户自有 Server 品牌出现，Radio 只作为可选能力。
