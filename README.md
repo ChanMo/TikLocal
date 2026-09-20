@@ -16,6 +16,30 @@ TikLocal's main features include:
 * **Multiple media sources and URL downloads** merged into one local library.
 * **Support for light and dark modes** to suit your personal preferences.
 
+## Screenshots
+
+TikLocal is designed mobile-first, so the phone views are shown first for each page, with the desktop view alongside for context.
+
+### Flow — TikTok-style swipe feed
+
+<img src="docs/screenshots/flow-mobile.png" alt="TikLocal Flow page on a phone, showing a full-screen vertical video swipe feed with like/save/info actions" width="280" />　<img src="docs/screenshots/flow-desktop.png" alt="TikLocal Flow page on desktop, showing the same swipe feed with a sidebar navigation" width="480" />
+
+*A mixed video/image swipe feed, similar to TikTok, with manual swipe navigation and in-feed actions.*
+
+### Radio — ambient player
+
+<img src="docs/screenshots/radio-mobile.png" alt="TikLocal Radio page on a phone, showing a vinyl-record player UI over an animated rain-on-window background" width="280" />　<img src="docs/screenshots/radio-desktop.png" alt="TikLocal Radio page on desktop, showing the same vinyl-record player with a wider layout" width="480" />
+
+*An ambient audio player with a vinyl-style visualizer, room backgrounds (rain/breeze), and a local track list.*
+
+### Library — Pinterest-style grid + timeline
+
+<img src="docs/screenshots/library-mobile.png" alt="TikLocal Library page on a phone, showing a year/month timeline with a Pinterest-style grid of photo and video thumbnails" width="280" />　<img src="docs/screenshots/library-desktop.png" alt="TikLocal Library page on desktop, showing the same year/month timeline grid in a wider layout" width="480" />
+
+*A Pinterest-like grid organized as a year/month timeline, for browsing multi-year libraries.*
+
+> **Note:** the media shown above (gradient images, abstract clips, and ambient tones) is synthetic sample content generated only to populate the screenshots — not the app owner's real files. TikLocal never ships with or requires any bundled media library.
+
 ## Use cases
 
 TikLocal is suitable for the following use cases:
