@@ -1,7 +1,7 @@
 import hashlib
 import sys
 from pathlib import Path
-from tiklocal.services import VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
+from tiklocal.services.library import VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
 
 
 def compute_file_hash(path: Path, algorithm='sha256', chunk_size=8192) -> str | None:

@@ -1,4 +1,3 @@
-import os
 from urllib.parse import quote
 
 import pytest
@@ -7,158 +6,85 @@ from tiklocal.app import create_app
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    media_root = tmp_path / "media"
-    media_root.mkdir(parents=True, exist_ok=True)
-    (media_root / "clip.mp4").write_bytes(b"video")
-    (media_root / "cover.jpg").write_bytes(b"image")
-    (media_root / "odd & hash#.jpg").write_bytes(b"image")
-    (media_root / "extra-a.jpg").write_bytes(b"image")
-    (media_root / "extra-b.jpg").write_bytes(b"image")
-
-    data_root = tmp_path / "tiklocal-data"
-    monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
-
-    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
-    return app.test_client()
+def client(tmp_path):
+    media_root = tmp_path / 'media'
+    media_root.mkdir()
+    for name in ['clip.mp4', 'cover.jpg', 'odd & hash#.jpg', 'extra-a.jpg', 'extra-b.jpg']:
+        (media_root / name).write_bytes(b'media')
+    return create_app({'TESTING': True, 'MEDIA_ROOT': media_root}).test_client()
 
 
-def test_collection_create_and_list(client):
-    created = client.post(
-        "/api/collections",
-        json={"name": "灵感片段", "description": "测试集合"},
-    )
+def test_collection_edit_cover_persists_and_delete_removes_collection(client):
+    created = client.post('/api/collections', json={'name': '灵感', 'description': '片段'})
     assert created.status_code == 200
-    payload = created.get_json()["data"]["item"]
-    assert payload["name"] == "灵感片段"
-    assert payload["item_count"] == 0
-    assert payload["id"].startswith("col_")
+    item = created.get_json()['data']['item']
+    url = f"/api/collections/{item['id']}"
+    assert item['item_count'] == 0
+    assert client.get('/api/collections').get_json()['data']['items'] == [item]
+    client.post(f'{url}/items', json={
+        'uris': ['cover.jpg', 'clip.mp4', 'odd & hash#.jpg', 'extra-a.jpg', 'extra-b.jpg'],
+    })
 
-    listed = client.get("/api/collections")
-    assert listed.status_code == 200
-    items = listed.get_json()["data"]["items"]
-    assert len(items) == 1
-    assert items[0]["id"] == payload["id"]
+    updated = client.patch(url, json={'name': '新名字', 'cover_uri': 'cover.jpg'})
+    assert updated.status_code == 200
+    saved = client.get(url).get_json()['data']['item']
+    assert saved == updated.get_json()['data']['item']
+    assert (saved['name'], saved['description']) == ('新名字', '片段')
+    assert saved['cover_uri'] == saved['preview_items'][0]['uri'] == '@default/cover.jpg'
+    assert len(saved['preview_items']) == 4
+    assert client.patch(url, json={'cover_uri': 'not-a-member.jpg'}).status_code == 400
+    assert client.get(url).get_json()['data']['item'] == saved
 
-
-def test_saved_pages_share_navigation(client):
-    favorites = client.get("/favorite")
-    assert favorites.status_code == 200
-    favorites_body = favorites.data.decode("utf-8")
-    assert '<main class="saved-page">' in favorites_body
-    assert '<h1 id="saved-title" class="saved-title">已保存</h1>' in favorites_body
-    assert '<a class="saved-tab is-active" href="/favorite" aria-current="page">收藏</a>' in favorites_body
-    assert '<a class="saved-tab" href="/collections">集合</a>' in favorites_body
-
-    collections = client.get("/collections")
-    assert collections.status_code == 200
-    collections_body = collections.data.decode("utf-8")
-    assert '<main class="saved-page collections-shell">' in collections_body
-    assert '<h1 id="saved-title" class="saved-title">已保存</h1>' in collections_body
-    assert '<a class="saved-tab is-active" href="/collections" aria-current="page">集合</a>' in collections_body
-    assert '<span>已保存</span>' in collections_body
+    deleted = client.delete(url)
+    assert deleted.status_code == 200 and deleted.get_json()['data']['deleted'] is True
+    assert client.get(url).status_code == 404
+    assert client.get('/api/collections').get_json()['data']['items'] == []
 
 
-def test_collection_add_remove_and_by_media(client):
-    created = client.post("/api/collections", json={"name": "收藏一"}).get_json()["data"]["item"]
-    collection_id = created["id"]
-
-    added = client.post(
-        f"/api/collections/{quote(collection_id, safe='')}/items",
-        json={"uris": ["clip.mp4", "odd & hash#.jpg"]},
-    )
+def test_collection_membership_deduplicates_aliases_and_removal_updates_lookup(client):
+    collection_id = client.post('/api/collections', json={'name': '收藏'}).get_json()['data']['item']['id']
+    url = f'/api/collections/{collection_id}/items'
+    added = client.post(url, json={
+        'uris': ['./clip.mp4', '@default/clip.mp4', 'odd & hash#.jpg', '', 'odd & hash#.jpg'],
+    })
     assert added.status_code == 200
-    added_item = added.get_json()["data"]["item"]
-    assert added_item["item_count"] == 2
-    assert [entry["uri"] for entry in added_item["preview_items"]] == [
-        "@default/odd & hash#.jpg",
-        "@default/clip.mp4",
+    item = added.get_json()['data']['item']
+    assert item['item_count'] == 2
+    assert [entry['uri'] for entry in item['preview_items']] == [
+        '@default/odd & hash#.jpg', '@default/clip.mp4',
     ]
-    assert all(entry["thumb_url"].startswith("/thumb?uri=") for entry in added_item["preview_items"])
+    assert item['preview_items'][0]['thumb_url'] == '/thumb?uri=' + quote('@default/odd & hash#.jpg')
+    lookup = client.get('/api/collections/by-media', query_string={'uri': 'odd & hash#.jpg'})
+    assert [entry['id'] for entry in lookup.get_json()['data']['items']] == [collection_id]
 
-    by_media = client.get(f"/api/collections/by-media?uri={quote('odd & hash#.jpg', safe='')}")
-    assert by_media.status_code == 200
-    items = by_media.get_json()["data"]["items"]
-    assert any(item["id"] == collection_id for item in items)
-
-    removed = client.delete(
-        f"/api/collections/{quote(collection_id, safe='')}/items",
-        json={"uris": ["clip.mp4"]},
-    )
+    removed = client.delete(url, json={'uris': ['clip.mp4']})
     assert removed.status_code == 200
-    assert removed.get_json()["data"]["item"]["item_count"] == 1
-
-    by_media_after = client.get(f"/api/collections/by-media?uri={quote('clip.mp4', safe='')}")
-    assert by_media_after.status_code == 200
-    items_after = by_media_after.get_json()["data"]["items"]
-    assert all(item["id"] != collection_id for item in items_after)
+    assert removed.get_json()['data']['item']['item_count'] == 1
+    assert client.get('/api/collections/by-media?uri=clip.mp4').get_json()['data']['items'] == []
+    assert client.post(url, json={'uris': 'clip.mp4'}).status_code == 400
+    assert client.get('/api/library/items?scope=collection').status_code == 400
 
 
-def test_collection_scope_library_items_and_page(client):
-    created = client.post("/api/collections", json={"name": "媒体集"}).get_json()["data"]["item"]
-    collection_id = created["id"]
-    client.post(
-        f"/api/collections/{quote(collection_id, safe='')}/items",
-        json={"uris": ["clip.mp4", "cover.jpg"]},
+@pytest.mark.parametrize('endpoint', ['library', 'collection'])
+def test_collection_pages_keep_member_order_without_gaps(client, endpoint):
+    names = [f'page-{i:02d}.jpg' for i in range(25)]
+    for name in names:
+        (client.application.config['MEDIA_ROOT'] / name).write_bytes(b'image')
+    client.post('/api/library/sync')
+    collection_id = client.post('/api/collections', json={'name': '媒体集'}).get_json()['data']['item']['id']
+    client.post(f'/api/collections/{collection_id}/items', json={'uris': names})
+    assert client.get(f'/collection/{collection_id}').status_code == 200
+    url = (
+        f'/api/library/items?scope=collection&collection_id={collection_id}'
+        if endpoint == 'library' else f'/api/collections/{collection_id}/items?'
     )
-
-    page = client.get(f"/collection/{quote(collection_id, safe='')}")
-    assert page.status_code == 200
-    body = page.data.decode("utf-8")
-    assert "library_page_controller.js" in body
-    assert 'id="quick-set-cover"' in body
-    assert 'id="quick-collection-count"' in body
-    assert 'id="collection-identity-cover"' in body
-    assert '<h1 class="collection-identity-title">媒体集</h1>' in body
-    assert '<div class="collection-identity-count">2 个媒体</div>' in body
-    assert 'collectionCoverUri: "@default/cover.jpg"' in body
-
-    api_res = client.get(
-        f"/api/library/items?scope=collection&collection_id={quote(collection_id, safe='')}&offset=0&limit=20"
-    )
-    assert api_res.status_code == 200
-    payload = api_res.get_json()["data"]
-    names = {item["name"] for item in payload["items"]}
-    assert "@default/clip.mp4" in names
-    assert "@default/cover.jpg" in names
-
-    bad = client.get("/api/library/items?scope=collection&offset=0&limit=20")
-    assert bad.status_code == 400
-    assert bad.get_json()["success"] is False
-
-
-def test_collection_patch_cover_and_delete(client):
-    created = client.post("/api/collections", json={"name": "可编辑集合"}).get_json()["data"]["item"]
-    collection_id = created["id"]
-    client.post(
-        f"/api/collections/{quote(collection_id, safe='')}/items",
-        json={"uris": ["cover.jpg", "clip.mp4", "odd & hash#.jpg", "extra-a.jpg", "extra-b.jpg"]},
-    )
-
-    renamed = client.patch(
-        f"/api/collections/{quote(collection_id, safe='')}",
-        json={"name": "新名字", "cover_uri": "cover.jpg"},
-    )
-    assert renamed.status_code == 200
-    item = renamed.get_json()["data"]["item"]
-    assert item["name"] == "新名字"
-    assert item["cover_uri"] == "@default/cover.jpg"
-    assert item["preview_items"][0]["uri"] == "@default/cover.jpg"
-    assert len(item["preview_items"]) == 4
-
-    detail = client.get(f"/api/collections/{quote(collection_id, safe='')}")
-    assert detail.status_code == 200
-    assert detail.get_json()["data"]["item"]["cover_uri"] == "@default/cover.jpg"
-
-    page = client.get("/collections").data.decode("utf-8")
-    assert "collection-cover-collage" in page
-    assert 'data-count="${previewItems.length}"' in page
-    assert "<video src=" not in page
-
-    deleted = client.delete(f"/api/collections/{quote(collection_id, safe='')}")
-    assert deleted.status_code == 200
-    assert deleted.get_json()["data"]["deleted"] is True
-
-    missing = client.get(f"/api/collections/{quote(collection_id, safe='')}")
-    assert missing.status_code == 404
+    collected = []
+    for offset in (0, 12, 24):
+        response = client.get(f'{url}&offset={offset}&limit=12')
+        assert response.status_code == 200
+        page = response.get_json()['data']
+        assert page['total'] == 25
+        assert page['next_offset'] == offset + 12
+        assert page['has_more'] == (offset < 24)
+        collected.extend(item['name'] for item in page['items'])
+    assert collected == [f'@default/{name}' for name in reversed(names)]

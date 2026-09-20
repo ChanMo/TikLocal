@@ -72,7 +72,6 @@
 
   let mode = scope === 'all' ? initialMode : 'all';
   let seed = initialSeed || '';
-  const similarMode = 'similar_images';
   const collectionStateCache = new Map();
   let collectionCatalog = [];
   let collectionSelectedIds = new Set();
@@ -179,14 +178,10 @@
     if (isOpen && focus) requestAnimationFrame(() => searchInput?.focus());
   }
 
-  function isSimilarMode() {
-    return scope === 'all' && mode === similarMode;
-  }
-
   function readLibraryStateFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const nextMode = params.get('mode') || 'all';
-    const allowed = new Set(['all', 'image_random', similarMode, 'video_latest', 'big_files']);
+    const allowed = new Set(['all', 'image_random', 'video_latest', 'big_files']);
     return {
       mode: allowed.has(nextMode) ? nextMode : 'all',
       seed: params.get('seed') || '',
@@ -273,7 +268,6 @@
     waterfall.columns = [];
     waterfall.heights = [];
     grid.innerHTML = '';
-    grid.classList.remove('similar-groups-grid');
   }
 
   function ensureWaterfallLayout(force = false) {
@@ -346,64 +340,6 @@
     return tile;
   }
 
-  function createSimilarGroupCard(group) {
-    const card = document.createElement('article');
-    const groupItems = Array.isArray(group?.items) ? group.items : [];
-    const visibleItems = groupItems.slice(0, 6);
-    card.className = 'similar-group-card';
-    card.dataset.name = String(group?.name || '');
-    card.dataset.count = String(groupItems.length || 0);
-    const count = groupItems.length;
-    const layout = count >= 6 ? 'many' : String(Math.max(2, count));
-    card.dataset.layout = layout;
-
-    const inner = document.createElement('div');
-    inner.className = 'similar-group-grid';
-    visibleItems.forEach((item, itemIndex) => {
-      const link = document.createElement('a');
-      link.className = 'similar-group-link';
-      link.href = item.detail_url || '#';
-      link.title = item.name || '相似图片';
-      if (layout === 'many' && itemIndex === visibleItems.length - 1) {
-        link.classList.add('has-count-overlay');
-      }
-
-      const img = document.createElement('img');
-      img.src = item.thumb_url || item.media_url || '';
-      img.alt = '';
-      img.loading = 'lazy';
-      link.appendChild(img);
-      if (layout === 'many' && itemIndex === visibleItems.length - 1) {
-        const overlay = document.createElement('span');
-        overlay.className = 'similar-group-count-overlay';
-        overlay.textContent = String(count);
-        link.appendChild(overlay);
-      }
-      inner.appendChild(link);
-    });
-    card.appendChild(inner);
-    return card;
-  }
-
-  function resetSimilarLayout() {
-    waterfall.count = 0;
-    waterfall.gridWidth = 0;
-    waterfall.columnWidth = 0;
-    waterfall.columns = [];
-    waterfall.heights = [];
-    grid.innerHTML = '';
-    grid.classList.add('similar-groups-grid');
-  }
-
-  function appendIndexToSimilarGrid(index) {
-    const group = items[index];
-    if (!group) return;
-    if (!grid.classList.contains('similar-groups-grid')) {
-      resetSimilarLayout();
-    }
-    grid.appendChild(createSimilarGroupCard(group));
-  }
-
   function appendIndexToWaterfall(index) {
     const item = items[index];
     if (!item) return;
@@ -415,13 +351,6 @@
   }
 
   function relayoutWaterfall() {
-    if (isSimilarMode()) {
-      resetSimilarLayout();
-      for (let i = 0; i < items.length; i += 1) {
-        appendIndexToSimilarGrid(i);
-      }
-      return;
-    }
     if (!items.length) {
       resetWaterfallLayout();
       ensureWaterfallLayout(true);
@@ -445,7 +374,7 @@
       const layoutChanged = waterfall.count !== nextCount
         || waterfall.gap !== nextGap
         || waterfall.gridWidth !== nextGridWidth;
-      if (isSimilarMode() || !layoutChanged) return;
+      if (!layoutChanged) return;
       relayoutWaterfall();
     }, 180);
   }
@@ -488,22 +417,13 @@
     return params;
   }
 
-  function similarGroupApiParams(offset) {
-    return new URLSearchParams({
-      offset: String(offset),
-      limit: String(Math.min(pageSize || 24, 24)),
-    });
-  }
-
   async function loadNextPage() {
     if (flowSession.isLoading() || !flowSession.hasMore()) return;
     setLoadingText('正在加载...');
     try {
       await flowSession.loadMore(async (cursor) => {
         const offset = Number(cursor?.offset || 0);
-        const url = isSimilarMode()
-          ? `/api/library/similar-groups?${similarGroupApiParams(offset).toString()}`
-          : `/api/library/items?${apiParams(offset).toString()}`;
+        const url = `/api/library/items?${apiParams(offset).toString()}`;
         const res = await fetch(url);
         const data = await res.json();
         if (!data?.success) throw new Error('request failed');
@@ -518,14 +438,9 @@
       }).then((result) => {
         const appendedIndexes = result.appendedIndices || [];
         if (appendedIndexes.length) {
-          if (isSimilarMode()) {
-            if (!grid.classList.contains('similar-groups-grid')) resetSimilarLayout();
-            appendedIndexes.forEach((idx) => appendIndexToSimilarGrid(idx));
-          } else {
-            ensureWaterfallLayout(!waterfall.columns.length);
-            updateWaterfallMetrics();
-            appendedIndexes.forEach((idx) => appendIndexToWaterfall(idx));
-          }
+          ensureWaterfallLayout(!waterfall.columns.length);
+          updateWaterfallMetrics();
+          appendedIndexes.forEach((idx) => appendIndexToWaterfall(idx));
           feather.replace();
           if (quickView.classList.contains('active') && getCurrentIndex() >= 0) {
             quickCounter.textContent = `${getCurrentIndex() + 1} / ${items.length}`;
@@ -587,8 +502,7 @@
       hasMore: true,
       cursor: { offset: 0 },
     });
-    if (isSimilarMode()) resetSimilarLayout();
-    else resetWaterfallLayout();
+    resetWaterfallLayout();
     activeTab();
     setLoadingText('正在加载...');
     await loadNextPage();
@@ -887,12 +801,15 @@
     try {
       await mediaActions.syncFavorite(item.name);
     } catch (error) {
-      updateFavoriteButton(false);
+      if (currentItem()?.name === item.name) updateFavoriteButton(false);
     }
   }
 
   function updateFavoriteButton(favorited) {
     quickFavorite.classList.toggle('is-favorited', !!favorited);
+    quickFavorite.setAttribute('aria-pressed', String(!!favorited));
+    quickFavorite.setAttribute('aria-label', favorited ? '取消收藏' : '收藏');
+    quickFavorite.title = favorited ? '取消收藏' : '收藏';
   }
 
   function updateSourceButton(sourceMeta) {
@@ -945,8 +862,8 @@
 
   const mediaActions = window.createFlowMediaActionsController({
     actions: actionsShared,
-    onFavoriteChange: (value) => {
-      updateFavoriteButton(value);
+    onFavoriteChange: (value, name) => {
+      if (currentItem()?.name === name) updateFavoriteButton(value);
     },
     onSourceChange: (sourceMeta) => {
       updateSourceButton(sourceMeta);
@@ -967,13 +884,7 @@
     },
   });
 
-  async function loadCaption(uri) {
-    await mediaActions.loadCaption(uri);
-  }
 
-  async function generateCaption(uri) {
-    await mediaActions.generateCaption(uri);
-  }
 
   function currentImageEl() {
     const item = currentItem();
@@ -1186,7 +1097,7 @@
     quickTimeCurrent.textContent = '00:00';
     quickTimeTotal.textContent = '00:00';
     updateSourceButton(null);
-    clearCaption();
+    mediaActions.clearCaption();
     toggleMagnifier(false);
     updateCollectionCoverButton(null);
     setCollectionButtonState([]);
@@ -1199,7 +1110,7 @@
     }
   }
 
-  async function showItem(index) {
+  function showItem(index) {
     if (index < 0 || index >= items.length) return;
     setCurrentIndex(index);
     const item = items[index];
@@ -1211,7 +1122,7 @@
     updateCollectionCoverButton(item);
 
     if (item.type === 'video') {
-      clearCaption();
+      mediaActions.clearCaption();
       quickImage.classList.remove('active');
       quickImage.src = '';
       const nextSrc = String(item.media_url || '');
@@ -1237,7 +1148,7 @@
       quickVideo.load();
       quickImage.src = item.media_url;
       quickImage.classList.add('active');
-      await loadCaption(item.name);
+      mediaActions.loadCaption(item.name);
     }
 
     syncFavoriteState(item);
@@ -1290,6 +1201,10 @@
       await mediaActions.toggleFavorite(item.name);
     } catch (error) {
       await syncFavoriteState(item);
+      if (currentItem()?.name === item.name) {
+        quickFavorite.title = '收藏未保存，请重试';
+        quickFavorite.setAttribute('aria-label', quickFavorite.title);
+      }
     }
   });
 
@@ -1419,7 +1334,7 @@
     event.stopPropagation();
     const item = currentItem();
     if (!item || item.type !== 'image') return;
-    generateCaption(item.name);
+    mediaActions.generateCaption(item.name);
   });
 
   quickMagnifierToggle.addEventListener('click', (event) => {

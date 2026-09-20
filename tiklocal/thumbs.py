@@ -1,29 +1,16 @@
 import argparse
 import datetime
-import hashlib
 import json
 import os
-import subprocess as sp
 import sys
 from pathlib import Path
-import mimetypes
-from tiklocal.paths import get_thumbnails_dir, get_thumbs_map_path, get_data_dir
-
-
-def _thumb_key(rel_path: str) -> str:
-    return hashlib.sha1(rel_path.encode('utf-8', errors='ignore')).hexdigest() + '.jpg'
-
-
-def _thumb_path(rel_path: str) -> Path:
-    return get_thumbnails_dir() / _thumb_key(rel_path)
-
-
-def _map_path() -> Path:
-    return get_thumbs_map_path()
+from tiklocal.paths import get_thumbs_map_path, get_data_dir
+from tiklocal.services.library import LibraryService, VIDEO_EXTENSIONS
+from tiklocal.services.thumbnail import ThumbnailService
 
 
 def _load_map() -> dict:
-    p = _map_path()
+    p = get_thumbs_map_path()
     if p.exists():
         try:
             return json.loads(p.read_text(encoding='utf-8'))
@@ -33,76 +20,8 @@ def _load_map() -> dict:
 
 
 def _save_map(data: dict) -> None:
-    p = _map_path()
+    p = get_thumbs_map_path()
     p.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
-
-
-def _probe_duration(path: Path) -> float | None:
-    # 尝试用 ffprobe 获取时长（秒）
-    cmd = [
-        'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-        '-of', 'default=noprint_wrappers=1:nokey=1', str(path)
-    ]
-    try:
-        out = sp.check_output(cmd, stderr=sp.DEVNULL, timeout=10)
-        val = float(out.decode().strip())
-        if val > 0:
-            return val
-    except Exception:
-        return None
-    return None
-
-
-def _ffmpeg_capture(input_path: Path, output_path: Path, ts: float | None) -> bool:
-    candidates: list[float]
-    if ts is not None and ts >= 0:
-        candidates = [ts]
-    else:
-        dur = _probe_duration(input_path)
-        if dur and dur > 1:
-            t = max(1.0, min(dur - 1.0, dur * 0.2))
-            candidates = [t, 5.0, 1.0, 0.1]
-        else:
-            candidates = [5.0, 1.0, 0.1]
-
-    for t in candidates:
-        cmd = [
-            'ffmpeg', '-y', '-ss', str(max(0.0, float(t))), '-i', str(input_path),
-            '-frames:v', '1', '-vf', 'scale=-1:360:force_original_aspect_ratio=decrease',
-            '-q:v', '3', str(output_path)
-        ]
-        try:
-            sp.run(cmd, stdout=sp.DEVNULL, stderr=sp.DEVNULL, timeout=30)
-            if output_path.exists() and output_path.stat().st_size > 0:
-                return True
-        except Exception:
-            continue
-    return False
-
-
-VIDEO_EXTS = {'.mp4', '.webm', '.mov', '.mkv', '.avi', '.m4v'}
-
-
-def _is_video(path: Path) -> bool:
-    suf = path.suffix.lower()
-    if suf in VIDEO_EXTS:
-        return True
-    try:
-        mime = mimetypes.guess_type(path.name)[0] or ''
-    except Exception:
-        mime = ''
-    return mime.startswith('video/')
-
-
-def _iter_videos(root: Path) -> list[Path]:
-    videos: list[Path] = []
-    # 先按扩展名快速匹配，再做 mimetype 二次校验
-    for pattern in ('*.mp4', '*.webm', '*.mov', '*.mkv', '*.avi', '*.m4v',
-                    '*.MP4', '*.WEBM', '*.MOV', '*.MKV', '*.AVI', '*.M4V'):
-        for p in root.glob(f'**/{pattern}'):
-            if _is_video(p):
-                videos.append(p)
-    return videos
 
 
 def _print_progress(current: int, total: int, prefix: str = '') -> None:
@@ -115,136 +34,67 @@ def _print_progress(current: int, total: int, prefix: str = '') -> None:
 
 
 def generate_thumbnails(media_root: str | Path, overwrite: bool = False, limit: int = 0, show_progress: bool = True) -> dict:
-    root = Path(media_root)
+    library = LibraryService(media_root)
+    service = ThumbnailService(library.media_root, library)
     mapping = _load_map()
-    videos = _iter_videos(root)
-    total = len(videos)
-    done = 0
-    skipped = 0
-    failed = 0
-    limit_left = limit if limit and limit > 0 else None
-
+    videos = library.scan_videos()
+    stats = {'total': len(videos), 'generated': 0, 'skipped': 0, 'failed': 0}
     if show_progress:
         print(f'数据目录: {get_data_dir()}')
-        print(f'发现视频 {total} 个，缩略图目录：{get_thumbnails_dir()}')
-
-    processed = 0
-    for vp in videos:
-        rel = str(vp.relative_to(root))
-        out = _thumb_path(rel)
-        # 二次校验，防御性判断
-        if not _is_video(vp):
-            skipped += 1
-            processed += 1
-            if show_progress:
-                _print_progress(processed, total, prefix='生成中 ')
-            continue
-
-        if out.exists() and not overwrite:
-            skipped += 1
-            processed += 1
-            if show_progress:
-                _print_progress(processed, total, prefix='生成中 ')
-            if limit_left is not None:
-                limit_left -= 1
-                if limit_left <= 0:
-                    break
-            continue
-
-        ok = _ffmpeg_capture(vp, out, mapping.get(rel, {}).get('ts'))
-        if ok:
-            mapping[rel] = {
-                'ts': mapping.get(rel, {}).get('ts'),
-                'updated_at': datetime.datetime.now().isoformat(timespec='seconds')
-            }
-            done += 1
+        print(f'发现视频 {len(videos)} 个，缩略图目录：{service.thumb_dir}')
+    for index, path in enumerate(videos[:limit] if limit > 0 else videos, start=1):
+        uri = library.get_relative_path(path)
+        if not overwrite and service.cached_thumbnail(uri):
+            stats['skipped'] += 1
         else:
-            failed += 1
-
-        processed += 1
+            previous = mapping.get(uri) or mapping.get(library.relative_path_for_uri(uri)) or {}
+            timestamp = previous.get('ts')
+            generated = service.generate_thumbnail(uri, timestamp=timestamp, auto_timestamp=True)
+            if generated:
+                mapping[uri] = {'ts': timestamp, 'updated_at': datetime.datetime.now().isoformat(timespec='seconds')}
+                stats['generated'] += 1
+            else:
+                stats['failed'] += 1
         if show_progress:
-            _print_progress(processed, total, prefix='生成中 ')
-
-        if limit_left is not None:
-            limit_left -= 1
-            if limit_left <= 0:
-                break
-
+            _print_progress(index, len(videos), prefix='生成中 ')
     _save_map(mapping)
     if show_progress:
-        print()  # 换行
-        print(f'完成：生成 {done}，跳过 {skipped}，失败 {failed}，总计 {total}')
-    return {
-        'total': total,
-        'generated': done,
-        'skipped': skipped,
-        'failed': failed,
-    }
+        print(f"\n完成：生成 {stats['generated']}，跳过 {stats['skipped']}，失败 {stats['failed']}，总计 {stats['total']}")
+    return stats
 
 
 def clean_thumbnails(media_root: str | Path, show_progress: bool = True) -> dict:
-    root = Path(media_root)
+    library = LibraryService(media_root)
+    service = ThumbnailService(library.media_root, library)
     mapping = _load_map()
-    keys = list(mapping.keys())
-    total = len(keys)
-    removed = 0
-    kept = 0
-
-    if show_progress:
-        print(f'开始清理：映射 {total} 条')
-
-    for i, rel in enumerate(keys, start=1):
-        target = (root / rel)
-        thumb = _thumb_path(rel)
-        invalid = (not target.exists()) or (not _is_video(target))
-        if invalid:
-            try:
-                if thumb.exists():
-                    thumb.unlink()
-            except Exception:
-                pass
-            mapping.pop(rel, None)
+    total, removed = len(mapping), 0
+    for index, uri in enumerate(list(mapping), start=1):
+        source = library.source_for_uri(uri)
+        # A single-root CLI invocation cannot clean another source or an offline source.
+        if source is None or not source.path.is_dir():
+            continue
+        target = library.resolve_path(uri)
+        if target is None or not target.is_file() or target.suffix.lower() not in VIDEO_EXTENSIONS:
+            service.delete_thumbnail(uri)
+            mapping.pop(uri)
             removed += 1
-        else:
-            kept += 1
         if show_progress:
-            _print_progress(i, total, prefix='清理中 ')
-
+            _print_progress(index, total, prefix='清理中 ')
     _save_map(mapping)
     if show_progress:
-        print()  # 换行
-        print(f'清理完成：保留 {kept}，移除 {removed}，总计 {total}')
-    return {'kept': kept, 'removed': removed, 'total': total}
+        print(f'\n清理完成：保留 {total - removed}，移除 {removed}，总计 {total}')
+    return {'kept': total - removed, 'removed': removed, 'total': total}
 
 
 def verify_thumbnails(media_root: str | Path) -> dict:
-    root = Path(media_root)
+    library = LibraryService(media_root)
+    service = ThumbnailService(library.media_root, library)
     mapping = _load_map()
-    videos = _iter_videos(root)
-    video_set = {str(p.relative_to(root)) for p in videos}
-
-    mapped = 0
-    invalid = 0
-    missing = 0
-
-    for rel, meta in mapping.items():
-        thumb = _thumb_path(rel)
-        if rel in video_set and thumb.exists():
-            mapped += 1
-        else:
-            invalid += 1
-
-    for rel in video_set:
-        if not _thumb_path(rel).exists():
-            missing += 1
-
-    print(f"视频总数: {len(video_set)}  | 已有缩略图: {mapped}  | 异常映射: {invalid}  | 待生成: {missing}")
-    return {
-        'videos': len(video_set),
-        'mapped': mapped,
-        'invalid': invalid,
-        'missing': missing,
-    }
+    videos = {library.get_relative_path(path) for path in library.scan_videos()}
+    cached = {uri for uri in videos if service.cached_thumbnail(uri)}
+    invalid = sum(library.canonicalize_uri(uri) not in cached for uri in mapping if library.source_for_uri(uri))
+    print(f"视频总数: {len(videos)}  | 已有缩略图: {len(cached)}  | 异常映射: {invalid}  | 待生成: {len(videos - cached)}")
+    return {'videos': len(videos), 'mapped': len(cached), 'invalid': invalid, 'missing': len(videos - cached)}
 
 
 def main():

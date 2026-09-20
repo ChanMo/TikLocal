@@ -289,8 +289,12 @@
 
     const mediaActions = window.createFlowMediaActionsController({
       actions: actionsShared,
-      onFavoriteChange: (value) => {
+      onFavoriteChange: (value, name) => {
+        if (favoriteBtn.dataset.value !== name) return;
         favoriteBtn.classList.toggle('is-active', !!value);
+        favoriteBtn.setAttribute('aria-pressed', String(!!value));
+        favoriteBtn.setAttribute('aria-label', value ? '取消收藏' : '收藏');
+        favoriteBtn.title = value ? '取消收藏' : '收藏';
       },
       onCaptionClear: () => {
         clearCaption();
@@ -309,13 +313,7 @@
       confirmCaptionReplace: async () => window.confirm('已存在标题，是否覆盖生成？'),
     });
 
-    async function loadCaption(uri) {
-      await mediaActions.loadCaption(uri);
-    }
 
-    async function generateCaption(uri, force = false) {
-      await mediaActions.generateCaption(uri, { confirmExisting: !force });
-    }
 
     async function collectionsRequest(url, options = {}) {
       const response = await fetch(url, options);
@@ -569,7 +567,9 @@
 
     function updateFavoriteState(name) {
       mediaActions.syncFavorite(name)
-        .catch(() => favoriteBtn.classList.remove('is-active'));
+        .catch(() => {
+          if (favoriteBtn.dataset.value === name) favoriteBtn.classList.remove('is-active');
+        });
     }
 
     function updateControls(item) {
@@ -937,7 +937,7 @@
         progressFill.style.width = '0%';
         timeCurrent.textContent = '00:00';
         timeTotal.textContent = formatTime(item.el.duration);
-        clearCaption();
+        mediaActions.clearCaption();
 
         try {
           await prepareVideoStart(item.el);
@@ -972,19 +972,19 @@
         }
         if (needsVideoStartCover) hideVideoStartCover();
       } else if (item.type === 'image_group') {
-        clearCaption();
+        mediaActions.clearCaption();
         if (typeof item.renderChild === 'function') {
           item.activeChildIndex = item.renderChild(Number(item.activeChildIndex) || 0);
         }
         playStatusIcon.classList.add('hidden');
         playStatusIcon.classList.remove('visible');
       } else if (item.type === 'theme_strip') {
-        clearCaption();
+        mediaActions.clearCaption();
         playStatusIcon.classList.add('hidden');
         playStatusIcon.classList.remove('visible');
       } else {
         playStatusIcon.classList.remove('visible');
-        await loadCaption(item.name);
+        mediaActions.loadCaption(item.name);
       }
 
       if (getCurrentIndex() >= feedItems.length - 4 && flowSession.hasMore()) {
@@ -1353,10 +1353,11 @@
     favoriteBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       const name = favoriteBtn.dataset.value || '';
-      if (!name) return;
+      if (!name || favoriteBtn.disabled) return;
+      const item = currentItem();
+      favoriteBtn.disabled = true;
       try {
         const isFavorite = await mediaActions.toggleFavorite(name);
-        const item = currentItem();
         postActivity([{
           session_id: activitySessionId,
           uri: name,
@@ -1365,7 +1366,12 @@
           event: isFavorite ? 'favorite' : 'unfavorite',
         }]);
       } catch (error) {
-        updateFavoriteState(name);
+        if (favoriteBtn.dataset.value === name) {
+          favoriteBtn.title = '收藏未保存，请重试';
+          favoriteBtn.setAttribute('aria-label', favoriteBtn.title);
+        }
+      } finally {
+        favoriteBtn.disabled = false;
       }
     });
 
@@ -1493,7 +1499,7 @@
       e.preventDefault();
       const item = currentItem();
       if (!item || item.type !== 'image') return;
-      generateCaption(item.name);
+      mediaActions.generateCaption(item.name, { confirmExisting: true });
     });
 
     magnifierToggle.addEventListener('click', (e) => {

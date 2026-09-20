@@ -1,10 +1,11 @@
 import datetime
 import re
+import random
 from pathlib import Path
 
 from PIL import Image
 
-from tiklocal.services import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+from tiklocal.services.library import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 from tiklocal.services.database import AppDatabase
 
 
@@ -154,25 +155,46 @@ class MediaIndexStore:
         month: str = "",
         offset: int = 0,
         limit: int = 48,
+        mode: str = "all",
+        seed: str = "",
+        uris: list[str] | set[str] | None = None,
+        preserve_order: bool = False,
     ) -> dict:
+        if mode == 'image_random':
+            media_type = 'image'
+        elif mode in {'video_latest', 'big_files'}:
+            media_type = 'video'
         where, params = self._filters(
-            search=search,
-            media_type=media_type,
-            min_size=min_size,
-            month=month,
+            search=search, media_type=media_type, min_size=min_size, month=month,
         )
         safe_offset = max(0, int(offset))
         safe_limit = max(1, min(int(limit), 96))
         order_by = "captured_at DESC, uri" if self.is_month_key(month) else "mtime DESC, uri"
+        if mode == 'big_files':
+            order_by = "size_bytes DESC, mtime DESC, uri"
         with self.database.connect() as conn:
-            total = int(conn.execute(
-                f"SELECT COUNT(*) FROM media_items {where}",
-                params,
-            ).fetchone()[0])
-            rows = conn.execute(
-                f"SELECT * FROM media_items {where} ORDER BY {order_by} LIMIT ? OFFSET ?",
-                [*params, safe_limit, safe_offset],
-            ).fetchall()
+            source = 'media_items'
+            if uris is not None:
+                conn.execute('CREATE TEMP TABLE selected_media(selected_uri TEXT PRIMARY KEY, position INTEGER)')
+                conn.executemany(
+                    'INSERT INTO selected_media VALUES (?, ?)',
+                    [(uri, index) for index, uri in enumerate(dict.fromkeys(uris))],
+                )
+                source += ' JOIN selected_media ON uri = selected_uri'
+                if preserve_order:
+                    # Collections retain their member order and media types.
+                    where, params, order_by = '', [], 'position'
+            if mode == 'image_random' and not preserve_order:
+                rows = conn.execute(f'SELECT media_items.* FROM {source} {where} ORDER BY {order_by}', params).fetchall()
+                random.Random(seed).shuffle(rows)
+                total = len(rows)
+                rows = rows[safe_offset:safe_offset + safe_limit]
+            else:
+                total = int(conn.execute(f'SELECT COUNT(*) FROM {source} {where}', params).fetchone()[0])
+                rows = conn.execute(
+                    f'SELECT media_items.* FROM {source} {where} ORDER BY {order_by} LIMIT ? OFFSET ?',
+                    [*params, safe_limit, safe_offset],
+                ).fetchall()
         return {
             "records": [self._to_library_record(row) for row in rows],
             "total": total,
@@ -275,22 +297,6 @@ class MediaIndexStore:
             "has_more": has_more,
             "next_before": next_before,
         }
-
-    def records_for_uris(self, uris: list[str]) -> list[dict]:
-        wanted = list(dict.fromkeys(str(uri) for uri in uris if uri))
-        if not wanted:
-            return []
-        found: dict[str, dict] = {}
-        with self.database.connect() as conn:
-            for start in range(0, len(wanted), 500):
-                chunk = wanted[start:start + 500]
-                placeholders = ",".join("?" for _ in chunk)
-                rows = conn.execute(
-                    f"SELECT * FROM media_items WHERE uri IN ({placeholders})",
-                    chunk,
-                ).fetchall()
-                found.update({str(row["uri"]): self._to_library_record(row) for row in rows})
-        return [found[uri] for uri in wanted if uri in found]
 
     def stats(self) -> dict:
         with self.database.connect() as conn:
@@ -514,81 +520,81 @@ class LibraryIndexer:
 
     def sync(self) -> dict:
         time_states = self.store.time_states()
-        available_source_ids = {
-            source.id
-            for source in self.library.sources
-            if source.path.exists() and source.path.is_dir()
-        }
-        paths = (
-            self.library.scan_videos()
-            + self.library.scan_images()
-            + self.library.scan_audios()
-        )
-        records_by_uri = {
-            record["uri"]: record
-            for path in paths
-            if (record := self._record_for_path(path, time_states))
-        }
+        completed_sources = set()
+        failures = {}
+        records_by_uri = {}
+        for source in self.library.sources:
+            try:
+                records = [
+                    record for path in self.library.scan_source(source)
+                    if (record := self._record_for_path(path, time_states))
+                ]
+            except OSError as error:
+                failures[source.id] = str(error)
+                continue
+            completed_sources.add(source.id)
+            records_by_uri.update((record['uri'], record) for record in records)
         result = self.store.replace_snapshot(
             list(records_by_uri.values()),
-            synced_source_ids=available_source_ids,
+            synced_source_ids=completed_sources,
         )
-        result["unavailable_sources"] = [
-            source.id for source in self.library.sources if source.id not in available_source_ids
-        ]
+        result['unavailable_sources'] = list(failures)
+        result['source_errors'] = failures
         return result
 
     def register_uris(self, uris: list[str]) -> int:
         time_states = self.store.time_states()
         records = []
         for uri in uris:
+            if Path(uri).suffix.lower() not in VIDEO_EXTENSIONS | IMAGE_EXTENSIONS | AUDIO_EXTENSIONS:
+                continue
             path = self.library.resolve_path(uri)
-            record = self._record_for_path(path, time_states) if path else None
-            if record:
-                records.append(record)
+            if path is None or not path.is_file():
+                raise ValueError(f'媒体输出不存在或不可访问: {uri}')
+            record = self._record_for_path(path, time_states)
+            if record is None:
+                raise ValueError(f'无法登记媒体输出: {uri}')
+            records.append(record)
         return self.store.upsert(records)
 
     def _record_for_path(self, path: Path, time_states: dict[str, dict] | None = None) -> dict | None:
-        try:
-            stat = path.stat()
-            uri = self.library.get_relative_path(path)
-            ref = self.library.parse_uri(uri)
-            if not ref:
-                return None
-            suffix = path.suffix.lower()
-            if suffix in VIDEO_EXTENSIONS:
-                media_type = "video"
-            elif suffix in IMAGE_EXTENSIONS:
-                media_type = "image"
-            elif suffix in AUDIO_EXTENSIONS:
-                media_type = "audio"
-            else:
-                return None
-            existing = (time_states or {}).get(uri) or {}
-            unchanged = (
-                int(existing.get("size_bytes") or -1) == int(stat.st_size)
-                and float(existing.get("mtime") or -1) == float(stat.st_mtime)
-                and bool(existing.get("captured_local_date"))
-                and int(existing.get("time_metadata_version") or 0) >= 1
-            )
-            capture = {
-                "captured_at": float(existing.get("captured_at") or stat.st_mtime),
-                "captured_local_date": str(existing.get("captured_local_date") or ""),
-                "time_source": str(existing.get("time_source") or "filesystem_mtime"),
-                "time_confidence": str(existing.get("time_confidence") or "fallback"),
-                "time_metadata_version": int(existing.get("time_metadata_version") or 0),
-            } if unchanged else discover_capture_time(path, media_type, float(stat.st_mtime))
-            return {
-                "uri": uri,
-                "source_id": ref.source_id,
-                "rel_path": ref.rel_path,
-                "filename": path.name,
-                "parent_path": str(Path(ref.rel_path).parent).replace("\\", "/"),
-                "media_type": media_type,
-                "extension": suffix,
-                "size_bytes": int(stat.st_size),
-                "mtime": float(stat.st_mtime),
-                **capture,
-            }
-        except OSError:
+        stat = path.stat()
+        uri = self.library.get_relative_path(path)
+        ref = self.library.parse_uri(uri)
+        if not ref:
             return None
+        suffix = path.suffix.lower()
+        if suffix in VIDEO_EXTENSIONS:
+            media_type = "video"
+        elif suffix in IMAGE_EXTENSIONS:
+            media_type = "image"
+        elif suffix in AUDIO_EXTENSIONS:
+            media_type = "audio"
+        else:
+            return None
+        existing = (time_states or {}).get(uri) or {}
+        unchanged = (
+            int(existing.get("size_bytes") or -1) == int(stat.st_size)
+            and float(existing.get("mtime") or -1) == float(stat.st_mtime)
+            and bool(existing.get("captured_local_date"))
+            and int(existing.get("time_metadata_version") or 0) >= 1
+        )
+        capture = {
+            "captured_at": float(existing.get("captured_at") or stat.st_mtime),
+            "captured_local_date": str(existing.get("captured_local_date") or ""),
+            "time_source": str(existing.get("time_source") or "filesystem_mtime"),
+            "time_confidence": str(existing.get("time_confidence") or "fallback"),
+            "time_metadata_version": int(existing.get("time_metadata_version") or 0),
+        } if unchanged else discover_capture_time(path, media_type, float(stat.st_mtime))
+        return {
+            "uri": uri,
+            "source_id": ref.source_id,
+            "rel_path": ref.rel_path,
+            "filename": path.name,
+            "parent_path": str(Path(ref.rel_path).parent).replace("\\", "/"),
+            "media_type": media_type,
+            "extension": suffix,
+            "size_bytes": int(stat.st_size),
+            "mtime": float(stat.st_mtime),
+            **capture,
+        }

@@ -305,6 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const response = await fetch(`/api/favorite/${encodeURIComponent(fileName)}`);
       const data = await response.json();
+      if (!response.ok || typeof data.favorite !== 'boolean') throw new Error('读取收藏失败');
       isFavorited = data.favorite;
       updateFavoriteUI();
     } catch (error) {
@@ -336,18 +337,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // 收藏功能
   favoriteBtn?.addEventListener('click', async (e) => {
     e.preventDefault();
+    if (favoriteBtn.disabled) return;
+    favoriteBtn.disabled = true;
     try {
       const response = await fetch(`/api/favorite/${encodeURIComponent(fileName)}`, {
         method: 'POST'
       });
-      if (response.ok) {
-        isFavorited = !isFavorited;
-        updateFavoriteUI();
-        showNotification(isFavorited ? '已添加到收藏' : '已取消收藏', 'success');
-      }
+      const data = await response.json();
+      if (!response.ok || typeof data.favorite !== 'boolean') throw new Error('保存收藏失败');
+      isFavorited = data.favorite;
+      updateFavoriteUI();
+      showNotification(isFavorited ? '已添加到收藏' : '已取消收藏', 'success');
     } catch (error) {
       console.error('收藏操作失败:', error);
       showNotification('操作失败，请重试', 'error');
+    } finally {
+      favoriteBtn.disabled = false;
     }
   });
 

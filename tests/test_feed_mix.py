@@ -1,5 +1,4 @@
 import json
-import os
 import sqlite3
 
 import pytest
@@ -19,9 +18,7 @@ def client(tmp_path, monkeypatch):
     (media_root / "i1.jpg").write_bytes(b"00")
     (media_root / "i2.png").write_bytes(b"00")
 
-    data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
 
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
     return app.test_client()
@@ -62,130 +59,58 @@ def test_mix_feed_returns_typed_items(client):
             assert item["detail_url"].startswith("/image?uri=")
 
 
-def test_mix_feed_falls_back_to_videos_when_no_images(tmp_path, monkeypatch):
-    media_root = tmp_path / "media"
-    media_root.mkdir(parents=True, exist_ok=True)
-    (media_root / "only-video.mp4").write_bytes(b"00")
-    (media_root / "only-video-2.mp4").write_bytes(b"00")
+@pytest.mark.parametrize('extension,grouped,count', [
+    ('mp4', False, 24), ('jpg', False, 24), ('jpg', True, 24),
+    ('mixed', False, 24), ('jpg', False, 0),
+])
+def test_feed_cards_and_groups_preserve_all_media_across_pages(tmp_path, monkeypatch, extension, grouped, count):
+    media_root = tmp_path / 'media'
+    media_root.mkdir()
+    names = [
+        f'item-{index:02d}.{("mp4" if index < 6 else "jpg") if extension == "mixed" else extension}'
+        for index in range(count)
+    ]
+    for name in names:
+        (media_root / name).write_bytes(b'media')
+    data_root = tmp_path / 'tiklocal-data'
+    data_root.mkdir()
+    if grouped:
+        (data_root / 'download_sources.json').write_text(json.dumps({
+            'version': 1,
+            'items': {f'@default/{name}': {
+                'source_url_raw': 'https://example.com/post/1',
+                'source_url_display': 'https://example.com/post/1',
+                'source_domain': 'example.com',
+                'job_id': 'one-post',
+            } for name in names},
+        }))
+    client = create_app({'TESTING': True, 'MEDIA_ROOT': media_root}).test_client()
 
-    data_root = tmp_path / "tiklocal-data"
-    monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
-
-    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
-    test_client = app.test_client()
-
-    res = test_client.get("/api/feed/mix?page=1&size=8&seed=fixed-seed")
-    assert res.status_code == 200
-    data = res.get_json()
-
-    items = data["items"]
-    assert len(items) > 0
-    assert all(item["type"] == "video" for item in items)
-
-
-def test_mix_feed_can_insert_theme_strip_for_recent_added_and_favorites(tmp_path, monkeypatch):
-    media_root = tmp_path / "media"
-    media_root.mkdir(parents=True, exist_ok=True)
-    for idx, name in enumerate(("v1.mp4", "v2.mp4", "i1.jpg", "i2.png", "i3.jpg")):
-        path = media_root / name
-        path.write_bytes(b"00")
-        ts = 1_700_000_000 + idx
-        os.utime(path, (ts, ts))
-
-    (media_root / "favorite.json").write_text(
-        json.dumps(["i1.jpg", "i2.png", "v1.mp4"]),
-        encoding="utf-8",
-    )
-
-    data_root = tmp_path / "tiklocal-data"
-    data_root.mkdir(parents=True, exist_ok=True)
-
-    monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
-
-    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
-    test_client = app.test_client()
-
-    res = test_client.get("/api/feed/mix?page=1&size=24&seed=theme-seed")
-    assert res.status_code == 200
-    data = res.get_json()
-
-    items = data["items"]
-    strip = next((item for item in items if item.get("type") == "theme_strip"), None)
-    assert strip is not None
-    assert strip["name"] in {"theme:recent-added", "theme:favorite-picks"}
-    assert strip["title"]
-    assert strip["target_url"] in {"/favorite", "/library"}
-    assert strip["target_label"]
-    assert len(strip["items"]) >= 3
-    for child in strip["items"]:
-        assert child["type"] in {"video", "image"}
-        assert child["name"]
-        assert child["media_url"]
-        assert child["thumb_url"]
-        assert child["detail_url"]
-        assert child["focus_url"]
-
-
-def test_mix_feed_prefers_original_post_group_when_source_has_multiple_media(tmp_path, monkeypatch):
-    media_root = tmp_path / "media"
-    media_root.mkdir(parents=True, exist_ok=True)
-    for name in ("set-1.jpg", "set-2.jpg", "solo.mp4", "fallback.jpg"):
-        (media_root / name).write_bytes(b"00")
-
-    data_root = tmp_path / "tiklocal-data"
-    data_root.mkdir(parents=True, exist_ok=True)
-    (data_root / "download_sources.json").write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "updated_at": "2026-03-14T10:30:00Z",
-                "items": {
-                    "set-1.jpg": {
-                        "source_url_raw": "https://x.com/demo/status/100",
-                        "source_url_display": "https://x.com/demo/status/100",
-                        "source_domain": "x.com",
-                        "job_id": "job-group",
-                        "created_at": "2026-03-14T10:00:00Z",
-                    },
-                    "set-2.jpg": {
-                        "source_url_raw": "https://x.com/demo/status/100",
-                        "source_url_display": "https://x.com/demo/status/100",
-                        "source_domain": "x.com",
-                        "job_id": "job-group",
-                        "created_at": "2026-03-14T10:00:00Z",
-                    },
-                    "solo.mp4": {
-                        "source_url_raw": "https://x.com/demo/status/101",
-                        "source_url_display": "https://x.com/demo/status/101",
-                        "source_domain": "x.com",
-                        "job_id": "job-solo",
-                        "created_at": "2026-03-14T09:00:00Z",
-                    },
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
-
-    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
-    test_client = app.test_client()
-
-    res = test_client.get("/api/feed/mix?page=1&size=24&seed=group-seed")
-    assert res.status_code == 200
-    data = res.get_json()
-
-    group = next((item for item in data["items"] if item.get("type") == "image_group"), None)
-    assert group is not None
-    assert group["title"] == "原始图集"
-    names = [child["name"] for child in group["items"]]
-    assert "@default/set-1.jpg" in names
-    assert "@default/set-2.jpg" in names
-    assert all(child["media_url"] for child in group["items"])
+    seen, theme_count, group_count = [], 0, 0
+    pages = max(1, (count + 7) // 8)
+    for page in range(1, pages + 1):
+        response = client.get('/api/feed/mix', query_string={'page': page, 'size': 8, 'seed': 'fixed'})
+        assert response.status_code == 200
+        payload = response.get_json()
+        page_names = []
+        for item in payload['items']:
+            if item['type'] == 'theme_strip':
+                theme_count += 1
+                assert page == 1
+                assert client.get(item['target_url']).status_code == 200
+            elif item['type'] == 'image_group':
+                group_count += 1
+                page_names.extend(child['name'] for child in item['items'])
+                assert all(client.get(child['media_url']).data == b'media' for child in item['items'])
+            else:
+                page_names.append(item['name'])
+        assert len(page_names) == min(8, count)
+        assert not set(page_names).intersection(seen)
+        assert payload['has_more'] is (page < pages)
+        seen.extend(page_names)
+    assert set(seen) == {f'@default/{name}' for name in names}
+    assert theme_count == (1 if count else 0)
+    assert group_count == (3 if grouped else 0)
 
 
 def test_flow_activity_builds_and_clears_local_profile(client, tmp_path):

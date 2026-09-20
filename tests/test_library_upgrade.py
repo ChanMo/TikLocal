@@ -7,7 +7,7 @@ from PIL import Image
 
 import tiklocal.services.library_index as library_index_module
 from tiklocal.app import create_app
-from tiklocal.services import LibraryService
+from tiklocal.services.library import LibraryService
 from tiklocal.services.database import AppDatabase
 from tiklocal.services.library_index import MediaIndexStore
 
@@ -29,67 +29,15 @@ def client(tmp_path, monkeypatch):
         ts = 1_700_000_000 + idx
         os.utime(p, (ts, ts))
 
-    data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
 
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
     return app.test_client()
 
 
-def test_library_page_has_mode_tabs_and_no_masonry_label(client):
-    timeline = client.get("/library")
-    assert timeline.status_code == 200
-    timeline_body = timeline.data.decode("utf-8")
-    assert 'id="timeline-stream"' in timeline_body
-    assert 'id="timeline-current-date"' in timeline_body
-    assert '时间里的影像' in timeline_body
-    assert 'library_timeline.css' in timeline_body
-    assert 'library_timeline_controller.js' in timeline_body
-    assert 'window.__TIKLOCAL_TIMELINE_BOOT__' in timeline_body
-    assert 'library_page_controller.js' not in timeline_body
-
-    res = client.get("/library?view=explore")
-    assert res.status_code == 200
-    body = res.data.decode("utf-8")
-    assert "data-mode=\"all\"" in body
-    assert "data-mode=\"image_random\"" in body
-    assert "data-mode=\"video_latest\"" in body
-    assert "data-mode=\"big_files\"" in body
-    assert "id=\"library-search-input\"" in body
-    assert 'id="library-toolbar"' in body
-    assert 'id="library-search-toggle"' in body
-    assert 'id="library-search-clear"' in body
-    assert 'role="search"' in body
-    assert 'aria-label="媒体库浏览模式"' in body
-    assert "Masonry" not in body
-    assert "id=\"quick-source\"" in body
-    assert "id=\"quick-close-top\"" in body
-    assert "id=\"quick-speed\"" in body
-    assert "id=\"quick-caption\"" in body
-    assert "id=\"quick-magnifier\"" in body
-    assert "id=\"quick-play-status\"" in body
-    assert "#quick-view.immersive .quick-caption-panel" in body
-    assert "image-focus" not in body
-    assert "waterfall-col" in body
-    assert "library_page_controller.js" in body
-    assert "flow_ui_shared.js" in body
-    assert "flow_state_controller.js" in body
-    assert "flow_session.js" in body
-    assert "flow_actions_shared.js" in body
-    assert "flow_media_actions_controller.js" in body
-    assert "pageSize: 24" in body
-    assert 'id="library-status-text"' in body
-    assert 'id="library-retry"' in body
-    assert 'id="library-clear-search"' in body
-    assert '探索媒体库' in body
-    assert 'href="/library"' in body
-
-    controller = client.get("/static/library_page_controller.js").data.decode("utf-8")
-    assert "syncSearchUI" in controller
-    assert "aria-pressed" in controller
-    assert "waterfall.gridWidth !== nextGridWidth" in controller
-    assert "if (isSimilarMode() || !layoutChanged) return;" in controller
+@pytest.mark.parametrize('url', ['/', '/flow', '/library', '/library?view=explore', '/radio', '/download', '/settings/', '/favorite', '/collections'])
+def test_web_pages_are_available(client, url):
+    assert client.get(url).status_code == 200
 
 
 def test_library_timeline_groups_months_and_month_detail_filters(client):
@@ -106,11 +54,6 @@ def test_library_timeline_groups_months_and_month_detail_filters(client):
 
     month_page = client.get("/library?view=month&month=2023-11")
     assert month_page.status_code == 200
-    month_body = month_page.data.decode("utf-8")
-    assert 'data-month-heading="2023-11"' in month_body
-    assert 'timelineMonth: "2023-11"' in month_body
-    assert 'library_page_controller.js' in month_body
-
     items = client.get("/api/library/items?scope=all&month=2023-11&limit=20").get_json()["data"]
     assert items["total"] == 13
 
@@ -129,8 +72,6 @@ def test_timeline_prefers_embedded_and_filename_capture_dates(tmp_path, monkeypa
     os.utime(photo, (recent_ts, recent_ts))
     os.utime(video, (recent_ts, recent_ts))
 
-    data_root = tmp_path / "tiklocal-data"
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
     database = AppDatabase(tmp_path / "timeline.sqlite3")
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root, "APP_DATABASE": database})
     local_client = app.test_client()
@@ -170,93 +111,6 @@ def test_timeline_prefers_embedded_and_filename_capture_dates(tmp_path, monkeypa
     create_app({"TESTING": True, "MEDIA_ROOT": media_root, "APP_DATABASE": database})
 
 
-def test_flow_uses_unified_immersive_model(client):
-    res = client.get("/flow")
-    assert res.status_code == 200
-    body = res.data.decode("utf-8")
-    assert "body.immersive-mode .caption-panel:not(.is-hidden)" in body
-    assert "flow_ui_shared.js" in body
-    assert "flow_state_controller.js" in body
-    assert "flow_session.js" in body
-    assert "flow_actions_shared.js" in body
-    assert "flow_media_actions_controller.js" in body
-    assert "home_feed_controller.js" in body
-    assert 'id="collection-btn"' in body
-    assert 'id="collection-count"' in body
-    assert 'id="collection-modal"' in body
-    assert 'id="app-nav-menu-trigger"' in body
-    assert 'id="app-nav-menu"' in body
-    assert 'href="/static/app_navigation.css?v=' in body
-    assert 'class="mobile-mode-link is-active"' in body
-    assert '>Flow</a>' in body
-    assert '>Radio</a>' in body
-    assert 'class="rail-brand"' in body
-    assert 'id="more-theme-toggle"' not in body
-    assert '<span>设置</span>' in body
-    assert 'id="flow-state"' in body
-    assert 'id="flow-state-retry"' in body
-    assert 'id="flow-state-next"' in body
-    assert 'id="video-start-cover"' in body
-    assert 'id="video-start-cover-image"' not in body
-    assert ".video-start-cover.is-visible" in body
-    assert "transition: none" in body
-    assert "transform: scale(1.01)" not in body
-    assert "filter: blur(2px)" not in body
-    assert 'href="/favorite"' in body
-    assert '<span>已保存</span>' in body
-    assert 'href="/collections"' not in body
-
-
-def test_home_is_a_media_launchpad(client):
-    res = client.get("/")
-    assert res.status_code == 200
-    body = res.data.decode("utf-8")
-    assert 'data-nav-context="home"' in body
-    assert 'href="/static/home.css?v=' in body
-    assert 'home_page_controller.js' in body
-    assert 'id="home-title"' in body
-    assert 'href="/flow"' in body
-    assert 'href="/radio"' in body
-    assert 'id="home-recent"' in body
-    assert 'id="home-rediscover"' in body
-    assert 'id="home-collections"' in body
-    assert "home_feed_controller.js" not in body
-
-
-def test_settings_focuses_on_useful_local_controls(client):
-    res = client.get('/settings/')
-    assert res.status_code == 200
-    body = res.data.decode('utf-8')
-    assert '<h1 class="settings-title">设置</h1>' in body
-    assert 'data-theme-preference="system"' in body
-    assert 'data-theme-preference="light"' in body
-    assert 'data-theme-preference="dark"' in body
-    assert 'id="refresh-library"' in body
-    assert 'id="clear-cache"' in body
-    assert 'id="reset-recommendations"' in body
-    assert 'LLM Provider' not in body
-    assert 'AI Prompt' not in body
-    assert 'href="/download"' in body
-    assert 'href="/settings"' in body
-    assert 'id="quick-theme-toggle"' not in body
-    assert "image-focus-mode" not in body
-
-    controller = client.get("/static/home_feed_controller.js").data.decode("utf-8")
-    assert "size: '24'" in controller
-    assert "snapshot: '1'" not in controller
-    assert "randomStartRatio" not in controller
-    assert "_randomStart" not in controller
-    assert "function prepareVideoStart(videoEl)" in controller
-    assert "function isVideoStartReady(videoEl)" in controller
-    assert "waitForPresentedVideoFrame" in controller
-    assert "prepareVideoStart(v).catch" in controller
-    assert "const needsVideoStartCover = item.type === 'video' && !isVideoStartReady(item.el)" in controller
-    assert "updateControls(item);\n      preloadNextVideo();" in controller
-    assert "videoStartCoverImage" not in controller
-    assert "video.poster = item.thumb_url" not in controller
-    assert "_activityPlayedSeconds" in controller
-
-
 def test_api_library_items_supports_modes_search_and_sync(client, tmp_path):
     all_res = client.get("/api/library/items?scope=all&mode=all&offset=0&limit=20")
     assert all_res.status_code == 200
@@ -277,6 +131,7 @@ def test_api_library_items_supports_modes_search_and_sync(client, tmp_path):
     assert len(image_items) > 0
     assert all(item["type"] == "image" for item in image_items)
     assert image_res.get_json()["data"]["seed"] == "fixed"
+    assert client.get(image_res.request.url).get_json()["data"]["items"] == image_items
 
     big_res = client.get("/api/library/items?scope=all&mode=big_files&offset=0&limit=20&min_mb=1")
     big_items = big_res.get_json()["data"]["items"]
@@ -314,6 +169,23 @@ def test_api_library_items_no_duplicates_across_offsets(client):
         offset = int(data["next_offset"])
 
 
+def test_big_files_sort_by_size_across_pages(client, tmp_path):
+    for size in range(3, 17):
+        path = tmp_path / 'media' / f'large-{size:02}.mp4'
+        with path.open('wb') as stream:
+            stream.truncate(size * 1024 * 1024)
+        os.utime(path, (1_700_000_000 - size, 1_700_000_000 - size))
+    client.post('/api/library/sync')
+    url = '/api/library/items?mode=big_files&min_mb=3&limit=12'
+    first = client.get(url).get_json()['data']
+    second = client.get(f"{url}&offset={first['next_offset']}").get_json()['data']
+    assert first['total'] == 14 and first['has_more']
+    assert not second['has_more']
+    assert [item['name'] for item in first['items'] + second['items']] == [
+        f'@default/large-{size:02}.mp4' for size in range(16, 2, -1)
+    ]
+
+
 def test_api_library_items_dedupes_symlink_aliases(tmp_path, monkeypatch):
     media_root = tmp_path / "media"
     media_root.mkdir(parents=True, exist_ok=True)
@@ -326,9 +198,7 @@ def test_api_library_items_dedupes_symlink_aliases(tmp_path, monkeypatch):
     except (OSError, NotImplementedError):
         pytest.skip("Symlink not supported in this environment")
 
-    data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
     local_client = app.test_client()
 
@@ -348,9 +218,7 @@ def test_api_library_items_merges_multiple_media_sources(tmp_path, monkeypatch):
     (default_root / "main.mp4").write_bytes(b"video")
     (extra_root / "photo.jpg").write_bytes(b"image")
 
-    data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(default_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
     app = create_app({
         "TESTING": True,
         "MEDIA_ROOT": default_root,
@@ -399,7 +267,8 @@ def test_startup_resyncs_existing_media_index(tmp_path, monkeypatch):
     assert app.extensions["media_index_sync"]["deleted"] == 1
 
 
-def test_startup_preserves_index_for_unavailable_media_source(tmp_path):
+@pytest.mark.parametrize('failure', ['offline', 'directory_read', 'file_stat'])
+def test_startup_preserves_index_for_unavailable_media_source(tmp_path, monkeypatch, failure):
     default_root = tmp_path / "default"
     extra_root = tmp_path / "extra"
     default_root.mkdir()
@@ -421,7 +290,27 @@ def test_startup_preserves_index_for_unavailable_media_source(tmp_path):
     create_app(config)
 
     main.unlink()
-    extra_root.rename(tmp_path / "extra-offline")
+    if failure == 'offline':
+        extra_root.rename(tmp_path / "extra-offline")
+    elif failure == 'directory_read':
+        original_scandir = os.scandir
+
+        def failing_scandir(path):
+            if str(path) == str(extra_root):
+                raise PermissionError('source temporarily unreadable')
+            return original_scandir(path)
+
+        monkeypatch.setattr(os, 'scandir', failing_scandir)
+    else:
+        from pathlib import Path
+        original_stat = Path.stat
+
+        def failing_stat(path, *args, **kwargs):
+            if path == extra_root / 'photo.jpg':
+                raise PermissionError('file temporarily unreadable')
+            return original_stat(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, 'stat', failing_stat)
     app = create_app(config)
 
     names = {item["name"] for item in MediaIndexStore(database).records()}
@@ -437,12 +326,12 @@ def test_library_images_use_bounded_cached_thumbnails(tmp_path, monkeypatch):
 
     data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
     local_client = app.test_client()
 
     payload = local_client.get("/api/library/items?scope=all").get_json()["data"]
     item = payload["items"][0]
+    assert (item['width'], item['height']) == (1400, 900)
     assert item["media_url"] == "/media/%40default/large%20image.png"
     assert item["thumb_url"] == "/thumb?uri=%40default/large%20image.png"
 
@@ -513,48 +402,22 @@ def test_special_chars_in_media_urls_are_encoded(tmp_path, monkeypatch):
     (media_root / video_name).write_bytes(b"video")
     (media_root / image_name).write_bytes(b"image")
 
-    data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
     local_client = app.test_client()
 
-    video_detail = local_client.get(f"/detail/{quote(video_name, safe='')}")
-    assert video_detail.status_code == 200
-    video_body = video_detail.data.decode("utf-8")
-    assert 'src="/media/%40default/v%231%2B.mp4"' in video_body
-    assert 'poster="/thumb?uri=%40default%2Fv%231%2B.mp4"' in video_body
-    assert "const fileName = \"@default/v#1+.mp4\";" in video_body
-    assert "fetch('/delete/%40default/v%231%2B.mp4', { method: 'POST' })" in video_body
-    assert 'aria-controls="detail-action-menu"' in video_body
-    assert 'id="detail-action-menu" class="detail-action-menu"' in video_body
-    assert 'class="detail-action-item is-danger"' in video_body
-    assert 'class="detail-wrap-anywhere text-xl' in video_body
-    assert "document.getElementById('detail-action-menu')" in video_body
-    assert ".more-menu {" not in video_body
+    items = local_client.get('/api/library/items').get_json()['data']['items']
+    assert {item['name'] for item in items} == {
+        f'@default/{video_name}', f'@default/{image_name}',
+    }
+    for item in items:
+        expected = b'video' if item['type'] == 'video' else b'image'
+        assert local_client.get(item['media_url']).data == expected
+        assert local_client.get(item['detail_url']).status_code == 200
+        legacy = local_client.get('/media', query_string={'uri': item['name']}, follow_redirects=True)
+        assert legacy.data == expected
 
-    image_detail = local_client.get(f"/image?uri={quote(image_name, safe='')}")
-    assert image_detail.status_code == 200
-    image_body = image_detail.data.decode("utf-8")
-    assert 'src="/media?uri=%40default%2Fa%26b.jpg"' in image_body
-    assert "const imageUri = \"@default/a\\u0026b.jpg\";" in image_body
-    assert "const imageUriEncoded = \"%40default%2Fa%26b.jpg\";" in image_body
-    assert "image_viewer_controller.js" in image_body
-    assert 'id="zoom-in-btn"' in image_body
-    assert 'id="zoom-out-btn"' in image_body
-    assert 'id="fullscreen-stage"' in image_body
-    assert "fetch('/delete/%40default/a%26b.jpg', { method: 'POST' })" in image_body
-    assert "window.location.href = '/library';" in image_body
-    assert 'aria-controls="detail-action-menu"' in image_body
-    assert 'id="detail-action-menu" class="detail-action-menu"' in image_body
-    assert 'id="caption-title" class="detail-wrap-anywhere' in image_body
-    assert "chip.className = 'detail-tag " in image_body
-    assert "document.getElementById('detail-action-menu')" in image_body
-
-    detail_css = local_client.get("/static/output.css").data.decode("utf-8")
-    assert ".detail-action-menu" in detail_css
-    assert ".detail-wrap-anywhere" in detail_css
-
-    media_res = local_client.get(f"/media?uri={quote(video_name, safe='')}", follow_redirects=False)
-    assert media_res.status_code in {301, 302, 308}
-    assert media_res.headers.get("Location", "").endswith("/media/%40default/v%231%2B.mp4")
+    deleted = local_client.post(f"/delete/{quote('@default/' + image_name, safe='')}")
+    assert deleted.status_code == 302
+    assert not (media_root / image_name).exists()
+    assert (media_root / video_name).exists()

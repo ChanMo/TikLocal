@@ -18,7 +18,10 @@
     if (!encoded) return false;
     var response = await fetch('/api/favorite/' + encoded);
     var data = await readJsonResponse(response);
-    return !!(data && data.favorite);
+    if (!response.ok || !data || typeof data.favorite !== 'boolean') {
+      throw new Error((data && data.error) || '收藏操作失败，请重试。');
+    }
+    return data.favorite;
   }
 
   async function toggleFavorite(name) {
@@ -26,7 +29,10 @@
     if (!encoded) return false;
     var response = await fetch('/api/favorite/' + encoded, { method: 'POST' });
     var data = await readJsonResponse(response);
-    return !!(data && data.favorite);
+    if (!response.ok || !data || typeof data.favorite !== 'boolean') {
+      throw new Error((data && data.error) || '收藏操作失败，请重试。');
+    }
+    return data.favorite;
   }
 
   async function getSourceMeta(name) {
@@ -43,20 +49,21 @@
     if (!encoded) return { success: false, error: 'missing uri' };
     var response = await fetch('/api/image/metadata?uri=' + encoded);
     var data = await readJsonResponse(response);
-    if (data && typeof data === 'object') return data;
-    return { success: false, error: 'invalid response' };
+    if (!response.ok || !data || !data.success) throw new Error((data && data.error) || '标题请求失败');
+    return data;
   }
 
-  async function generateImageMetadata(uri) {
+  async function generateImageMetadata(uri, options) {
+    var conf = options || {};
     if (!uri) return { success: false, error: 'missing uri' };
     var response = await fetch('/api/image/metadata', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uri: uri, force: true }),
+      body: JSON.stringify({ uri: uri, force: conf.force !== false, prompt_override: conf.promptOverride }),
     });
     var data = await readJsonResponse(response);
-    if (data && typeof data === 'object') return data;
-    return { success: false, error: 'invalid response' };
+    if (!response.ok || !data || !data.success) throw new Error((data && data.error) || '标题请求失败');
+    return data;
   }
 
   global.FlowActionsShared = {

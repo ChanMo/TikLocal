@@ -122,12 +122,7 @@ def configure_auth(app, auth_store, *, enabled: bool, device_auth_store=None) ->
     def enforce_authentication():
         if request.endpoint in {
             'static',
-            'pwa_manifest',
-            'pwa_icon',
-            'pwa_service_worker',
-            'pwa_install_guide',
-            'pwa_ca_certificate',
-            'pwa_ca_certificate_der',
+            'retired_service_worker',
         }:
             return None
         if request.endpoint == 'login_view':

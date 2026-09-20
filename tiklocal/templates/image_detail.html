@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block extra_head %}
+{% if similarity_enabled %}<link rel="stylesheet" href="{{ static_asset('experiments/image-similarity.css') }}">{% endif %}
 <style>
   .image-viewer {
     max-height: calc(100vh - 160px);
@@ -64,20 +65,6 @@
   }
   #caption-primary-btn.is-loading {
     cursor: default;
-  }
-  #similar-images-section {
-    display: none;
-  }
-  #similar-images-section.is-visible {
-    display: block;
-  }
-  .similar-image-card {
-    aspect-ratio: 1 / 1;
-  }
-  .similar-image-card img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
   #embedded-prompt {
     max-height: 7.5rem;
@@ -287,13 +274,7 @@
         </button>
       </section>
 
-      <!-- 相似图片推荐 -->
-      <section id="similar-images-section" class="similar-area">
-          <h2 class="mb-3 text-base font-semibold text-gray-900 dark:text-white">相似图片</h2>
-          <p id="similar-images-status" hidden></p>
-          <div id="similar-images-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
-          <div id="similar-images-empty" class="hidden"></div>
-      </section>
+      {% if similarity_enabled %}{% include 'experiments/image-similarity.html' %}{% endif %}
 
       <!-- 侧边栏信息 -->
       <aside class="info-area min-w-0 space-y-6 lg:border-l lg:border-gray-200 lg:pl-6 dark:lg:border-gray-800">
@@ -432,7 +413,10 @@
 {% endblock %}
 
 {% block extra_body %}
+{% if similarity_enabled %}<script defer src="{{ static_asset('experiments/image-similarity.js') }}"></script>{% endif %}
 <script src="{{ static_asset('image_viewer_controller.js') }}"></script>
+<script src="{{ static_asset('flow_actions_shared.js') }}"></script>
+<script src="{{ static_asset('flow_media_actions_controller.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const mainImage = document.getElementById('main-image');
@@ -453,13 +437,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const copyLinkBtn = document.getElementById('copy-link-btn');
   const moreMenuBtn = document.getElementById('more-menu-btn');
   const moreMenu = document.getElementById('detail-action-menu');
-  const similarImagesSection = document.getElementById('similar-images-section');
   const captionBtn = document.getElementById('caption-primary-btn');
   const captionPrimaryLabel = document.getElementById('caption-primary-label');
   const captionEmptyCta = document.getElementById('caption-empty-cta');
-  const similarImagesStatus = document.getElementById('similar-images-status');
-  const similarImagesGrid = document.getElementById('similar-images-grid');
-  const similarImagesEmpty = document.getElementById('similar-images-empty');
   const captionAdvancedBtn = document.getElementById('caption-advanced-btn');
   const captionContent = document.getElementById('caption-content');
   const captionTitle = document.getElementById('caption-title');
@@ -478,7 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const promptTagsInput = document.getElementById('caption-override-tags');
   const imageUri = {{ uri|tojson }};
   const imageUriEncoded = {{ uri_query_encoded|tojson }};
-  let currentCaption = null;
   let promptConfigCache = null;
   const mainViewer = window.createImageViewerController({
     stage: imageContainer,
@@ -581,18 +560,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const renderCaption = (data) => {
-    currentCaption = data || null;
-    if (!data) {
-      captionTitle.textContent = '';
-      captionTags.innerHTML = '';
-      captionTitle.classList.add('hidden');
-      captionContent.classList.add('hidden');
-      setCaptionEmptyVisible(true);
-      if (captionPrimaryLabel) captionPrimaryLabel.textContent = '生成标题';
-      return;
-    }
-    const title = data.title || '';
-    const tags = Array.isArray(data.tags) ? data.tags : [];
+    const title = data?.title || '';
+    const tags = Array.isArray(data?.tags) ? data.tags : [];
     if (!title && tags.length === 0) {
       captionTitle.textContent = '';
       captionTags.innerHTML = '';
@@ -616,21 +585,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const loadCaption = async () => {
-    try {
-      const res = await fetch(`/api/image/metadata?uri=${encodeURIComponent(imageUri)}`);
-      const data = await res.json();
-      if (data.success) {
-        renderCaption(data.data);
-      } else {
-        setCaptionEmptyVisible(false);
-        showNotification(data.error || '读取失败', 'error');
-      }
-    } catch (err) {
-      setCaptionEmptyVisible(false);
-      showNotification('读取失败', 'error');
-    }
-  };
+  const mediaActions = window.createFlowMediaActionsController({
+    onCaptionRender: renderCaption,
+    onCaptionLoading: (loading) => {
+      captionBtn.disabled = loading;
+      captionBtn.classList.toggle('is-loading', loading);
+    },
+    onError: (kind, error) => {
+      if (kind === 'caption_load') setCaptionEmptyVisible(false);
+      showNotification(error.message || '标题请求失败', 'error');
+    },
+    confirmCaptionReplace: () => window.confirm('已存在标题，是否覆盖？'),
+  });
 
   const renderEmbeddedGeneration = (data) => {
     const embedded = data && data.embedded_generation ? data.embedded_generation : null;
@@ -654,48 +620,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       embeddedGenerationCard?.classList.add('hidden');
-    }
-  };
-
-  const renderSimilarImages = (payload) => {
-    const items = payload && Array.isArray(payload.items) ? payload.items : [];
-    similarImagesGrid.innerHTML = '';
-    similarImagesSection?.classList.remove('is-visible');
-    similarImagesEmpty.classList.add('hidden');
-    if (!payload || payload.available === false) {
-      return;
-    }
-    if (!payload.indexed) {
-      return;
-    }
-    if (items.length === 0) {
-      return;
-    }
-    similarImagesSection?.classList.add('is-visible');
-    items.forEach((item) => {
-      const link = document.createElement('a');
-      link.href = item.detail_url || '#';
-      link.className = 'similar-image-card block overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700 ring-1 ring-gray-200 dark:ring-gray-700 hover:ring-cyan-400 dark:hover:ring-cyan-500 transition-all';
-      const img = document.createElement('img');
-      img.src = item.media_url;
-      img.alt = item.name || 'similar image';
-      img.loading = 'lazy';
-      link.appendChild(img);
-      similarImagesGrid.appendChild(link);
-    });
-  };
-
-  const loadSimilarImages = async () => {
-    if (!similarImagesGrid || !similarImagesStatus) return;
-    try {
-      const res = await fetch(`/api/recommend/similar?uri=${encodeURIComponent(imageUri)}&limit=12`);
-      const data = await res.json();
-      if (!data.success) {
-        return;
-      }
-      renderSimilarImages(data.data);
-    } catch (err) {
-      similarImagesSection?.classList.remove('is-visible');
     }
   };
 
@@ -765,36 +689,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const generateCaption = async (force = false, promptOverride = null) => {
-    if (currentCaption && !force) {
-      const ok = window.confirm('已存在标题，是否覆盖？');
-      if (!ok) return;
-      force = true;
-    }
-    captionBtn.disabled = true;
-    captionBtn.classList.add('is-loading');
-    try {
-      const payload = { uri: imageUri, force };
-      if (promptOverride) {
-        payload.prompt_override = promptOverride;
-      }
-      const res = await fetch('/api/image/metadata', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (data.success) {
-        renderCaption(data.data);
-        showNotification('标题已更新', 'success');
-      } else {
-        showNotification(data.error || '生成失败', 'error');
-      }
-    } catch (err) {
-      showNotification(err.message || '生成失败', 'error');
-    } finally {
-      captionBtn.disabled = false;
-      captionBtn.classList.remove('is-loading');
-    }
+    const result = await mediaActions.generateCaption(imageUri, {
+      confirmExisting: !force, force, promptOverride,
+    });
+    if (result?.success) showNotification('标题已更新', 'success');
   };
 
   captionBtn?.addEventListener('click', () => generateCaption());
@@ -819,9 +717,8 @@ document.addEventListener('DOMContentLoaded', () => {
       showNotification(err.message || '覆盖配置无效', 'error');
     }
   });
-  loadCaption();
+  mediaActions.loadCaption(imageUri);
   loadEmbeddedGeneration();
-  loadSimilarImages();
   
   // 键盘导航
   document.addEventListener('keydown', (e) => {

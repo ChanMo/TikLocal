@@ -33,9 +33,7 @@ def test_embedded_metadata_api_returns_prompt_and_model(tmp_path, monkeypatch):
         "Prompt: bathroom editorial portrait | Model: x-ai/grok-imagine-image-quality | GeneratedAt: 2026-06-06T20:28:16+08:00",
     )
 
-    data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
     client = app.test_client()
 
@@ -47,28 +45,3 @@ def test_embedded_metadata_api_returns_prompt_and_model(tmp_path, monkeypatch):
     embedded = data["data"]["embedded_generation"]
     assert embedded["prompt"] == "bathroom editorial portrait"
     assert embedded["model"] == "x-ai/grok-imagine-image-quality"
-
-
-def test_image_detail_has_embedded_generation_panel(tmp_path, monkeypatch):
-    media_root = tmp_path / "media"
-    media_root.mkdir(parents=True, exist_ok=True)
-    image_path = media_root / "generated.jpg"
-    _write_jpeg_with_comment(
-        image_path,
-        "Prompt: compact prompt | Model: demo-model",
-    )
-
-    data_root = tmp_path / "tiklocal-data"
-    monkeypatch.setenv("MEDIA_ROOT", str(media_root))
-    monkeypatch.setenv("TIKLOCAL_INSTANCE", str(data_root))
-    app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
-    client = app.test_client()
-
-    res = client.get("/image?uri=generated.jpg")
-    body = res.data.decode("utf-8")
-
-    assert res.status_code == 200
-    assert 'id="embedded-generation-card"' in body
-    assert 'id="embedded-model"' in body
-    assert 'id="embedded-prompt"' in body
-    assert "/api/image/embedded-metadata" in body

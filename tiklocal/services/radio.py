@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from tiklocal.services import FavoriteService, LibraryService
+from tiklocal.services.library import LibraryService
+from tiklocal.services.favorites import FavoriteService
 
 
 def _positive_float(value) -> float | None:
@@ -124,11 +125,13 @@ class RadioService:
         self,
         library_service: LibraryService,
         favorite_service: FavoriteService,
+        media_index,
         profile_store: RadioProfileStore | None = None,
         activity_store=None,
     ):
         self.library = library_service
         self.favorites = favorite_service
+        self.media_index = media_index
         self.profile_store = profile_store
         self.activity_store = activity_store
         self._metadata_cache: dict[str, tuple[float, AudioMetadata]] = {}
@@ -164,7 +167,7 @@ class RadioService:
         serialize_track: Callable[[RadioCandidate], dict],
     ) -> dict:
         station_id = station if station in {item.id for item in self.stations} else "default"
-        candidates = self._collect_candidates()
+        candidates = self.collect_candidates()
         excluded = set(exclude or set())
         available = [item for item in candidates if item.name not in excluded]
         if not available and candidates:
@@ -187,12 +190,15 @@ class RadioService:
             "available": len(available),
         }
 
-    def _collect_candidates(self) -> list[RadioCandidate]:
+    def collect_candidates(self) -> list[RadioCandidate]:
         favs = self.favorites.load()
         candidates: list[RadioCandidate] = []
-        for path in self.library.scan_audios():
+        for record in self.media_index.records(media_type='audio'):
             try:
-                name = self.library.get_relative_path(path)
+                name = record['name']
+                path = self.library.resolve_path(name)
+                if path is None or not path.is_file():
+                    continue
                 parent = self.library.relative_path_for_uri(name).rsplit("/", 1)[0]
                 candidates.append(
                     RadioCandidate(
@@ -204,10 +210,10 @@ class RadioService:
                         duration=None,
                         parent_key=parent,
                         is_favorite=self.library.is_uri_in_set(name, favs),
-                        mtime=path.stat().st_mtime,
+                        mtime=record['mtime_ts'],
                     )
                 )
-            except Exception:
+            except OSError:
                 continue
         return candidates
 

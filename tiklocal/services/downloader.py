@@ -1,11 +1,13 @@
 import datetime
 import json
 import os
-import queue
+from collections import deque
 import re
 import shutil
+import signal
 import subprocess as sp
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable
@@ -443,18 +445,52 @@ class DownloadManager:
         self.on_outputs = on_outputs
 
         self._lock = threading.Lock()
-        self._shutdown = threading.Event()
-        self._queue: queue.Queue[str | None] = queue.Queue()
+        self._started = False
+        self._closed = False
+        self._pending: deque[str] = deque()
 
         self._jobs: dict[str, dict[str, Any]] = {}
         self._job_order: list[str] = []
         self._cancel_events: dict[str, threading.Event] = {}
         self._processes: dict[str, sp.Popen[str]] = {}
-        self._workers: list[threading.Thread] = []
+        self._workers: dict[str, threading.Thread] = {}
 
         self._config = self.config_store.get()
         self._load_history()
-        self._ensure_workers()
+
+    def start(self) -> None:
+        with self._lock:
+            if self._closed:
+                raise RuntimeError('下载管理器已关闭。')
+            self._started = True
+
+    def close(self, timeout: float = 5.0) -> None:
+        with self._lock:
+            self._closed = True
+            changed = False
+            for job_id, job in self._jobs.items():
+                if job['status'] not in TERMINAL_JOB_STATUS:
+                    changed = True
+                    self._cancel_events[job_id].set()
+                    job['cancel_requested'] = True
+                    if job['status'] == 'queued':
+                        job.update(status='canceled', finished_at=_utc_now_iso(),
+                                   error_message='已取消。', eta_sec=None)
+            self._pending.clear()
+            processes = list(self._processes.values())
+            workers = list(self._workers.values())
+        try:
+            if changed:
+                with self._lock:
+                    self._persist_locked()
+        finally:
+            for process in processes:
+                self._terminate_process(process)
+            deadline = time.monotonic() + timeout
+            for worker in workers:
+                worker.join(max(0, deadline - time.monotonic()))
+            if any(worker.is_alive() for worker in workers):
+                raise RuntimeError('下载任务未能及时停止；仍有工作线程等待收尾。')
 
     def probe_dependencies(self) -> dict[str, Any]:
         yt_dlp_path, yt_dlp_version = self._probe_binary("yt-dlp")
@@ -487,7 +523,7 @@ class DownloadManager:
         with self._lock:
             self._config = _merge_download_config(DEFAULT_DOWNLOAD_CONFIG, saved)
             self._config["updated_at"] = saved.get("updated_at")
-            self._ensure_workers_locked()
+            self._dispatch_locked()
             return dict(self._config)
 
     def list_cookie_files(self) -> dict[str, Any]:
@@ -535,6 +571,8 @@ class DownloadManager:
             raise RuntimeError(cookie_error)
 
         with self._lock:
+            if not self._started or self._closed:
+                raise RuntimeError('下载管理器尚未启动或已关闭。')
             if not self._config.get("enabled", True):
                 raise RuntimeError("下载功能已禁用。")
 
@@ -556,6 +594,7 @@ class DownloadManager:
                 "output_files_rel": [],
                 "file_count": 0,
                 "error_message": "",
+                "failure_stage": "",
                 "requested_format": "mp4_preferred",
                 "cancel_requested": False,
                 "cookie_file": chosen_file,
@@ -567,14 +606,8 @@ class DownloadManager:
             self._job_order.insert(0, job_id)
             self._cancel_events[job_id] = threading.Event()
             self._persist_locked()
-            max_concurrent = int(self._config.get("max_concurrent", 2))
-
-        if max_concurrent == 0:
-            threading.Thread(target=self._run_job, args=(job_id,), daemon=True).start()
-        else:
-            self._ensure_workers()
-            self._queue.put(job_id)
-
+            self._pending.append(job_id)
+            self._dispatch_locked()
         return self.get_job(job_id) or job
 
     def upload_cookie_file(self, filename: str, content: bytes, *, replace: bool = False) -> dict[str, Any]:
@@ -649,17 +682,33 @@ class DownloadManager:
 
     def retry_job(self, job_id: str) -> tuple[dict[str, Any] | None, str | None]:
         with self._lock:
+            if not self._started or self._closed:
+                return None, '下载管理器尚未启动或已关闭。'
             job = self._jobs.get(job_id)
             if not job:
                 return None, "Job not found"
             if job.get("status") not in {"failed", "canceled"}:
                 return None, "仅失败或已取消任务支持重试"
+            index_only = job.get('failure_stage') == 'index'
+            if index_only:
+                for uri in job['output_files_rel']:
+                    path = self._resolve_media_file_path(uri)
+                    if path is None or not path.is_file():
+                        return None, '已下载文件不存在，无法重新登记；请重新创建下载任务。'
+                job.update(status='queued', error_message='', finished_at=None, cancel_requested=False)
+                self._cancel_events[job_id] = threading.Event()
+                self._persist_locked()
+                self._pending.append(job_id)
+                self._dispatch_locked()
             url = str(job.get("url") or "")
             save_mode = str(job.get("save_mode") or "root")
             engine = str(job.get("engine") or DEFAULT_DOWNLOAD_ENGINE)
             cookie_file = str(job.get("cookie_file") or "")
             cookie_match_mode = str(job.get("cookie_match_mode") or "none")
             output_token = str(job.get("output_token") or "")
+
+        if index_only:
+            return self.get_job(job_id), None
 
         cookie_mode = "none"
         if cookie_match_mode in {"auto", "manual"}:
@@ -778,6 +827,7 @@ class DownloadManager:
                     "output_files_rel": [str(v) for v in output_files_rel if str(v).strip()],
                     "file_count": _to_int(item.get("file_count")) or 0,
                     "error_message": str(item.get("error_message") or ""),
+                    "failure_stage": str(item.get("failure_stage") or ""),
                     "requested_format": str(item.get("requested_format") or "mp4_preferred"),
                     "cancel_requested": False,
                     "cookie_file": str(item.get("cookie_file") or ""),
@@ -797,58 +847,50 @@ class DownloadManager:
                 self._job_order.append(job_id)
                 self._cancel_events[job_id] = threading.Event()
 
-    def _ensure_workers(self) -> None:
-        with self._lock:
-            self._ensure_workers_locked()
-
-    def _ensure_workers_locked(self) -> None:
-        max_concurrent = int(self._config.get("max_concurrent", DEFAULT_DOWNLOAD_CONFIG["max_concurrent"]))
-        if max_concurrent <= 0:
+    def _dispatch_locked(self) -> None:
+        if not self._started or self._closed:
             return
-
-        self._workers = [worker for worker in self._workers if worker.is_alive()]
-        missing = max_concurrent - len(self._workers)
-        for _ in range(max(0, missing)):
-            worker = threading.Thread(target=self._worker_loop, daemon=True)
-            worker.start()
-            self._workers.append(worker)
-
-    def _worker_loop(self) -> None:
-        while not self._shutdown.is_set():
-            try:
-                job_id = self._queue.get(timeout=0.5)
-            except queue.Empty:
+        limit = int(self._config['max_concurrent'])
+        while self._pending and (limit == 0 or len(self._workers) < limit):
+            job_id = self._pending[0]
+            if job_id in self._workers:
+                break  # An immediate retry must wait for the previous execution to finish.
+            self._pending.popleft()
+            job = self._jobs.get(job_id)
+            if not job or job['status'] != 'queued':
                 continue
-
-            if job_id is None:
-                self._queue.task_done()
-                break
-
-            self._run_job(job_id)
-            self._queue.task_done()
+            worker = threading.Thread(target=self._run_job, args=(job_id,),
+                                      name=f'tiklocal-download-{job_id}', daemon=True)
+            self._workers[job_id] = worker
+            worker.start()
 
     def _run_job(self, job_id: str) -> None:
-        with self._lock:
-            job = self._jobs.get(job_id)
-            if not job:
-                return
-
-            if job["status"] != "queued":
-                return
-
-            cancel_event = self._cancel_events.get(job_id)
-            if cancel_event and cancel_event.is_set():
-                self._mark_canceled_locked(job)
-                return
-
-            job["status"] = "running"
-            job["started_at"] = _utc_now_iso()
-            job["progress_percent"] = 0.0
-            self._persist_locked()
-
         try:
-            result = self._execute_download(job_id)
-            return_code, error_message, output_rel_list = self._normalize_execute_result(result)
+            with self._lock:
+                job = self._jobs.get(job_id)
+                if not job:
+                    return
+
+                if job["status"] != "queued":
+                    return
+
+                cancel_event = self._cancel_events.get(job_id)
+                if cancel_event and cancel_event.is_set():
+                    self._mark_canceled_locked(job)
+                    return
+
+                job["status"] = "running"
+                job["started_at"] = _utc_now_iso()
+                job["progress_percent"] = 0.0
+                index_only = job.get('failure_stage') == 'index'
+                existing_outputs = list(job['output_files_rel'])
+                self._persist_locked()
+
+            if index_only:
+                return_code, error_message, output_rel_list = 0, '', existing_outputs
+            else:
+                result = self._execute_download(job_id)
+                return_code, error_message, output_rel_list = self._normalize_execute_result(result)
             source_context: dict[str, Any] | None = None
 
             with self._lock:
@@ -868,6 +910,7 @@ class DownloadManager:
                     job["file_count"] = len(output_rel_list)
                     job["output_path_rel"] = output_rel_list[0] if output_rel_list else ""
                     job["error_message"] = ""
+                    job['failure_stage'] = 'index'
                     source_context = {
                         "url": str(job.get("url") or ""),
                         "engine": str(job.get("engine") or ""),
@@ -875,6 +918,7 @@ class DownloadManager:
                         "created_at": str(job.get("created_at") or _utc_now_iso()),
                         "files": list(output_rel_list),
                     }
+                    self._persist_locked()
                 else:
                     job["status"] = "failed"
                     job["error_message"] = error_message or "下载失败，请检查 URL 与网络环境。"
@@ -884,10 +928,7 @@ class DownloadManager:
             if source_context:
                 self._record_job_sources_on_success(source_context)
             if return_code == 0 and output_rel_list and self.on_outputs:
-                try:
-                    self.on_outputs(output_rel_list)
-                except Exception:
-                    pass
+                self.on_outputs(output_rel_list)
             if return_code == 0:
                 # Do not expose a successful job until its outputs are visible in
                 # the media index. Otherwise clients can observe success and then
@@ -896,35 +937,43 @@ class DownloadManager:
                     job = self._jobs.get(job_id)
                     if not job:
                         return
+                    if self._cancel_events[job_id].is_set():
+                        self._mark_canceled_locked(job)
+                        return
                     job["status"] = "success"
+                    job['failure_stage'] = ''
                     job["finished_at"] = _utc_now_iso()
                     self._persist_locked()
-        except FileNotFoundError as exc:
+        except Exception as exc:
             with self._lock:
                 job = self._jobs.get(job_id)
                 if not job:
                     return
-                engine = str(job.get("engine") or DEFAULT_DOWNLOAD_ENGINE)
+                if self._cancel_events[job_id].is_set():
+                    self._mark_canceled_locked(job)
+                    return
                 job["status"] = "failed"
                 job["finished_at"] = _utc_now_iso()
-                missing_text = str(exc or "").lower()
-                if "gallery-dl" in missing_text or engine == "gallery-dl":
-                    job["error_message"] = "未检测到 gallery-dl，请先安装后再使用该引擎。"
+                if job.get('failure_stage') == 'index':
+                    job['error_message'] = f'文件已下载，媒体登记失败：{exc}'
+                elif isinstance(exc, FileNotFoundError):
+                    engine = job.get('engine') or DEFAULT_DOWNLOAD_ENGINE
+                    job['error_message'] = f'未检测到 {engine}，请先安装后再使用该引擎。'
                 else:
-                    job["error_message"] = "未检测到 yt-dlp，请先安装后再使用下载功能。"
-                self._persist_locked()
-        except Exception as exc:  # pragma: no cover - defensive branch
-            with self._lock:
-                job = self._jobs.get(job_id)
-                if not job:
-                    return
-                job["status"] = "failed"
-                job["finished_at"] = _utc_now_iso()
-                job["error_message"] = str(exc)
+                    job['error_message'] = str(exc)
                 self._persist_locked()
         finally:
             with self._lock:
-                self._processes.pop(job_id, None)
+                process = self._processes.pop(job_id, None)
+            try:
+                if process:
+                    self._terminate_process(process)
+                    if process.stdout:
+                        process.stdout.close()
+            finally:
+                with self._lock:
+                    self._workers.pop(job_id, None)
+                    self._dispatch_locked()
 
     def _execute_download(self, job_id: str) -> tuple[int, str, list[str]] | tuple[int, str, str]:
         with self._lock:
@@ -986,16 +1035,7 @@ class DownloadManager:
 
         cmd.append(url)
 
-        process = sp.Popen(
-            cmd,
-            stdout=sp.PIPE,
-            stderr=sp.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-
-        with self._lock:
-            self._processes[job_id] = process
+        process = self._start_process(job_id, cmd)
 
         cancel_event = self._cancel_events.get(job_id)
         output_path_abs = ""
@@ -1076,16 +1116,7 @@ class DownloadManager:
 
         cmd.extend(["--write-log", str(log_file), url])
 
-        process = sp.Popen(
-            cmd,
-            stdout=sp.PIPE,
-            stderr=sp.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-
-        with self._lock:
-            self._processes[job_id] = process
+        process = self._start_process(job_id, cmd)
 
         cancel_event = self._cancel_events.get(job_id)
         error_message = ""
@@ -1145,17 +1176,35 @@ class DownloadManager:
         job["eta_sec"] = None
         self._persist_locked()
 
+    def _start_process(self, job_id: str, cmd: list[str]) -> sp.Popen[str]:
+        # Cancellation and process registration share the lock: no late child can
+        # escape close() while it is taking its process snapshot.
+        with self._lock:
+            if self._closed or self._cancel_events[job_id].is_set():
+                raise RuntimeError('下载已取消。')
+            process = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT, text=True,
+                               bufsize=1, start_new_session=os.name == 'posix')
+            self._processes[job_id] = process
+            return process
+
     def _terminate_process(self, process: sp.Popen[str]) -> None:
-        if process.poll() is not None:
-            return
         try:
-            process.terminate()
-            process.wait(timeout=2)
-        except Exception:
+            if os.name == 'posix':
+                os.killpg(process.pid, signal.SIGTERM)
+            else:
+                process.terminate()
             try:
-                process.kill()
-            except Exception:
+                process.wait(timeout=2)
+            except sp.TimeoutExpired:
                 pass
+            # A downloader may leave a child (such as ffmpeg) holding stdout open.
+            if os.name == 'posix':
+                os.killpg(process.pid, signal.SIGKILL)
+            elif process.poll() is None:
+                process.kill()
+        except ProcessLookupError:
+            pass
+        process.wait()
 
     def _parse_progress(self, line: str) -> dict[str, Any] | None:
         percent = None

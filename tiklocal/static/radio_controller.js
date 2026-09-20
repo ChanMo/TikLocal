@@ -324,16 +324,26 @@
   }
 
   function toggleFavorite() {
-    if (!currentTrack) return;
-    fetch('/api/favorite/' + encodeURIComponent(currentTrack.name), { method: 'POST' })
-      .then(function (response) { return response.json(); })
-      .then(function (data) {
-        currentTrack.is_favorite = Boolean(data.favorite);
-        updateFavorite();
-        if (currentTrack.is_favorite) reportFeedback('favorite', currentTrack, playbackRatio());
+    if (!currentTrack || els.btnFav.disabled) return;
+    var track = currentTrack;
+    var ratio = playbackRatio();
+    els.btnFav.disabled = true;
+    fetch('/api/favorite/' + encodeURIComponent(track.name), { method: 'POST' })
+      .then(async function (response) {
+        var data = await response.json();
+        if (!response.ok || typeof data.favorite !== 'boolean') throw new Error('收藏操作失败');
+        track.is_favorite = data.favorite;
+        if (currentTrack === track) updateFavorite();
+        if (track.is_favorite) reportFeedback('favorite', track, ratio);
         settleControl(els.btnFav);
       })
-      .catch(function () {});
+      .catch(function () {
+        if (currentTrack === track) {
+          els.btnFav.title = '收藏未保存，请重试';
+          els.btnFav.setAttribute('aria-label', els.btnFav.title);
+        }
+      })
+      .finally(function () { els.btnFav.disabled = false; });
   }
 
   function cycleEncore() {

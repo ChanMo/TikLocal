@@ -1,7 +1,7 @@
 # Flow 交互统一架构（Flow / Library / Favorites）
 
 - 状态: 已落地
-- 更新时间: 2026-02-25
+- 更新时间: 2026-09-19
 
 ## 背景/目标
 
@@ -47,14 +47,29 @@
 
 ## 影响范围
 
+### 正式标题能力与异步规则
+
+- `services/captions.py` 管理 Prompt、模型配置、图片编码、远程调用及结果解析；`web/captions.py` 保持原有配置/元数据 API；`services/metadata.py` 是标题与尺寸的统一存储入口。
+- `CaptionSettings.resolve()` 同时服务生成与 `/api/ai/vision-config` 的有效配置。存在有效文件 vision 字段时，Prompt 使用文件配置和默认值，不启用旧自定义 Prompt；否则使用已启用的旧 Prompt。单次覆盖始终最后应用，不写回配置。
+- vision 模型或地址非空时优先使用该组，缺少的字段沿用旧 LLM 环境变量；vision 两者皆空时使用旧 LLM 环境配置与已存自定义配置。这里保留原优先级，未改为逐字段合并所有来源。
+- Key 顺序统一为 `TIKLOCAL_VISION_API_KEY` → `TIKLOCAL_AI_API_KEY` → `OPENAI_API_KEY` → `OPENROUTER_API_KEY`；忽略空白值，API 仅返回是否存在，不返回密钥。
+- `flow_actions_shared.js` 统一标题 HTTP 成败与覆盖参数；`flow_media_actions_controller.js` 统一标题缓存、当前资源和在途生成。Flow、Quick Viewer 和图片详情页各自保留渲染，不引入通用面板组件。
+- 切图不等待标题读取。切换资源、返回缓存、切到非图片或关闭预览都会更新当前请求状态；旧响应不得覆盖新面板。生成完成仍缓存到对应 URI，用户返回时可看到结果；只有当前资源能更新按钮 loading 和错误状态。
+- 同一 URI 的重复生成合并为一个在途请求。失败保留已有标题；仅有尺寸缓存不算已有标题。Flow 和详情页继续确认覆盖，Quick Viewer 保留直接刷新规则。
+- 只保护同一页面内的生成并发，不提供跨浏览器/多客户端的全局模型请求去重。真实模型输出质量需单独验收。
+
 - 模板：
 1. `tiklocal/templates/tiktok.html`
 2. `tiklocal/templates/library.html`
+3. `tiklocal/templates/image_detail.html`
 - 静态资源：
 1. `tiklocal/static/flow_state_controller.js`
 2. `tiklocal/static/flow_ui_shared.js`
+3. `tiklocal/static/flow_actions_shared.js`
+4. `tiklocal/static/flow_media_actions_controller.js`
 - 测试：
 1. `tests/test_library_upgrade.py`
+2. `tests/test_captions.py`
 
 ## 风险与权衡
 
@@ -70,9 +85,10 @@
 3. 视频放大镜在播放中可持续刷新，暂停后仍可在当前帧拖拽观察。
 4. Library 与 Favorites 的手势行为一致（上下滑切换、按钮可用）。
 5. Flow 与 Library 的放大镜取样均无横向压扁。
+6. 延迟标题读取时切图、返回缓存、切到视频或关闭；旧结果不覆盖当前面板。生成失败保留已有标题，旧生成完成不解除新媒体的 loading。
 
 ## 后续事项
 
 - [ ] 抽取第三层共享（视频进度条与 AI 标题面板渲染助手），进一步减少模板内脚本体积。
-- [ ] 增加端到端交互测试，覆盖“沉浸 ↔ 放大镜 ↔ 媒体切换”链路。
+- [ ] 保留“沉浸 ↔ 放大镜 ↔ 媒体切换”人工验收；出现重复回归时再补小规模浏览器测试，不预建完整端到端套件。
 - [ ] 评估将共享脚本迁移到打包流程，减少模板内内联逻辑规模。

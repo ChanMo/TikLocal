@@ -124,7 +124,7 @@
         ${sourceAction}${menu}`;
     } else {
       actions = `
-        ${(job.status === 'failed' || job.status === 'canceled') ? `<button class="download-action is-retry" type="button" data-action="retry" data-job-id="${escapeHtml(job.id)}"><i data-feather="rotate-ccw"></i><span>重新下载</span></button>` : ''}
+        ${(job.status === 'failed' || job.status === 'canceled') ? `<button class="download-action is-retry" type="button" data-action="retry" data-job-id="${escapeHtml(job.id)}"><i data-feather="rotate-ccw"></i><span>${job.failure_stage === 'index' ? '重新登记' : '重新下载'}</span></button>` : ''}
         ${sourceAction}${menu}`;
     }
 
@@ -297,7 +297,7 @@
       if (action === 'cancel') await api(`/api/download/jobs/${jobId}/cancel`, { method: 'POST' });
       if (action === 'retry') {
         await api(`/api/download/jobs/${jobId}/retry`, { method: 'POST' });
-        notify('已重新加入下载队列');
+        notify('已提交重试');
       }
       if (action === 'delete') await api(`/api/download/jobs/${jobId}`, { method: 'DELETE' });
       lastJobsSignature = '';

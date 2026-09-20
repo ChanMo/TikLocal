@@ -19,9 +19,9 @@
 - For templates, stick to descriptive block names (`content`, `sidebar`) and keep inline scripts minimal.
 
 ## Testing Guidelines
-- No automated suite ships today; add `tests/` with `pytest` fixtures that exercise key routes via Flask’s test client.
-- Run prospective suites with `poetry run pytest`; prefer temporary media directories created under `tmp_path`.
-- Perform manual smoke tests by running `poetry run tiklocal <media_path>` and browsing `/`, `/gallery`, and `/browse`.
+- Run the existing suite with `poetry run pytest`; use temporary media and data directories under `tmp_path`.
+- Keep tests focused on public behavior, data integrity, security boundaries, and meaningful failure paths. Remove duplicate tests and HTML/CSS/JavaScript source-text assertions instead of preserving implementation details.
+- Perform manual smoke tests with a temporary media library, browsing `/`, `/flow`, `/library`, `/radio`, and `/download`.
 
 ## Commit & Pull Request Guidelines
 - Match the existing history: short, imperative messages (`fix: 调整视频播放布局`, `Release v0.4.0 …`); include scope prefixes when they clarify intent.

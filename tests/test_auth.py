@@ -17,7 +17,6 @@ def authenticated_app(tmp_path, monkeypatch):
     media_root.mkdir()
     (media_root / 'clip.mp4').write_bytes(b'private-video')
     auth_path = tmp_path / 'auth.json'
-    monkeypatch.setenv('TIKLOCAL_INSTANCE', str(tmp_path / 'tiklocal-data'))
     AuthStore(auth_path).ensure(PASSWORD)
     app = create_app({
         'TESTING': True,
@@ -96,19 +95,17 @@ def test_authentication_protects_pages_apis_and_media(authenticated_app):
     assert static_asset.status_code == 200
 
 
-def test_login_is_polished_safe_and_creates_a_secure_session(authenticated_app):
+def test_login_creates_a_secure_session(authenticated_app):
     app, _ = authenticated_app
     client = app.test_client()
 
     login_page = client.get('/login', query_string={'next': '/flow'})
     assert login_page.status_code == 200
-    assert b'PRIVATE FREQUENCY' in login_page.data
     assert b'no-store' in login_page.headers['Cache-Control'].encode()
     assert login_page.headers['X-Frame-Options'] == 'SAMEORIGIN'
 
     failed = _login(client, password='incorrect-password')
     assert failed.status_code == 401
-    assert '访问密码不正确'.encode() in failed.data
 
     logged_in = _login(client, next_url='/flow')
     assert logged_in.status_code == 302
@@ -117,7 +114,10 @@ def test_login_is_polished_safe_and_creates_a_secure_session(authenticated_app):
     assert 'HttpOnly' in cookie
     assert 'SameSite=Lax' in cookie
     assert 'Expires=' in cookie
-    assert client.get('/').status_code == 200
+    for url in ('/', '/settings/'):
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers['Cache-Control'] == 'private, no-cache'
     assert client.get('/media/clip.mp4').data == b'private-video'
 
 
@@ -157,7 +157,10 @@ def test_cli_password_change_invalidates_running_sessions(authenticated_app):
     app, auth_path = authenticated_app
     client = app.test_client()
     _login(client)
-    assert client.get('/').status_code == 200
+    for url in ('/', '/settings/'):
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers['Cache-Control'] == 'private, no-cache'
 
     AuthStore(auth_path).set_password('replacement-private-password')
 

@@ -30,6 +30,22 @@ def _normalize_text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def normalize_collection_mutation_uris(uris: Any) -> list[str]:
+    if not isinstance(uris, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in uris:
+        uri = _normalize_uri(item)
+        if not uri or uri in seen:
+            continue
+        seen.add(uri)
+        normalized.append(uri)
+        if len(normalized) >= MAX_COLLECTION_ITEMS_MUTATION:
+            break
+    return normalized
+
+
 class CollectionStore:
     def __init__(self, store_path: Path):
         self.store_path = store_path
@@ -225,7 +241,7 @@ class CollectionStore:
         key = _normalize_text(collection_id)
         if not key:
             return None
-        normalized = self._normalize_mutation_uris(uris)
+        normalized = normalize_collection_mutation_uris(uris)
         if not normalized:
             return self.get(collection_id)
 
@@ -258,7 +274,7 @@ class CollectionStore:
         key = _normalize_text(collection_id)
         if not key:
             return None
-        normalized = set(self._normalize_mutation_uris(uris))
+        normalized = set(normalize_collection_mutation_uris(uris))
         if not normalized:
             return self.get(collection_id)
 
@@ -310,21 +326,6 @@ class CollectionStore:
         if newest_first:
             uris.reverse()
         return uris
-
-    def _normalize_mutation_uris(self, uris: Any) -> list[str]:
-        if not isinstance(uris, list):
-            return []
-        normalized: list[str] = []
-        seen: set[str] = set()
-        for item in uris:
-            uri = _normalize_uri(item)
-            if not uri or uri in seen:
-                continue
-            seen.add(uri)
-            normalized.append(uri)
-            if len(normalized) >= MAX_COLLECTION_ITEMS_MUTATION:
-                break
-        return normalized
 
     def _find_collection(self, collections: list[dict[str, Any]], collection_id: str) -> dict[str, Any] | None:
         for item in collections:

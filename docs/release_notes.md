@@ -1,6 +1,21 @@
 # Release Notes
 
 ## Unreleased
+- Web Radio、媒体详情/传输与设置入口收拢到对应路由模块；Radio 封面由缩略图服务统一生成，设置页与库统计 API 共用统计逻辑，合并重复 Radio 测试。
+- 移除 PWA 安装与内置本地 HTTPS：删除安装界面、证书管理、专属依赖和测试；HTTPS 交给外部反向代理，保留 Cookie、认证与媒体 Range。旧 TLS 配置显式报错，已有证书文件不删除；旧 Service Worker 只负责注销及清理 TikLocal 公共缓存。
+- Flow 页面/API、主题与图集组装集中到 `web/flow.py`，公共媒体字段归入 `web/media_payloads.py`，删除 `view_builders.py` 与多层回调转发；媒体库、收藏和集合共用 `web/library.py`。
+- 下载管理器采用显式启动/关闭与单一并发队列，空闲不保留线程；服务退出取消未完成任务并停止子进程，开发重载父进程不启动下载器。下载与来源 API 集中到独立路由模块，测试保留真实进程关闭边界并合并重复用例。
+- 隔离向量与相似图片实验，新增启动总开关和独立结果页面，保留旧向量数据；普通 Library 移除实验分支，同步 Web 构建下线并沿用 CLI，相关测试改用真实 SQLite。
+- Web 公共媒体能力收敛：CLI/Web 共用缩略图生成、缓存有效性和删除规则，按规范 URI 隔离不同来源；默认来源仍可复用有效旧缓存，生成失败保留已有缓存。Radio 候选与列表改读音频索引，外部新增资源在同步后可见。
+- 将来源、收藏和推荐迁入对应服务模块，更新实际调用方；统一媒体链接生成，修复相似预览使用原图和主题预览未展开所选图片的问题。
+- Web 首批代码收敛：删除未使用的扫描辅助函数和页面源码/样式断言，保留行为、安全及协议测试；测试默认使用隔离数据目录。
+- 修复 Flow 主题卡片与来源图集造成的分页漏项，以及纯图片库提前结束；页大小按基础媒体数量计算，主题能力继续保留。
+- 下载登记失败不再被吞掉：保留文件和输出记录，原重试入口只重新登记；来源扫描不完整时保留该来源的旧索引，避免误清理。
+- 原生 App 以 `Flow / Library / Music / Settings` 取代模式选择 Home：Flow 成为默认入口并独立读取本地资料库，空状态可直接导入，Library 指定媒体可返回 Flow，TikLocal 在 Settings 中降为可选 Folder Source；既有 Radio 位于次级 Music 空间。
+- 原生 App 采用可回退的 `LumaFold` 工作品牌与 The Fold 候选标志，统一显示名称、启动页、Flow、权限说明和本地资料库文案；旧图标继续保留，bundle ID、Expo slug、`tiklocal-radio://` Scheme、SQLite、SecureStore 与 TikLocal Server 协议不变。
+- 原生客户端扩展为本地优先 App：新增无需账号或 Server 的 Photos / Files 媒体导入、App 沙盒副本、SQLite 本地索引和图片 / 视频纵向离线 Flow；既有 TikLocal Radio 作为可选入口完整保留。
+- 本地资料库补齐 SQLite v1 事务迁移、图片 / 视频数量与空间统计、长按多选删除和一键清空；删除仅影响 App 管理的离线副本，iOS 媒体目录与新导入文件标记为不进入 iCloud 设备备份。
+- 本地资料库升级到 SQLite v2：新增跨 iOS / Android 的持久化视频缩略图、旧视频渐进回填、确定导入进度、设备剩余空间展示和带 128 MB 安全余量的复制前空间阻断；缩略图失败不影响原视频播放。
 - 新增独立的 React Native / Expo 客户端 TikLocal Radio：包含编辑式原生播放界面、Demo Signal、后台音频配置、锁屏媒体信息、收藏、有限再听与睡眠定时。
 - TikLocal Radio 新增 iOS 优先的原生页面栈：Connection 使用 Form Sheet，配对改为扫码 / 手动 / 粘贴链接逐步展开并保留系统返回手势；根 Radio 使用独立 Safe Area 顶部，不再受标准导航栏标题与 Server 按钮限制。
 - Radio 首页重构为开放式 Signal Dial：当前 Station 位于左上角并用系统 Action Sheet 切换，SF Symbols 提供 Favorite / Play / Next 与状态图标，Encore、Sleep、Connection 收进右上角菜单；删除巨大方形 Card、Server 重复信息、频道编号、横向 Chip、文字模拟图标和技术页脚。

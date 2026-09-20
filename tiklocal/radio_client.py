@@ -3,10 +3,9 @@ from urllib.parse import quote, unquote, urlencode, urlsplit, urlunsplit
 
 import segno
 from flask import request, send_file
-from PIL import Image, ImageDraw
 
 from tiklocal.auth import LoginAttemptLimiter
-from tiklocal.services import AUDIO_EXTENSIONS
+from tiklocal.services.library import AUDIO_EXTENSIONS
 from tiklocal.services.radio import RadioCandidate
 
 
@@ -253,13 +252,8 @@ def register_radio_client_routes(
         uri = existing_audio_uri(request.args.get("uri") or "")
         if not uri:
             return error("audio_not_found", "Audio not found", 404)
-        path, mimetype = thumbnail_service.get_thumbnail(uri)
-        if not isinstance(path, bytes):
-            return send_file(path, mimetype=mimetype)
-        return send_file(
-            io.BytesIO(radio_artwork_bytes(uri)),
-            mimetype="image/png",
-        )
+        path, mimetype = thumbnail_service.get_radio_artwork(uri)
+        return send_file(io.BytesIO(path) if isinstance(path, bytes) else path, mimetype=mimetype)
 
     @app.put("/api/v1/radio/favorite")
     def api_v1_radio_favorite():
@@ -269,7 +263,10 @@ def register_radio_client_routes(
             return error("audio_not_found", "Audio not found", 404)
         if not isinstance(payload.get("favorite"), bool):
             return error("invalid_favorite", "favorite must be a boolean", 400)
-        favorite = favorite_service.set_favorite(uri, payload["favorite"])
+        try:
+            favorite = favorite_service.set_favorite(uri, payload["favorite"])
+        except (OSError, ValueError):
+            return error("favorite_unavailable", "Favorite storage is unavailable", 503)
         return ok({"uri": uri, "is_favorite": favorite})
 
     @app.post("/api/v1/radio/feedback")
@@ -336,47 +333,3 @@ def _ratio(value) -> float | None:
         return max(0.0, min(float(value), 1.0))
     except (TypeError, ValueError):
         return None
-
-
-def radio_artwork_bytes(uri: str) -> bytes:
-    palettes = [
-        ("#466b61", "#a88756", "#d7d2c4"),
-        ("#5c6750", "#b18462", "#d8d3c8"),
-        ("#57707a", "#9b8257", "#d2d5ce"),
-        ("#675f82", "#9b8b5b", "#d7d1c0"),
-        ("#72634e", "#5f8174", "#d8d4c7"),
-        ("#4f6f7e", "#a36f5d", "#d5d0c4"),
-    ]
-    palette = palettes[sum(uri.encode("utf-8", errors="ignore")) % len(palettes)]
-    size = 512
-    image = Image.new("RGB", (size, size), palette[2])
-    draw = ImageDraw.Draw(image, "RGBA")
-
-    for radius in range(size // 2, 24, -8):
-        index = (radius // 8) % 2
-        color = palette[index]
-        alpha = 18 if index else 26
-        inset = size // 2 - radius
-        draw.ellipse(
-            (inset, inset, size - inset, size - inset),
-            fill=color + f"{alpha:02x}",
-        )
-
-    draw.ellipse((42, 42, size - 42, size - 42), outline=(36, 36, 31, 38), width=2)
-    draw.ellipse((112, 112, size - 112, size - 112), outline=(70, 107, 97, 34), width=2)
-    draw.ellipse(
-        (182, 182, size - 182, size - 182),
-        fill=palette[0],
-        outline=(255, 255, 255, 56),
-        width=2,
-    )
-    draw.ellipse(
-        (220, 220, size - 220, size - 220),
-        fill=palette[2],
-        outline=(36, 36, 31, 30),
-        width=1,
-    )
-
-    output = io.BytesIO()
-    image.save(output, format="PNG", optimize=True)
-    return output.getvalue()

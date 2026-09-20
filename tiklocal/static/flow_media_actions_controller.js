@@ -27,8 +27,10 @@
     var confirmCaptionReplace = typeof opts.confirmCaptionReplace === 'function' ? opts.confirmCaptionReplace : null;
 
     var favoriteState = new Map();
+    var favoriteRequests = new Map();
     var sourceState = new Map();
     var captionCache = new Map();
+    var captionRequests = new Map();
     var currentCaptionUri = '';
     var captionRequestId = 0;
 
@@ -44,31 +46,33 @@
       if (typeof actions.getFavoriteState === 'function') {
         value = !!(await actions.getFavoriteState(key));
       }
+      if (favoriteState.has(key)) value = favoriteState.get(key);
       favoriteState.set(key, value);
       onFavoriteChange(value, key);
       return value;
     }
 
-    async function toggleFavorite(name) {
+    function toggleFavorite(name) {
       var key = String(name || '');
-      if (!key) return false;
-      var before = favoriteState.has(key) ? !!favoriteState.get(key) : await syncFavorite(key);
-      var optimistic = !before;
-      favoriteState.set(key, optimistic);
-      onFavoriteChange(optimistic, key);
-      try {
-        var result = optimistic;
-        if (typeof actions.toggleFavorite === 'function') {
-          result = !!(await actions.toggleFavorite(key));
+      if (!key) return Promise.resolve(false);
+      if (favoriteRequests.has(key)) return favoriteRequests.get(key);
+      var request = (async function () {
+        var before = favoriteState.has(key) ? favoriteState.get(key) : await syncFavorite(key);
+        favoriteState.set(key, !before);
+        onFavoriteChange(!before, key);
+        try {
+          var result = await actions.toggleFavorite(key);
+          favoriteState.set(key, result);
+          onFavoriteChange(result, key);
+          return result;
+        } catch (error) {
+          favoriteState.set(key, before);
+          onFavoriteChange(before, key);
+          throw error;
         }
-        favoriteState.set(key, result);
-        onFavoriteChange(result, key);
-        return result;
-      } catch (error) {
-        favoriteState.set(key, before);
-        onFavoriteChange(before, key);
-        throw error;
-      }
+      })().finally(function () { favoriteRequests.delete(key); });
+      favoriteRequests.set(key, request);
+      return request;
     }
 
     async function syncSource(name) {
@@ -92,91 +96,74 @@
       return source || null;
     }
 
-    function clearCaption(resetUri) {
-      var shouldReset = resetUri !== false;
-      if (shouldReset) currentCaptionUri = '';
-      onCaptionClear(shouldReset);
+    function clearCaption() {
+      currentCaptionUri = '';
+      ++captionRequestId;
+      onCaptionLoading(false);
+      onCaptionClear();
     }
 
     async function loadCaption(uri) {
       var key = String(uri || '');
-      if (!key) {
-        clearCaption(true);
-        return null;
-      }
+      if (!key) { clearCaption(); return null; }
+      currentCaptionUri = key;
+      var reqId = ++captionRequestId;
+      onCaptionLoading(captionRequests.has(key));
       if (captionCache.has(key)) {
-        currentCaptionUri = key;
-        var cached = captionCache.get(key) || null;
+        var cached = captionCache.get(key);
         onCaptionRender(cached, key);
         return cached;
       }
-
-      clearCaption(true);
-      currentCaptionUri = key;
-      var reqId = ++captionRequestId;
+      onCaptionClear();
       try {
-        var data = null;
-        if (typeof actions.getImageMetadata === 'function') {
-          data = await actions.getImageMetadata(key);
-        }
-        if (reqId !== captionRequestId || currentCaptionUri !== key) return null;
-        if (!(data && data.success)) {
-          onError('caption_load', data);
-          return null;
-        }
+        var data = await actions.getImageMetadata(key);
+        if (reqId !== captionRequestId || currentCaptionUri !== key || captionRequests.has(key)) return null;
+        if (!(data && data.success)) throw new Error((data && data.error) || '读取标题失败');
         var payload = data.data || null;
         captionCache.set(key, payload);
         onCaptionRender(payload, key);
         return payload;
       } catch (error) {
-        if (reqId !== captionRequestId || currentCaptionUri !== key) return null;
-        onError('caption_load', error);
+        if (reqId === captionRequestId && currentCaptionUri === key && !captionRequests.has(key)) {
+          onError('caption_load', error);
+        }
         return null;
       }
     }
 
-    async function generateCaption(uri, options) {
+    function generateCaption(uri, options) {
       var key = String(uri || '');
-      if (!key) return null;
-
-      var conf = options || {};
-      var confirmExisting = !!conf.confirmExisting;
-      var existing = captionCache.get(key) || null;
-      if (confirmExisting && hasContentCaption(existing) && confirmCaptionReplace) {
-        var accepted = await confirmCaptionReplace(key, existing);
-        if (!accepted) return { skipped: true };
-      }
-
-      onCaptionLoading(true);
-      try {
-        var data = null;
-        if (typeof actions.generateImageMetadata === 'function') {
-          data = await actions.generateImageMetadata(key);
+      if (!key) return Promise.resolve(null);
+      if (captionRequests.has(key)) return captionRequests.get(key);
+      var request = (async function () {
+        var conf = options || {};
+        var existing = captionCache.get(key);
+        if (conf.confirmExisting && hasContentCaption(existing) && confirmCaptionReplace) {
+          if (!(await confirmCaptionReplace(key, existing))) return { skipped: true };
+          if (currentCaptionUri !== key) return { skipped: true };
+          conf.force = true;
         }
-        if (!(data && data.success)) {
-          onError('caption_generate', data);
+        if (currentCaptionUri === key) onCaptionLoading(true);
+        try {
+          var data = await actions.generateImageMetadata(key, conf);
+          if (!(data && data.success)) throw new Error((data && data.error) || '生成标题失败');
+          var payload = data.data || null;
+          captionCache.set(key, payload);
+          if (currentCaptionUri === key) {
+            ++captionRequestId;
+            onCaptionRender(payload, key);
+          }
+          return data;
+        } catch (error) {
+          if (currentCaptionUri === key) onError('caption_generate', error);
           return null;
         }
-        var payload = data.data || null;
-        captionCache.set(key, payload);
-        if (currentCaptionUri === key) {
-          onCaptionRender(payload, key);
-        }
-        return payload;
-      } catch (error) {
-        onError('caption_generate', error);
-        return null;
-      } finally {
-        onCaptionLoading(false);
-      }
-    }
-
-    function markCaptionCurrent(uri) {
-      currentCaptionUri = String(uri || '');
-    }
-
-    function getCaptionCurrentUri() {
-      return currentCaptionUri;
+      })().finally(function () {
+        captionRequests.delete(key);
+        if (currentCaptionUri === key) onCaptionLoading(false);
+      });
+      captionRequests.set(key, request);
+      return request;
     }
 
     return {
@@ -186,8 +173,6 @@
       clearCaption: clearCaption,
       loadCaption: loadCaption,
       generateCaption: generateCaption,
-      markCaptionCurrent: markCaptionCurrent,
-      getCaptionCurrentUri: getCaptionCurrentUri,
     };
   }
 

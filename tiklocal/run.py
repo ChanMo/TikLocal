@@ -1,33 +1,20 @@
 import os
 import sys
+import signal
 import argparse
 import getpass
-import datetime
-import importlib
 from pathlib import Path
 from waitress import serve
 from tiklocal.app import create_app
 from tiklocal.thumbs import generate_thumbnails
-from tiklocal.paths import get_data_dir, get_database_path
+from tiklocal.paths import get_data_dir
 from tiklocal.paths import get_auth_path
 from tiklocal.services.auth import AuthStore
-from tiklocal.services import LibraryService, build_media_sources, normalize_source_id
-from tiklocal.services.embedding import (
-    ImageVectorService,
-    OpenAICompatibleImageEmbeddingClient,
-    SQLiteImageVectorStore,
-    get_default_embedding_config,
-    merge_embedding_config,
-    validate_embedding_config,
-)
-from tiklocal.services.database import AppDatabase
-from tiklocal.services.similarity import (
-    DEFAULT_SIMILARITY_MAX_GROUP_SIZE,
-    DEFAULT_SIMILARITY_MIN_GROUP_SIZE,
-    DEFAULT_SIMILARITY_SCAN_LIMIT,
-    DEFAULT_SIMILARITY_THRESHOLD,
-    ImageSimilarityService,
-    SQLiteSimilarityGroupStore,
+from tiklocal.services.library import normalize_source_id
+from tiklocal.config import normalize_media_sources, similarity_enabled
+from tiklocal.experiments.similarity import (
+    DEFAULT_SIMILARITY_MAX_GROUP_SIZE, DEFAULT_SIMILARITY_MIN_GROUP_SIZE,
+    DEFAULT_SIMILARITY_SCAN_LIMIT, DEFAULT_SIMILARITY_THRESHOLD,
 )
 
 try:
@@ -61,29 +48,6 @@ def load_config():
     return config
 
 
-def normalize_media_sources(config, cli_sources=None, media_root=None):
-    raw_sources = cli_sources or config.get('media_sources') or []
-    sources = []
-    if isinstance(raw_sources, dict):
-        raw_sources = [{'id': key, 'path': value, 'name': key} for key, value in raw_sources.items()]
-    if isinstance(raw_sources, list):
-        for item in raw_sources:
-            if not isinstance(item, dict):
-                continue
-            source_id = normalize_source_id(item.get('id') or item.get('name'))
-            path = str(item.get('path') or '').strip()
-            if not path:
-                continue
-            sources.append({
-                'id': source_id,
-                'name': str(item.get('name') or source_id).strip() or source_id,
-                'path': path,
-            })
-    if media_root and all(item.get('id') != 'default' for item in sources):
-        sources.insert(0, {'id': 'default', 'name': 'Default', 'path': str(media_root)})
-    return sources
-
-
 def parse_cli_media_source(value):
     text = str(value or '').strip()
     if '=' not in text:
@@ -94,272 +58,6 @@ def parse_cli_media_source(value):
     if not path:
         raise argparse.ArgumentTypeError('媒体目录不能为空')
     return {'id': source_id, 'name': source_id, 'path': path}
-
-
-def resolve_embedding_config(config, args=None):
-    effective = get_default_embedding_config()
-    file_config, error = validate_embedding_config(config.get('embedding') or config.get('embedding_config') or {}, partial=True)
-    if error:
-        file_config = {}
-    effective = merge_embedding_config(effective, file_config)
-
-    if args is not None:
-        overrides = {}
-        if getattr(args, 'max_size', None):
-            overrides['image_max_size'] = args.max_size
-        if getattr(args, 'quality', None):
-            overrides['image_quality'] = args.quality
-        if getattr(args, 'dimensions', None):
-            overrides['dimensions'] = args.dimensions
-        if overrides:
-            validated, error = validate_embedding_config(overrides, partial=True)
-            if error:
-                raise ValueError(error)
-            effective = merge_embedding_config(effective, validated)
-    return effective
-
-
-def run_vectorize(config, args, parser):
-    media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
-    media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
-    if not media_root and not media_sources:
-        parser.error('必须指定媒体目录:\n  - tiklocal vectorize /path/to/media\n  - 或设置 media_root/media_sources')
-
-    media_path = Path(media_root).expanduser() if media_root else Path(media_sources[0]['path']).expanduser()
-    for source in media_sources:
-        source_path = Path(str(source.get('path') or '')).expanduser()
-        if not source_path.exists() or not source_path.is_dir():
-            print(f"错误: 媒体源不可用 {source.get('id')}: {source_path}", file=sys.stderr)
-            sys.exit(1)
-
-    try:
-        embedding_config = resolve_embedding_config(config, args)
-    except ValueError as exc:
-        parser.error(str(exc))
-
-    if not bool(embedding_config.get('enabled')):
-        parser.error('请先在 config.yaml 中设置 embedding.enabled: true')
-
-    library = LibraryService(media_path, media_sources=build_media_sources(media_path, media_sources or None))
-    app_database = AppDatabase(get_database_path())
-    app_database.migrate()
-    vector_index = SQLiteImageVectorStore(app_database)
-    vector_service = ImageVectorService(library, vector_index)
-
-    if args.cleanup:
-        result = vector_service.cleanup_missing()
-        print(f"已清理失效向量: {result['deleted']}")
-        if not args.continue_after_cleanup:
-            return
-
-    source_id = normalize_source_id(args.source) if args.source else None
-    plan = vector_service.plan_records(
-        config=embedding_config,
-        limit=max(int(args.limit or 0), 0),
-        order=args.order,
-        source_id=source_id,
-        force=bool(args.force),
-    )
-
-    print("TikLocal image vectorization")
-    print("Media sources:")
-    for source in library.sources:
-        print(f"  @{source.id}: {source.path}")
-    print("Config:")
-    print(f"  model: {embedding_config.get('model_name')}")
-    print(f"  dimensions: {embedding_config.get('dimensions')}")
-    print(f"  image_max_size: {embedding_config.get('image_max_size')}")
-    print(f"  image_quality: {embedding_config.get('image_quality')}")
-    print("Images:")
-    print(f"  total: {plan['total_images']}")
-    print(f"  indexed current: {plan['indexed_current']}")
-    print(f"  missing: {plan['missing']}")
-    print(f"  stale: {plan['stale']}")
-    print(f"  selected this run: {plan['selected_count']}")
-    print(f"  order: {plan['order']}")
-    if plan.get('source_id'):
-        print(f"  source: @{plan['source_id']}")
-
-    if args.dry_run:
-        return
-    if plan['selected_count'] == 0:
-        print("没有需要向量化的图片。")
-        return
-    if not args.yes:
-        answer = input("Proceed? [y/N] ").strip().lower()
-        if answer not in {'y', 'yes'}:
-            print("已取消。")
-            return
-
-    client = OpenAICompatibleImageEmbeddingClient(
-        model=str(embedding_config.get('model_name') or ''),
-        base_url=str(embedding_config.get('base_url') or ''),
-        dimensions=int(embedding_config.get('dimensions') or 768),
-        image_max_size=int(embedding_config.get('image_max_size') or 512),
-        image_quality=int(embedding_config.get('image_quality') or 82),
-    )
-
-    def report(index, total, record, status, error_text):
-        uri = str(record.get('uri') or '')
-        if status == 'indexed':
-            print(f"[{index}/{total}] {uri} indexed")
-        else:
-            print(f"[{index}/{total}] {uri} failed: {error_text}", file=sys.stderr)
-
-    result = vector_service.index_missing_or_stale(
-        config=embedding_config,
-        client=client,
-        limit=int(args.limit or 0),
-        order=args.order,
-        source_id=source_id,
-        force=bool(args.force),
-        progress_callback=report,
-    )
-    print("Done:")
-    print(f"  indexed: {result['indexed']}")
-    print(f"  failed: {result['failed']}")
-
-
-def run_analyze_similar(config, args, parser):
-    media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
-    media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
-    if not media_root and not media_sources:
-        parser.error('必须指定媒体目录:\n  - tiklocal analyze-similar /path/to/media\n  - 或设置 media_root/media_sources')
-
-    media_path = Path(media_root).expanduser() if media_root else Path(media_sources[0]['path']).expanduser()
-    for source in media_sources:
-        source_path = Path(str(source.get('path') or '')).expanduser()
-        if not source_path.exists() or not source_path.is_dir():
-            print(f"错误: 媒体源不可用 {source.get('id')}: {source_path}", file=sys.stderr)
-            sys.exit(1)
-
-    library = LibraryService(media_path, media_sources=build_media_sources(media_path, media_sources or None))
-    app_database = AppDatabase(get_database_path())
-    app_database.migrate()
-    vector_index = SQLiteImageVectorStore(app_database)
-    similarity_service = ImageSimilarityService(library, vector_index)
-    group_store = SQLiteSimilarityGroupStore(app_database)
-
-    scan_limit = max(50, min(int(args.limit or DEFAULT_SIMILARITY_SCAN_LIMIT), 5000))
-    threshold = max(0.5, min(float(args.threshold), 0.99))
-    min_group_size = max(2, min(int(args.min_group_size), 12))
-    max_group_size = max(2, min(int(args.max_group_size), 16))
-    if max_group_size < min_group_size:
-        max_group_size = min_group_size
-
-    if args.clear:
-        deleted = group_store.clear()
-        print(f"已清理相似图片组: {deleted}")
-        if not args.continue_after_clear:
-            return
-
-    vectors = similarity_service.load_vectors(scan_limit=scan_limit)
-    comparisons = max(0, len(vectors) * (len(vectors) - 1) // 2)
-    candidate_pairs = similarity_service.count_candidate_pairs(vectors, threshold=threshold)
-    payload = similarity_service.build_groups(
-        offset=0,
-        limit=5000,
-        threshold=threshold,
-        min_group_size=min_group_size,
-        max_group_size=max_group_size,
-        scan_limit=scan_limit,
-    )
-    groups = payload.get('items') or []
-    grouped_images = sum(len(group.get('items') or []) for group in groups)
-
-    print("TikLocal similar image analysis")
-    print("Media sources:")
-    for source in library.sources:
-        print(f"  @{source.id}: {source.path}")
-    print("Analysis:")
-    print(f"  vectors loaded: {len(vectors)}")
-    print(f"  scan limit: {scan_limit}")
-    print(f"  threshold: {threshold}")
-    print(f"  min group size: {min_group_size}")
-    print(f"  max group size: {max_group_size}")
-    print(f"  pair comparisons: {comparisons}")
-    print(f"  candidate pairs: {candidate_pairs}")
-    print(f"  groups found: {len(groups)}")
-    print(f"  grouped images: {grouped_images}")
-    print(f"  singleton images: {max(0, len(vectors) - grouped_images)}")
-
-    if args.profile:
-        print("Threshold profile:")
-        for item in similarity_service.profile_thresholds(
-            scan_limit=scan_limit,
-            min_group_size=min_group_size,
-            max_group_size=max_group_size,
-        ):
-            print(
-                f"  {item['threshold']:.2f}: "
-                f"groups {item['groups']}, pairs {item['candidate_pairs']}, grouped {item['grouped_images']}"
-            )
-
-    if args.dry_run:
-        return
-    if not groups:
-        print("没有可保存的相似图片组。")
-        return
-    if not args.yes:
-        answer = input("Save groups to SQLite? [y/N] ").strip().lower()
-        if answer not in {'y', 'yes'}:
-            print("已取消。")
-            return
-
-    saved = group_store.save_groups(
-        groups,
-        threshold=threshold,
-        min_group_size=min_group_size,
-        max_group_size=max_group_size,
-        exclusive=True,
-    )
-    print("Done:")
-    print(f"  saved groups: {saved}")
-
-
-TLS_EXTRA_HINT = (
-    "自动生成和维护 HTTPS 证书需要可选依赖。请运行: "
-    "pip install 'TikLocal[https]'"
-)
-
-
-def _load_tls_service():
-    """按需加载证书工具，避免普通 HTTP 安装依赖 cryptography。"""
-    try:
-        return importlib.import_module('tiklocal.services.tls')
-    except ModuleNotFoundError as exc:
-        if exc.name == 'cryptography' or str(exc.name).startswith('cryptography.'):
-            raise RuntimeError(TLS_EXTRA_HINT) from exc
-        raise
-
-
-def _print_tls_status(material, tls_service) -> None:
-    expired = material.expires_at <= datetime.datetime.now(datetime.timezone.utc)
-    state = '已过期' if expired else ('已新建' if material.cert_created else '有效')
-    print(f'HTTPS 证书: {state}')
-    print(f'服务器证书: {material.cert_path}')
-    print(f'服务器私钥: {material.key_path}')
-    print(f'根证书: {material.ca_cert_path}')
-    print(f'有效期至: {material.expires_at.astimezone().isoformat(timespec="seconds")}')
-    print(f'主机名: {", ".join(material.hostnames)}')
-    print(f'IP 地址: {", ".join(material.ip_addresses)}')
-    print(f'CA SHA-256: {material.ca_fingerprint}')
-    installed = tls_service.local_ca_is_installed(material.ca_cert_path)
-    if installed is not None:
-        print(f'本机钥匙串: {"已安装" if installed else "未安装（运行 tiklocal tls trust）"}')
-    print('提示: 只把根证书 ca.pem 安装到访问设备；不要复制 ca-key.pem。')
-
-
-def _serve_https(app, host, port, cert_path, key_path) -> None:
-    from cheroot.ssl.builtin import BuiltinSSLAdapter
-    from cheroot.wsgi import Server
-
-    server = Server((str(host), int(port)), app, server_name='TikLocal')
-    server.ssl_adapter = BuiltinSSLAdapter(str(cert_path), str(key_path))
-    try:
-        server.start()
-    except KeyboardInterrupt:
-        server.stop()
 
 
 def main():
@@ -379,7 +77,7 @@ def main():
             if idx != 0:
                 argv.pop(idx)
                 argv.insert(0, 'thumbs')
-        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize', 'analyze-similar', 'auth', 'tls'):
+        elif len(argv) == 0 or argv[0] not in ('serve', 'thumbs', 'dedupe', 'vectorize', 'analyze-similar', 'auth'):
             # 默认回退 serve（空参数或第一个不是已知子命令）
             argv.insert(0, 'serve')
 
@@ -399,8 +97,6 @@ def main():
   tiklocal vectorize /path --limit 200     # 按最新时间向量化前 200 张
   tiklocal analyze-similar /path --yes     # 预生成相似图片组
   tiklocal auth set-password               # 设置新的访问密码
-  tiklocal tls init                         # 生成本机 HTTPS 证书
-  tiklocal /path --https                    # 通过 HTTPS 启动
         '''
     )
 
@@ -410,25 +106,15 @@ def main():
     serve_parser = subparsers.add_parser('serve', help='启动服务器')
     serve_parser.add_argument('media_root', nargs='?', help='媒体文件根目录路径')
     serve_parser.add_argument('--host', default=None, help='服务器监听地址 (默认: 0.0.0.0)')
-    serve_parser.add_argument('--port', type=int, default=None, help='服务器端口 (HTTP 默认 8000，HTTPS 默认 8443)')
+    serve_parser.add_argument('--port', type=int, default=None, help='服务器端口 (默认: 8000)')
     serve_parser.add_argument('--dev', action='store_true', help='开发模式（启用热重载和调试）')
-    serve_parser.add_argument('--https', action='store_true', help='启用内置 HTTPS，自动维护本机证书')
-    serve_parser.add_argument('--tls-cert', default=None, help='使用自备 TLS 证书文件')
-    serve_parser.add_argument('--tls-key', default=None, help='使用自备 TLS 私钥文件')
-    serve_parser.add_argument('--hostname', action='append', default=None,
-                              help='加入自动证书的主机名，可重复')
-    serve_parser.add_argument('--name', default=None, help='当前实例在安装界面显示的名称')
+    serve_parser.add_argument('--name', default=None, help='当前实例的显示名称')
     serve_parser.add_argument('--media-source', action='append', type=parse_cli_media_source,
                               help='添加媒体源，格式 id=/path/to/media，可重复')
     serve_parser.add_argument('--download-source', default=None, help='下载保存到的媒体源 id')
 
     auth_parser = subparsers.add_parser('auth', help='管理访问认证')
     auth_parser.add_argument('action', choices=['set-password', 'status'], help='认证操作')
-
-    tls_parser = subparsers.add_parser('tls', help='管理本机 HTTPS 证书')
-    tls_parser.add_argument('action', choices=['init', 'status', 'renew', 'trust'], help='证书操作')
-    tls_parser.add_argument('--hostname', action='append', default=None,
-                            help='加入服务器证书的主机名，可重复')
 
     # thumbs 子命令
     thumbs_parser = subparsers.add_parser('thumbs', help='批量生成视频缩略图')
@@ -532,11 +218,21 @@ def main():
         )
         return
 
+    if cmd in {'vectorize', 'analyze-similar'}:
+        try:
+            enabled = similarity_enabled(config.get('experiments'), config.get('embedding') or config.get('embedding_config'))
+        except ValueError as exc:
+            parser.error(str(exc))
+        if not enabled:
+            parser.error('相似图片实验已关闭；请设置 experiments.similarity.enabled: true')
+
     if cmd == 'vectorize':
+        from tiklocal.experiments.similarity.cli import run_vectorize
         run_vectorize(config, args, parser)
         return
 
     if cmd == 'analyze-similar':
+        from tiklocal.experiments.similarity.cli import run_analyze_similar
         run_analyze_similar(config, args, parser)
         return
 
@@ -568,40 +264,13 @@ def main():
         print('访问密码已更新，所有已登录设备需要重新登录。')
         return
 
-    if cmd == 'tls':
-        try:
-            tls_service = _load_tls_service()
-        except RuntimeError as exc:
-            parser.error(str(exc))
-        if args.action == 'status':
-            material = tls_service.read_tls_material()
-            if material is None:
-                print('HTTPS 证书: 尚未初始化')
-                print('运行 tiklocal tls init 生成本机证书。')
-                return
-        else:
-            material = tls_service.ensure_tls_material(
-                extra_hostnames=args.hostname or (),
-                force_renew=args.action == 'renew',
-            )
-        _print_tls_status(material, tls_service)
-        if args.action == 'trust':
-            try:
-                keychain = tls_service.trust_local_ca(material.ca_cert_path)
-            except RuntimeError as exc:
-                parser.error(str(exc))
-            print(f'根证书已信任: {keychain}')
-            print('请完全退出并重新打开 Safari 和 Chrome。')
-        return
-
     # serve 路径
     media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
     host = args.host or os.environ.get('TIKLOCAL_HOST') or config.get('host', '0.0.0.0')
-    configured_cert = args.tls_cert or config.get('tls_cert')
-    configured_key = args.tls_key or config.get('tls_key')
-    https_enabled = bool(args.https or config.get('https') or configured_cert or configured_key)
+    if any(config.get(key) for key in ('https', 'tls_cert', 'tls_key', 'hostnames')):
+        parser.error('内置 HTTPS 已移除；请删除旧 TLS 配置，并由外部反向代理提供 HTTPS。')
     configured_port = int(os.environ.get('TIKLOCAL_PORT', 0)) or config.get('port')
-    port = args.port or configured_port or (8443 if https_enabled else 8000)
+    port = args.port or configured_port or 8000
     media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
     download_source = args.download_source or config.get('download_source') or 'default'
     vision_config = config.get('vision') or config.get('vision_config') or None
@@ -656,38 +325,7 @@ def main():
     else:
         print(f"媒体目录: {media_path.absolute()}")
     print(f"数据目录: {get_data_dir()}")
-    tls_material = None
-    tls_cert_path = None
-    tls_key_path = None
-    if bool(configured_cert) != bool(configured_key):
-        parser.error('--tls-cert 与 --tls-key 必须同时提供')
-    if configured_cert and configured_key:
-        tls_cert_path = Path(str(configured_cert)).expanduser()
-        tls_key_path = Path(str(configured_key)).expanduser()
-        if not tls_cert_path.is_file() or not tls_key_path.is_file():
-            parser.error('指定的 TLS 证书或私钥文件不存在')
-    elif https_enabled:
-        configured_hostnames = args.hostname or config.get('hostnames') or []
-        if isinstance(configured_hostnames, str):
-            configured_hostnames = [configured_hostnames]
-        try:
-            tls_service = _load_tls_service()
-        except RuntimeError as exc:
-            parser.error(str(exc))
-        tls_material = tls_service.ensure_tls_material(extra_hostnames=configured_hostnames)
-        tls_cert_path = tls_material.cert_path
-        tls_key_path = tls_material.key_path
-
-    scheme = 'https' if https_enabled else 'http'
-    print(f"访问地址: {scheme}://{host}:{port}")
-    if tls_material:
-        preferred_names = [name for name in tls_material.hostnames if name != 'localhost']
-        for name in preferred_names:
-            print(f"局域网入口: https://{name}:{port}")
-        if tls_material.ca_created:
-            print('已创建 TikLocal 本地 CA；其他设备首次访问前需要信任根证书。')
-        print(f"根证书: {tls_material.ca_cert_path}")
-        print(f"CA 指纹: {tls_material.ca_fingerprint}")
+    print(f"访问地址: http://{host}:{port}")
 
     try:
         app = create_app({
@@ -696,11 +334,8 @@ def main():
             "DOWNLOAD_SOURCE": normalize_source_id(download_source),
             "VISION_CONFIG": vision_config,
             "EMBEDDING_CONFIG": embedding_config,
+            "EXPERIMENTS": config.get('experiments'),
             "INSTANCE_NAME": args.name or config.get('name') or os.environ.get('TIKLOCAL_NAME'),
-            "AUTH_COOKIE_SECURE": https_enabled,
-            "HTTPS_ENABLED": https_enabled,
-            "TLS_CA_CERT_PATH": str(tls_material.ca_cert_path) if tls_material else None,
-            "TLS_CA_FINGERPRINT": tls_material.ca_fingerprint if tls_material else None,
         })
     except ValueError as exc:
         parser.error(str(exc))
@@ -712,16 +347,21 @@ def main():
         print(f"│ {bootstrap.generated_password:<42} │")
         print("│ 请保存；可用 tiklocal auth set-password 更改 │")
         print("└────────────────────────────────────────────┘")
-    if getattr(args, 'dev', False):
-        # 开发模式：使用Flask内置服务器
-        print("⚠️  开发模式已启用（不要在生产环境使用）")
-        ssl_context = (str(tls_cert_path), str(tls_key_path)) if https_enabled else None
-        app.run(host=host, port=port, debug=True, use_reloader=True, ssl_context=ssl_context)
-    elif https_enabled:
-        _serve_https(app, host, port, tls_cert_path, tls_key_path)
-    else:
-        # 生产模式：使用Waitress
-        serve(app, host=host, port=port)
+    download_manager = app.extensions['download_manager']
+    previous_sigterm = signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    try:
+        if not args.dev or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+            download_manager.start()
+        if getattr(args, 'dev', False):
+            # 开发模式：使用Flask内置服务器
+            print("⚠️  开发模式已启用（不要在生产环境使用）")
+            app.run(host=host, port=port, debug=True, use_reloader=True)
+        else:
+            # 生产模式：使用Waitress
+            serve(app, host=host, port=port)
+    finally:
+        signal.signal(signal.SIGTERM, previous_sigterm)
+        download_manager.close()
 
 
 if __name__ == '__main__':

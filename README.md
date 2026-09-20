@@ -2,6 +2,11 @@
 
 **TikLocal** is a **mobile and tablet** **web application** built on **Flask**. It allows you to browse and manage your local videos and images in a way similar to TikTok and Pinterest.
 
+The repository also includes **LumaFold**, a local-first native iPhone/Android
+client under `apps/radio`. It can import user-selected photos and videos into a private
+offline Flow without an account, network, or TikLocal Server; Radio remains an
+optional connection to a user-operated server.
+
 [中文](./README_zh.md)
 
 ## Introduction
@@ -59,13 +64,7 @@ TikLocal is a Python application that you can install using the following comman
 pip install tiklocal
 ```
 
-The default package supports HTTP and existing TLS certificates without compiling
-`cryptography`. This is the recommended installation on Android/Termux. Install the
-optional HTTPS extra only when TikLocal should generate and maintain a local CA:
-
-```bash
-pip install 'TikLocal[https]'
-```
+The default package serves HTTP and works on Android/Termux. HTTPS is provided by an external reverse proxy.
 
 ### Usage
 
@@ -77,7 +76,9 @@ tiklocal ~/Videos/
 
 You can specify any media folder.
 
-To close, press `Ctrl + C`.
+To close, press `Ctrl + C`. Normal shutdown (including SIGTERM) cancels unfinished downloads, stops their processes, and retains downloaded files. Interrupted jobs are not resumed automatically.
+
+The CLI owns the download manager lifecycle. When embedding `create_app()` in a custom WSGI host, call `app.extensions['download_manager'].start()` inside the serving worker, then `.close()` in its shutdown/finally hook. Do not attach close to Flask's per-request teardown. Constructing the app alone starts no download threads; starting the manager is required before submitting jobs.
 
 #### CLI Commands
 
@@ -90,28 +91,21 @@ tiklocal --port 9000              # Use custom port
 tiklocal --media-source photos=~/Pictures/AI  # Add a media source, repeatable
 ```
 
-**Installable app and HTTPS:**
+**Browser access and HTTPS:**
 
-TikLocal ships a Web App Manifest, per-instance name, and app icons, so it can be installed from Settings on phones, tablets, and desktops. Browsers such as Chrome and Edge normally require trusted HTTPS. A public domain is optional; a stable LAN hostname is sufficient.
+Open TikLocal directly in your browser. PWA installation, offline asset caching, built-in HTTPS, and local certificate management have been removed. Existing media and saved data are unchanged.
+
+For HTTPS, terminate TLS at an external reverse proxy and forward requests to TikLocal's HTTP server:
 
 ```bash
-pip install 'TikLocal[https]'                       # Required for automatic local certificates
-tiklocal ~/Videos --https --name "Studio Mac"     # Maintain a local certificate; defaults to port 8443
-tiklocal tls trust                                # Trust TikLocal CA on the server Mac
-tiklocal tls status                               # Inspect certificate names and CA fingerprint
-tiklocal tls renew --hostname studio-mac.local    # Add a stable hostname and renew the leaf certificate
-tiklocal ~/Videos --tls-cert cert.pem --tls-key key.pem  # Use an existing certificate
+FLASK_AUTH_COOKIE_SECURE=true tiklocal ~/Videos --host 127.0.0.1 --port 8000 --name "Studio Mac"
 ```
 
-Automatic HTTPS creates a TikLocal-specific local CA under `~/.tiklocal/tls/` and renews the server certificate when names, LAN addresses, or expiry require it. On the server Mac, `tiklocal tls trust` adds that CA to the current user's login keychain. Every other client device must trust the CA once before connecting; `/install` provides an Apple-friendly `.cer`, a PEM alternative, the fingerprint, and platform instructions. Never copy or install `ca-key.pem`. Each TikLocal server has an independent CA by default, so multiple servers must be trusted separately. `--hostname` only adds a certificate name; it does not configure DNS, so make sure the name resolves through your router, mDNS/Bonjour, or local DNS.
+The proxy handles certificates and should preserve the original Host header and media Range requests. Use the secure-cookie setting only when browsing through HTTPS. For direct LAN HTTP, omit it and bind to the appropriate interface.
 
-The initial installable-app release registers a deliberately narrow Service Worker for versioned public interface assets and app icons. Dynamic pages, APIs, thumbnails, and original media are excluded, remain private, and preserve native HTTP Range behavior. Safari uses **File > Add to Dock**; Chromium browsers expose the direct button only after their install criteria are met.
+When upgrading, remove `https`, `tls_cert`, `tls_key`, and `hostnames` from the YAML configuration. Active old TLS settings stop startup instead of silently switching to HTTP; the old `--https`, `--tls-cert`, `--tls-key`, `--hostname` options, `tls` commands and `[https]` package extra are no longer supported. Certificate files under `~/.tiklocal/tls/` and system trust records are left untouched.
 
-On Android/Termux, use the default installation and `http://127.0.0.1:8000` when the
-browser and TikLocal run on the same phone. This avoids the native Rust/OpenSSL build
-required by `cryptography`. To serve other devices with TikLocal-managed HTTPS, install
-`TikLocal[https]` on a supported host; providing your own `--tls-cert` and `--tls-key`
-does not require that extra.
+Previously installed shortcuts can be removed manually. Revisit the same origin to retire its old TikLocal worker and public asset cache; browsers cannot clean another origin's state. `/service-worker.js` remains only as a retirement endpoint. New visits do not register a worker, and the browser's ordinary HTTP caching remains available.
 
 **Access authentication:**
 
@@ -130,6 +124,10 @@ The password is stored as a scrypt hash in `~/.tiklocal/auth.json`; the plain pa
 tiklocal thumbs /path/to/media    # Generate thumbnails
 tiklocal thumbs /path --overwrite # Regenerate existing thumbnails
 ```
+
+The CLI and Web share thumbnail caches keyed by media-source URI. Valid legacy
+caches for the default source remain readable. CLI generation first tries a frame
+near 20% of the video duration; Web generation keeps its short fixed-time fallback.
 
 **Find and remove duplicate files:**
 ```bash
@@ -168,7 +166,7 @@ Recommended workflow:
 
 `vectorize` only uploads images that are missing or stale. A vector becomes stale when file size, mtime, model, dimensions, `image_max_size`, or `image_quality` changes. Images are EXIF-transposed, resized, re-encoded as JPEG, and sent without original EXIF/ICC/XMP/IPTC metadata.
 
-After vectors are built, run `analyze-similar` to precompute visual similarity groups into SQLite. The image detail page can query similar images directly from local vectors, while the Library `Similar Images` mode only reads precomputed groups for fast loading.
+After vectors are built, run `analyze-similar` to precompute visual similarity groups into SQLite. The image detail page can query similar images directly from local vectors, while the experimental page at `/experiments/similarity` reads precomputed groups. Open it from Settings when enabled; old Library links redirect there.
 
 ### URL Download (Web)
 
@@ -230,10 +228,7 @@ media_sources:
     path: ~/Pictures/AI
 download_source: default
 name: Studio Mac
-https: true
-port: 8443
-hostnames:
-  - studio-mac.local
+port: 8000
 
 vision:
   enabled: true
@@ -246,6 +241,10 @@ vision:
   user_prompt: |
     Analyze this image and return a short Chinese title plus up to {tags_limit} Chinese tags.
     Output JSON: {"title":"...","tags":["..."]}
+
+experiments:
+  similarity:
+    enabled: true
 
 embedding:
   enabled: true
@@ -272,6 +271,10 @@ tiklocal vectorize ~/Videos/TikLocal --dry-run
 tiklocal analyze-similar ~/Videos/TikLocal --limit 500 --yes
 ```
 
+`experiments.similarity.enabled` is the startup switch for the experiment, including its CLI commands. Explicit `false` disables it without deleting vectors or groups. When omitted, a valid legacy `embedding.enabled: true` enables it; saved `embedding_config.json` takes precedence over the YAML configuration. Existing vectors alone do not enable the feature: set the new switch explicitly to view those results. Restart the server after changing the switch.
+
+For read-only access, enable the experiment and set the effective `embedding.enabled` to `false`. Building vectors still requires `embedding.enabled: true`; viewing results never invokes a model. CLI configuration precedence is defaults < YAML < saved embedding configuration < CLI overrides. Preview with `--dry-run` and a bounded `--limit` before building; estimated cost is unknown. Synchronous Web builds have been retired: `POST /api/ai/embedding-index/run` returns 410 with CLI guidance (404 when the experiment is disabled).
+
 API keys are read from environment variables, preferring `TIKLOCAL_VISION_API_KEY` for vision, `TIKLOCAL_EMBEDDING_API_KEY` for embedding, then falling back to `TIKLOCAL_AI_API_KEY`, `OPENAI_API_KEY`, or `OPENROUTER_API_KEY`.
 
 * **Light and dark modes:** You can choose to use light or dark mode.
@@ -282,6 +285,7 @@ API keys are read from environment variables, preferring `TIKLOCAL_VISION_API_KE
 - Docs index: `docs/README.md`
 - Flow interaction unification: `docs/flow-interaction-unification.md`
 - Media index and local recommendation architecture: `docs/media-index-and-recommendation.md`
+- Native local-first app architecture: `docs/native-local-app-architecture.md`
 - TikLocal Radio native client architecture: `docs/radio-native-client-architecture.md`
 - TikLocal Radio player selection: `docs/radio-player-selection.md`
 - OpenRouter image-to-video research: `docs/openrouter-image-to-video-research.md`
