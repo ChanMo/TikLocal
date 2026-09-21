@@ -9,6 +9,7 @@
     "build": "npm run build-css-prod"
   },
   "devDependencies": {
+    "daisyui": "^5.7.42",
     "tailwindcss": "^4.3.0"
   },
   "keywords": [
