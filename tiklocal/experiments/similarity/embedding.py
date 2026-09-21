@@ -41,9 +41,9 @@ class OpenAICompatibleImageEmbeddingClient:
         )
         self.timeout = timeout
         if not self.api_key:
-            raise RuntimeError("未配置 TIKLOCAL_EMBEDDING_API_KEY、TIKLOCAL_AI_API_KEY、OPENAI_API_KEY 或 OPENROUTER_API_KEY。")
+            raise RuntimeError("Configure TIKLOCAL_EMBEDDING_API_KEY, TIKLOCAL_AI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY.")
         if not self.model:
-            raise RuntimeError("未配置 embedding model。")
+            raise RuntimeError("No embedding model is configured.")
 
     def embed_image(self, image_path: Path) -> list[float]:
         data_url = self._to_data_url(image_path, max_size=self.image_max_size, quality=self.image_quality)
@@ -74,12 +74,12 @@ class OpenAICompatibleImageEmbeddingClient:
         try:
             data = response.json()
         except Exception:
-            raise RuntimeError("Embedding API 返回了非 JSON 响应。")
+            raise RuntimeError("The embedding API returned a non-JSON response.")
         if isinstance(data, dict) and data.get("error"):
             raise RuntimeError(self._parse_error(data) or "Embedding API error")
         embedding = ((data.get("data") or [{}])[0] or {}).get("embedding") if isinstance(data, dict) else None
         if not isinstance(embedding, list) or not embedding:
-            raise RuntimeError("Embedding API 未返回向量。")
+            raise RuntimeError("The embedding API returned no vector.")
         return [float(value) for value in embedding]
 
     def _to_data_url(self, image_path: Path, max_size: int = 512, quality: int = 82) -> str:

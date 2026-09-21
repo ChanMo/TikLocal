@@ -130,20 +130,20 @@ class RecommendService:
             if not media_type:
                 media_type = 'video' if path and path.suffix.lower() in VIDEO_EXTENSIONS else 'image'
             if self.library.is_uri_in_set(uri, favorites):
-                reasons[uri] = '来自你的收藏'
+                reasons[uri] = 'From your favorites'
             elif self.activity_store and any(
                 dimension_scores.get(dimension, 0.0) >= 0.15
                 for dimension in self.activity_store.dimensions_for(uri, media_type)
             ):
-                reasons[uri] = '符合你的浏览偏好'
+                reasons[uri] = 'Matches your browsing preferences'
             elif int(profile.get('impressions') or 0) == 0:
-                reasons[uri] = '随机探索'
+                reasons[uri] = 'Random discovery'
             else:
                 try:
                     age_days = max((now - path.stat().st_mtime) / 86400, 0.0) if path else 999
                 except OSError:
                     age_days = 999
-                reasons[uri] = '最近加入' if age_days <= 30 else '很久没看'
+                reasons[uri] = 'Recently added' if age_days <= 30 else 'Not viewed recently'
         return reasons
 
     @staticmethod

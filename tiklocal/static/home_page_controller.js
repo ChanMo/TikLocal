@@ -16,7 +16,7 @@
   }
 
   function mediaName(item) {
-    var raw = String(item.name || '').split('/').pop() || '未命名媒体';
+    var raw = String(item.name || '').split('/').pop() || 'Untitled media';
     return raw.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
   }
 
@@ -31,7 +31,7 @@
     var link = document.createElement('a');
     link.className = 'media-tile' + (extraClass ? ' ' + extraClass : '');
     link.href = item.detail_url || '/library';
-    link.setAttribute('aria-label', '查看 ' + mediaName(item));
+    link.setAttribute('aria-label', 'View ' + mediaName(item));
 
     var image = document.createElement('img');
     image.src = item.thumb_url;
@@ -70,7 +70,7 @@
       collage.appendChild(placeholder);
     }
     var total = Number(stats && stats.indexed_total) || items.length;
-    byId('home-flow-meta').textContent = total ? total.toLocaleString('zh-CN') + ' 段私人记忆' : '混合影像漫游';
+    byId('home-flow-meta').textContent = total ? total.toLocaleString('en') + ' private moments' : 'Mixed media flow';
   }
 
   function renderRibbon(containerId, items, extraClass) {
@@ -80,7 +80,7 @@
     if (!items.length) {
       var empty = document.createElement('div');
       empty.className = 'home-empty';
-      empty.innerHTML = '<span>这里还很安静。<br><a href="/settings/">添加媒体来源</a>后，它会慢慢长出来。</span>';
+      empty.innerHTML = '<span>It is quiet here for now.<br><a href="/settings/">Add a media source</a> and your library will begin to grow.</span>';
       container.appendChild(empty);
       return;
     }
@@ -95,7 +95,7 @@
       var empty = document.createElement('a');
       empty.className = 'collection-empty';
       empty.href = '/collections';
-      empty.innerHTML = '还没有集合。<br>把喜欢的片段，收进一个属于你的章节。';
+      empty.innerHTML = 'No collections yet.<br>Gather favorite moments into a chapter of your own.';
       container.appendChild(empty);
       return;
     }
@@ -117,9 +117,9 @@
       var copy = document.createElement('span');
       copy.className = 'collection-copy';
       var title = document.createElement('strong');
-      title.textContent = item.name || '未命名集合';
+      title.textContent = item.name || 'Untitled collection';
       var count = document.createElement('span');
-      count.textContent = (Number(item.item_count) || 0) + ' 项媒体';
+      count.textContent = (Number(item.item_count) || 0) + ' media items';
       copy.appendChild(title);
       copy.appendChild(count);
 
@@ -133,8 +133,8 @@
   function renderStats(stats) {
     var total = Number(stats.indexed_total) || 0;
     var audio = Number(stats.audios) || 0;
-    var summary = total ? total.toLocaleString('zh-CN') + ' 项媒体' : '等待你的第一段媒体';
-    if (audio) summary += ' · ' + audio.toLocaleString('zh-CN') + ' 首声音';
+    var summary = total ? total.toLocaleString('en') + ' media items' : 'Waiting for your first media item';
+    if (audio) summary += ' · ' + audio.toLocaleString('en') + ' audio tracks';
     byId('home-library-summary').textContent = summary;
   }
 
@@ -146,23 +146,23 @@
     fetchJson('/api/radio/stations').then(function (payload) {
       var stations = apiData(payload).stations || [];
       var station = stations.find(function (item) { return item.id === stationId; });
-      if (station) byId('home-radio-station').textContent = station.name || '私人电台';
+      if (station) byId('home-radio-station').textContent = station.name || 'Private Radio';
     }).catch(function () {});
 
     if (!saved.name) return;
     fetchJson('/api/radio/metadata?uri=' + encodeURIComponent(saved.name)).then(function (payload) {
       var track = apiData(payload);
       byId('home-radio-title').textContent = track.title || mediaName({ name: saved.name });
-      byId('home-radio-action').firstChild.nodeValue = '继续收听 ';
+      byId('home-radio-action').firstChild.nodeValue = 'Keep Listening ';
     }).catch(function () {});
   }
 
   function updateGreeting() {
     var hour = new Date().getHours();
-    var title = '此刻，想从哪里开始？';
-    if (hour >= 18 || hour < 5) title = '今晚，想从哪里开始？';
-    else if (hour < 11) title = '早上好，想从哪里开始？';
-    else if (hour < 14) title = '午后，想从哪里开始？';
+    var title = 'Where would you like to begin?';
+    if (hour >= 18 || hour < 5) title = 'Where would you like to begin tonight?';
+    else if (hour < 11) title = 'Good morning. Where would you like to begin?';
+    else if (hour < 14) title = 'Where would you like to begin this afternoon?';
     byId('home-title').textContent = title;
   }
 

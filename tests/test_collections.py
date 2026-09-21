@@ -15,7 +15,7 @@ def client(tmp_path):
 
 
 def test_collection_edit_cover_persists_and_delete_removes_collection(client):
-    created = client.post('/api/collections', json={'name': '灵感', 'description': '片段'})
+    created = client.post('/api/collections', json={'name': 'Inspiration', 'description': 'Clips'})
     assert created.status_code == 200
     item = created.get_json()['data']['item']
     url = f"/api/collections/{item['id']}"
@@ -25,11 +25,11 @@ def test_collection_edit_cover_persists_and_delete_removes_collection(client):
         'uris': ['cover.jpg', 'clip.mp4', 'odd & hash#.jpg', 'extra-a.jpg', 'extra-b.jpg'],
     })
 
-    updated = client.patch(url, json={'name': '新名字', 'cover_uri': 'cover.jpg'})
+    updated = client.patch(url, json={'name': 'New name', 'cover_uri': 'cover.jpg'})
     assert updated.status_code == 200
     saved = client.get(url).get_json()['data']['item']
     assert saved == updated.get_json()['data']['item']
-    assert (saved['name'], saved['description']) == ('新名字', '片段')
+    assert (saved['name'], saved['description']) == ('New name', 'Clips')
     assert saved['cover_uri'] == saved['preview_items'][0]['uri'] == '@default/cover.jpg'
     assert len(saved['preview_items']) == 4
     assert client.patch(url, json={'cover_uri': 'not-a-member.jpg'}).status_code == 400
@@ -42,7 +42,7 @@ def test_collection_edit_cover_persists_and_delete_removes_collection(client):
 
 
 def test_collection_membership_deduplicates_aliases_and_removal_updates_lookup(client):
-    collection_id = client.post('/api/collections', json={'name': '收藏'}).get_json()['data']['item']['id']
+    collection_id = client.post('/api/collections', json={'name': 'Favorites'}).get_json()['data']['item']['id']
     url = f'/api/collections/{collection_id}/items'
     added = client.post(url, json={
         'uris': ['./clip.mp4', '@default/clip.mp4', 'odd & hash#.jpg', '', 'odd & hash#.jpg'],
@@ -71,7 +71,7 @@ def test_collection_pages_keep_member_order_without_gaps(client, endpoint):
     for name in names:
         (client.application.config['MEDIA_ROOT'] / name).write_bytes(b'image')
     client.post('/api/library/sync')
-    collection_id = client.post('/api/collections', json={'name': '媒体集'}).get_json()['data']['item']['id']
+    collection_id = client.post('/api/collections', json={'name': 'Media set'}).get_json()['data']['item']['id']
     client.post(f'/api/collections/{collection_id}/items', json={'uris': names})
     assert client.get(f'/collection/{collection_id}').status_code == 200
     url = (

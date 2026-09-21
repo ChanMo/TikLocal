@@ -16,13 +16,13 @@ def run_vectorize(config, args, parser):
     media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
     media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
     if not media_root and not media_sources:
-        parser.error('必须指定媒体目录:\n  - tiklocal vectorize /path/to/media\n  - 或设置 media_root/media_sources')
+        parser.error('Specify a media directory:\n  - tiklocal vectorize /path/to/media\n  - or configure media_root/media_sources')
 
     media_path = Path(media_root).expanduser() if media_root else Path(media_sources[0]['path']).expanduser()
     for source in media_sources:
         source_path = Path(str(source.get('path') or '')).expanduser()
         if not source_path.exists() or not source_path.is_dir():
-            print(f"错误: 媒体源不可用 {source.get('id')}: {source_path}", file=sys.stderr)
+            print(f"Error: Media source unavailable {source.get('id')}: {source_path}", file=sys.stderr)
             sys.exit(1)
 
     try:
@@ -31,7 +31,7 @@ def run_vectorize(config, args, parser):
         parser.error(str(exc))
 
     if not bool(embedding_config.get('enabled')):
-        parser.error('请先在 config.yaml 中设置 embedding.enabled: true')
+        parser.error('Set embedding.enabled: true in config.yaml first')
 
     library = LibraryService(media_path, media_sources=build_media_sources(media_path, media_sources or None))
     app_database = AppDatabase(get_database_path())
@@ -41,7 +41,7 @@ def run_vectorize(config, args, parser):
 
     if args.cleanup:
         result = vector_service.cleanup_missing()
-        print(f"已清理失效向量: {result['deleted']}")
+        print(f"Removed stale vectors: {result['deleted']}")
         if not args.continue_after_cleanup:
             return
 
@@ -76,12 +76,12 @@ def run_vectorize(config, args, parser):
     if args.dry_run:
         return
     if plan['selected_count'] == 0:
-        print("没有需要向量化的图片。")
+        print("There are no images to vectorize.")
         return
     if not args.yes:
         answer = input("Proceed? [y/N] ").strip().lower()
         if answer not in {'y', 'yes'}:
-            print("已取消。")
+            print("Canceled.")
             return
 
     client = OpenAICompatibleImageEmbeddingClient(
@@ -117,13 +117,13 @@ def run_analyze_similar(config, args, parser):
     media_root = args.media_root or os.environ.get('MEDIA_ROOT') or config.get('media_root')
     media_sources = normalize_media_sources(config, getattr(args, 'media_source', None), media_root=media_root)
     if not media_root and not media_sources:
-        parser.error('必须指定媒体目录:\n  - tiklocal analyze-similar /path/to/media\n  - 或设置 media_root/media_sources')
+        parser.error('Specify a media directory:\n  - tiklocal analyze-similar /path/to/media\n  - or configure media_root/media_sources')
 
     media_path = Path(media_root).expanduser() if media_root else Path(media_sources[0]['path']).expanduser()
     for source in media_sources:
         source_path = Path(str(source.get('path') or '')).expanduser()
         if not source_path.exists() or not source_path.is_dir():
-            print(f"错误: 媒体源不可用 {source.get('id')}: {source_path}", file=sys.stderr)
+            print(f"Error: Media source unavailable {source.get('id')}: {source_path}", file=sys.stderr)
             sys.exit(1)
 
     library = LibraryService(media_path, media_sources=build_media_sources(media_path, media_sources or None))
@@ -142,7 +142,7 @@ def run_analyze_similar(config, args, parser):
 
     if args.clear:
         deleted = group_store.clear()
-        print(f"已清理相似图片组: {deleted}")
+        print(f"Removed similar-image groups: {deleted}")
         if not args.continue_after_clear:
             return
 
@@ -191,12 +191,12 @@ def run_analyze_similar(config, args, parser):
     if args.dry_run:
         return
     if not groups:
-        print("没有可保存的相似图片组。")
+        print("There are no similar-image groups to save.")
         return
     if not args.yes:
         answer = input("Save groups to SQLite? [y/N] ").strip().lower()
         if answer not in {'y', 'yes'}:
-            print("已取消。")
+            print("Canceled.")
             return
 
     saved = group_store.save_groups(
@@ -208,5 +208,4 @@ def run_analyze_similar(config, args, parser):
     )
     print("Done:")
     print(f"  saved groups: {saved}")
-
 

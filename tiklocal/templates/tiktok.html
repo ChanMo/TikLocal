@@ -1010,12 +1010,12 @@ em.coll-count {
   <div id="flow-state" class="flow-state" data-kind="loading" aria-live="polite" aria-hidden="true">
     <div class="flow-state-card">
       <div class="flow-state-spinner" aria-hidden="true"></div>
-      <div id="flow-state-title" class="flow-state-title">正在准备内容</div>
+      <div id="flow-state-title" class="flow-state-title">Preparing your media</div>
       <div id="flow-state-detail" class="flow-state-detail"></div>
       <div id="flow-state-actions" class="flow-state-actions" hidden>
-        <button id="flow-state-retry" class="flow-state-btn primary" type="button" hidden>重试</button>
-        <button id="flow-state-next" class="flow-state-btn primary" type="button" hidden>下一条</button>
-        <a id="flow-state-library" class="flow-state-btn" href="/library" hidden>打开媒体库</a>
+        <button id="flow-state-retry" class="flow-state-btn primary" type="button" hidden>Try Again</button>
+        <button id="flow-state-next" class="flow-state-btn primary" type="button" hidden>Next</button>
+        <a id="flow-state-library" class="flow-state-btn" href="/library" hidden>Open Library</a>
       </div>
     </div>
   </div>
@@ -1041,7 +1041,7 @@ em.coll-count {
   <div class="controls-sidebar" id="controls">
     <div class="action-btn speed-btn" id="speed-btn">1x</div>
 
-    <button type="button" class="action-btn" id="caption-btn" title="生成标题" hidden>
+    <button type="button" class="action-btn" id="caption-btn" title="Generate Title" hidden>
       <i data-feather="zap"></i>
     </button>
 
@@ -1050,7 +1050,7 @@ em.coll-count {
         <button type="button" class="zoom-btn active" data-level="2.5">2.5x</button>
         <button type="button" class="zoom-btn" data-level="5">5x</button>
       </div>
-      <button type="button" class="action-btn" id="magnifier-toggle" title="放大镜">
+      <button type="button" class="action-btn" id="magnifier-toggle" title="Magnifier">
         <i data-feather="search"></i>
       </button>
     </div>
@@ -1060,7 +1060,7 @@ em.coll-count {
       <svg class="heart-filled" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
     </a>
 
-    <button type="button" class="action-btn" id="collection-btn" title="加入集合">
+    <button type="button" class="action-btn" id="collection-btn" title="Add to Collection">
       <i data-feather="bookmark"></i>
       <span class="collection-count" id="collection-count">0</span>
     </button>
@@ -1085,17 +1085,17 @@ em.coll-count {
     <div class="coll-drag-handle"></div>
     <div class="collection-modal-header">
       <div class="collection-modal-title-row">
-        <h3>加入集合</h3>
+        <h3>Add to Collection</h3>
         <button id="collection-modal-close" type="button" class="collection-modal-close">
           <i data-feather="x"></i>
         </button>
       </div>
-      <div id="collection-modal-meta" class="collection-modal-meta">当前未加入任何集合</div>
+      <div id="collection-modal-meta" class="collection-modal-meta">Not in any collections</div>
     </div>
     <div id="collection-list" class="collection-modal-list"></div>
     <div class="collection-modal-create">
-      <input id="collection-name-input" type="text" maxlength="80" placeholder="新建集合名称" />
-      <button id="collection-create-btn" type="button">新建</button>
+      <input id="collection-name-input" type="text" maxlength="80" placeholder="New collection name" />
+      <button id="collection-create-btn" type="button">Create</button>
     </div>
   </div>
 </div>

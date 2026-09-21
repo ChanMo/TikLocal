@@ -46,13 +46,13 @@ def validate_embedding_config(
     partial: bool = False,
 ) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(payload, dict):
-        return None, "配置格式必须是 JSON 对象。"
+        return None, "Configuration must be a JSON object."
 
     cleaned: dict[str, Any] = {}
 
     if "enabled" in payload:
         if not isinstance(payload["enabled"], bool):
-            return None, "enabled 必须是布尔值。"
+            return None, "enabled must be a boolean."
         cleaned["enabled"] = payload["enabled"]
     elif not partial:
         cleaned["enabled"] = bool(DEFAULT_EMBEDDING_CONFIG["enabled"])
@@ -60,42 +60,42 @@ def validate_embedding_config(
     if "base_url" in payload or not partial:
         base_url = str(payload.get("base_url", DEFAULT_EMBEDDING_CONFIG["base_url"])).strip()
         if len(base_url) > EMBEDDING_BASE_URL_MAX_LENGTH:
-            return None, f"base_url 不能超过 {EMBEDDING_BASE_URL_MAX_LENGTH} 个字符。"
+            return None, f"base_url cannot exceed {EMBEDDING_BASE_URL_MAX_LENGTH} characters."
         if base_url and not (base_url.startswith("http://") or base_url.startswith("https://")):
-            return None, "base_url 必须以 http:// 或 https:// 开头。"
+            return None, "base_url must start with http:// or https://."
         cleaned["base_url"] = base_url
 
     if "model_name" in payload or not partial:
         model_name = str(payload.get("model_name", DEFAULT_EMBEDDING_CONFIG["model_name"])).strip()
         if len(model_name) > EMBEDDING_MODEL_NAME_MAX_LENGTH:
-            return None, f"model_name 不能超过 {EMBEDDING_MODEL_NAME_MAX_LENGTH} 个字符。"
+            return None, f"model_name cannot exceed {EMBEDDING_MODEL_NAME_MAX_LENGTH} characters."
         cleaned["model_name"] = model_name
 
     if "dimensions" in payload or not partial:
         try:
             dimensions = int(payload.get("dimensions", DEFAULT_EMBEDDING_CONFIG["dimensions"]))
         except (TypeError, ValueError):
-            return None, "dimensions 必须是整数。"
+            return None, "dimensions must be an integer."
         if not (EMBEDDING_DIMENSIONS_MIN <= dimensions <= EMBEDDING_DIMENSIONS_MAX):
-            return None, f"dimensions 必须在 {EMBEDDING_DIMENSIONS_MIN} 到 {EMBEDDING_DIMENSIONS_MAX} 之间。"
+            return None, f"dimensions must be between {EMBEDDING_DIMENSIONS_MIN} and {EMBEDDING_DIMENSIONS_MAX}."
         cleaned["dimensions"] = dimensions
 
     if "image_max_size" in payload or not partial:
         try:
             image_max_size = int(payload.get("image_max_size", DEFAULT_EMBEDDING_CONFIG["image_max_size"]))
         except (TypeError, ValueError):
-            return None, "image_max_size 必须是整数。"
+            return None, "image_max_size must be an integer."
         if not (EMBEDDING_IMAGE_MAX_SIZE_MIN <= image_max_size <= EMBEDDING_IMAGE_MAX_SIZE_MAX):
-            return None, f"image_max_size 必须在 {EMBEDDING_IMAGE_MAX_SIZE_MIN} 到 {EMBEDDING_IMAGE_MAX_SIZE_MAX} 之间。"
+            return None, f"image_max_size must be between {EMBEDDING_IMAGE_MAX_SIZE_MIN} and {EMBEDDING_IMAGE_MAX_SIZE_MAX}."
         cleaned["image_max_size"] = image_max_size
 
     if "image_quality" in payload or not partial:
         try:
             image_quality = int(payload.get("image_quality", DEFAULT_EMBEDDING_CONFIG["image_quality"]))
         except (TypeError, ValueError):
-            return None, "image_quality 必须是整数。"
+            return None, "image_quality must be an integer."
         if not (EMBEDDING_IMAGE_QUALITY_MIN <= image_quality <= EMBEDDING_IMAGE_QUALITY_MAX):
-            return None, f"image_quality 必须在 {EMBEDDING_IMAGE_QUALITY_MIN} 到 {EMBEDDING_IMAGE_QUALITY_MAX} 之间。"
+            return None, f"image_quality must be between {EMBEDDING_IMAGE_QUALITY_MIN} and {EMBEDDING_IMAGE_QUALITY_MAX}."
         cleaned["image_quality"] = image_quality
 
     return cleaned, None
@@ -169,5 +169,4 @@ def resolve_embedding_config(config, args=None):
                 raise ValueError(error)
             effective = merge_embedding_config(effective, validated)
     return effective
-
 

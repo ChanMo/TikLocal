@@ -550,10 +550,10 @@ class LibraryIndexer:
                 continue
             path = self.library.resolve_path(uri)
             if path is None or not path.is_file():
-                raise ValueError(f'媒体输出不存在或不可访问: {uri}')
+                raise ValueError(f'Media output does not exist or is inaccessible: {uri}')
             record = self._record_for_path(path, time_states)
             if record is None:
-                raise ValueError(f'无法登记媒体输出: {uri}')
+                raise ValueError(f'Unable to register media output: {uri}')
             records.append(record)
         return self.store.upsert(records)
 

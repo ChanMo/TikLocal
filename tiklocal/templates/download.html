@@ -269,32 +269,32 @@
 {% block content %}
 <main class="download-page tool-page">
   <header class="download-header tool-page-header">
-    <p class="tool-page-overline"><i data-feather="arrow-down-circle"></i><span>媒体导入</span></p>
-    <h1 class="download-title">下载</h1>
-    <p class="download-intro tool-page-intro">粘贴一个链接，将网络上的图片或视频保存到本地。</p>
+    <p class="tool-page-overline"><i data-feather="arrow-down-circle"></i><span>Media Import</span></p>
+    <h1 class="download-title">Download</h1>
+    <p class="download-intro tool-page-intro">Paste a link to save an online image or video to your local library.</p>
   </header>
 
   <form id="download-form" class="download-composer">
     <div class="download-editor">
-      <input id="download-url" class="download-input" type="url" required autocomplete="url" inputmode="url" placeholder="粘贴图片或视频链接…" aria-label="媒体链接">
+      <input id="download-url" class="download-input" type="url" required autocomplete="url" inputmode="url" placeholder="Paste an image or video URL…" aria-label="Media URL">
       <div id="download-detected" class="download-detected" aria-live="polite"></div>
     </div>
     <div class="download-composer-footer">
-      <div id="media-switch" class="media-switch" data-value="yt-dlp" role="group" aria-label="下载内容类型">
-        <button class="media-switch-option" type="button" data-engine="yt-dlp" aria-pressed="true"><i data-feather="play"></i><span>视频</span></button>
-        <button class="media-switch-option" type="button" data-engine="gallery-dl" aria-pressed="false"><i data-feather="image"></i><span>图片</span></button>
+      <div id="media-switch" class="media-switch" data-value="yt-dlp" role="group" aria-label="Download media type">
+        <button class="media-switch-option" type="button" data-engine="yt-dlp" aria-pressed="true"><i data-feather="play"></i><span>Video</span></button>
+        <button class="media-switch-option" type="button" data-engine="gallery-dl" aria-pressed="false"><i data-feather="image"></i><span>Images</span></button>
       </div>
-      <button id="download-submit" class="download-submit" type="submit">下载</button>
+      <button id="download-submit" class="download-submit" type="submit">Download</button>
     </div>
   </form>
   <div id="download-inline-alert" class="download-inline-alert" hidden>
-    <span id="download-inline-alert-copy"></span><a href="/settings#download">前往设置</a>
+    <span id="download-inline-alert-copy"></span><a href="/settings#download">Open Settings</a>
   </div>
 
   <div class="download-stack">
     <section id="active-section" class="download-section" hidden aria-labelledby="active-title">
       <div class="download-section-head">
-        <h2 id="active-title" class="download-section-title">正在进行</h2>
+        <h2 id="active-title" class="download-section-title">In Progress</h2>
         <span id="active-count" class="download-section-count"></span>
       </div>
       <div id="active-list" class="download-list" aria-live="polite"></div>
@@ -302,14 +302,14 @@
 
     <section class="download-section" aria-labelledby="history-title">
       <div class="download-section-head">
-        <h2 id="history-title" class="download-section-title">最近下载</h2>
+        <h2 id="history-title" class="download-section-title">Recent Downloads</h2>
         <span id="history-count" class="download-section-count"></span>
       </div>
       <div id="history-list" class="download-list" aria-live="polite">
-        <div class="download-empty"><div class="download-empty-icon"><i data-feather="loader"></i></div><div class="download-empty-title">正在读取</div></div>
+        <div class="download-empty"><div class="download-empty-icon"><i data-feather="loader"></i></div><div class="download-empty-title">Loading</div></div>
       </div>
       <div id="history-footer" class="download-history-footer" hidden>
-        <button id="clear-history-btn" class="download-clear" type="button">清除下载记录</button>
+        <button id="clear-history-btn" class="download-clear" type="button">Clear Download History</button>
       </div>
     </section>
   </div>
@@ -318,11 +318,11 @@
 
 <div id="download-confirm" class="download-confirm" hidden>
   <section class="download-confirm-card" role="dialog" aria-modal="true" aria-labelledby="download-confirm-title">
-    <h2 id="download-confirm-title" class="download-confirm-title">清除下载记录？</h2>
-    <p id="download-confirm-copy" class="download-confirm-copy">本地媒体文件会继续保留。</p>
+    <h2 id="download-confirm-title" class="download-confirm-title">Clear download history?</h2>
+    <p id="download-confirm-copy" class="download-confirm-copy">Local media files will be kept.</p>
     <div class="download-confirm-actions">
-      <button class="download-action" type="button" data-confirm-cancel>取消</button>
-      <button class="download-action is-danger" type="button" data-confirm-accept>清除记录</button>
+      <button class="download-action" type="button" data-confirm-cancel>Cancel</button>
+      <button class="download-action is-danger" type="button" data-confirm-accept>Clear History</button>
     </div>
   </section>
 </div>

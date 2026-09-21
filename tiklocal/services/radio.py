@@ -116,9 +116,9 @@ class RadioService:
     """Build low-decision radio batches from local audio files."""
 
     stations = [
-        RadioStation("default", "默认电台", "综合最近添加与收藏内容"),
-        RadioStation("recent", "最近添加", "优先播放新加入的音频"),
-        RadioStation("favorites", "收藏电台", "优先播放已收藏的音频"),
+        RadioStation("default", "Default Station", "A mix of recently added and favorite tracks"),
+        RadioStation("recent", "Recently Added", "Prioritizes newly added audio"),
+        RadioStation("favorites", "Favorites", "Prioritizes favorite audio"),
     ]
 
     def __init__(

@@ -40,8 +40,8 @@ def generate_thumbnails(media_root: str | Path, overwrite: bool = False, limit: 
     videos = library.scan_videos()
     stats = {'total': len(videos), 'generated': 0, 'skipped': 0, 'failed': 0}
     if show_progress:
-        print(f'数据目录: {get_data_dir()}')
-        print(f'发现视频 {len(videos)} 个，缩略图目录：{service.thumb_dir}')
+        print(f'Data directory: {get_data_dir()}')
+        print(f'Found {len(videos)} videos; thumbnail directory: {service.thumb_dir}')
     for index, path in enumerate(videos[:limit] if limit > 0 else videos, start=1):
         uri = library.get_relative_path(path)
         if not overwrite and service.cached_thumbnail(uri):
@@ -56,10 +56,10 @@ def generate_thumbnails(media_root: str | Path, overwrite: bool = False, limit: 
             else:
                 stats['failed'] += 1
         if show_progress:
-            _print_progress(index, len(videos), prefix='生成中 ')
+            _print_progress(index, len(videos), prefix='Generating ')
     _save_map(mapping)
     if show_progress:
-        print(f"\n完成：生成 {stats['generated']}，跳过 {stats['skipped']}，失败 {stats['failed']}，总计 {stats['total']}")
+        print(f"\nDone: generated {stats['generated']}, skipped {stats['skipped']}, failed {stats['failed']}, total {stats['total']}")
     return stats
 
 
@@ -79,10 +79,10 @@ def clean_thumbnails(media_root: str | Path, show_progress: bool = True) -> dict
             mapping.pop(uri)
             removed += 1
         if show_progress:
-            _print_progress(index, total, prefix='清理中 ')
+            _print_progress(index, total, prefix='Cleaning ')
     _save_map(mapping)
     if show_progress:
-        print(f'\n清理完成：保留 {total - removed}，移除 {removed}，总计 {total}')
+        print(f'\nCleanup complete: kept {total - removed}, removed {removed}, total {total}')
     return {'kept': total - removed, 'removed': removed, 'total': total}
 
 
@@ -93,26 +93,26 @@ def verify_thumbnails(media_root: str | Path) -> dict:
     videos = {library.get_relative_path(path) for path in library.scan_videos()}
     cached = {uri for uri in videos if service.cached_thumbnail(uri)}
     invalid = sum(library.canonicalize_uri(uri) not in cached for uri in mapping if library.source_for_uri(uri))
-    print(f"视频总数: {len(videos)}  | 已有缩略图: {len(cached)}  | 异常映射: {invalid}  | 待生成: {len(videos - cached)}")
+    print(f"Videos: {len(videos)}  | Cached thumbnails: {len(cached)}  | Invalid mappings: {invalid}  | Pending: {len(videos - cached)}")
     return {'videos': len(videos), 'mapped': len(cached), 'invalid': invalid, 'missing': len(videos - cached)}
 
 
 def main():
-    parser = argparse.ArgumentParser(description='TikLocal 缩略图工具')
-    parser.add_argument('media_root', nargs='?', help='媒体根目录（可省略以使用环境变量 MEDIA_ROOT）')
-    parser.add_argument('--overwrite', action='store_true', help='已存在时覆盖重建')
-    parser.add_argument('--limit', type=int, default=0, help='最多处理多少个（0 表示全部）')
-    parser.add_argument('--clean', action='store_true', help='清理非视频/孤儿缩略图与映射')
-    parser.add_argument('--verify', action='store_true', help='仅校验覆盖率与异常，不修改')
+    parser = argparse.ArgumentParser(description='TikLocal thumbnail tool')
+    parser.add_argument('media_root', nargs='?', help='Media root (optional when MEDIA_ROOT is set)')
+    parser.add_argument('--overwrite', action='store_true', help='Rebuild existing thumbnails')
+    parser.add_argument('--limit', type=int, default=0, help='Maximum items to process (0 means all)')
+    parser.add_argument('--clean', action='store_true', help='Remove non-video or orphaned thumbnails and mappings')
+    parser.add_argument('--verify', action='store_true', help='Check coverage and errors without making changes')
     args = parser.parse_args()
 
     media_root = args.media_root or os.environ.get('MEDIA_ROOT')
     if not media_root:
-        parser.error('必须指定媒体目录：位置参数或环境变量 MEDIA_ROOT')
+        parser.error('Specify a media directory as an argument or with MEDIA_ROOT')
 
     root = Path(media_root)
     if not root.exists() or not root.is_dir():
-        parser.error(f'媒体目录不可用：{media_root}')
+        parser.error(f'Media directory is unavailable: {media_root}')
 
     if args.clean:
         clean_thumbnails(root, show_progress=True)

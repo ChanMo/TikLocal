@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       link.className = 'similar-image-card block overflow-hidden rounded-lg';
       const image = document.createElement('img');
       image.src = item.thumb_url;
-      image.alt = item.name || '相似图片';
+      image.alt = item.name || 'Similar image';
       image.loading = 'lazy';
       link.appendChild(image);
       grid.appendChild(link);

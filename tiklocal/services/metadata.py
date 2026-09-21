@@ -18,7 +18,7 @@ class ImageMetadataStore:
         except FileNotFoundError:
             return {}
         if not isinstance(data, dict):
-            raise ValueError('媒体元数据文件格式无效')
+            raise ValueError('Invalid media metadata file format')
         return data
 
     def get(self, key: str) -> dict[str, Any] | None:

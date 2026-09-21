@@ -82,7 +82,7 @@ def _merge_download_config(base: dict[str, Any], override: dict[str, Any] | None
 
 def validate_download_config(payload: Any, *, partial: bool = False) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(payload, dict):
-        return None, "配置格式必须是 JSON 对象。"
+        return None, "Configuration must be a JSON object."
 
     cleaned: dict[str, Any] = {}
 
@@ -99,7 +99,7 @@ def validate_download_config(payload: Any, *, partial: bool = False) -> tuple[di
             return None
         value = payload[field]
         if not isinstance(value, bool):
-            return f"{field} 必须是布尔值。"
+            return f"{field} must be a boolean."
         cleaned[field] = value
         return None
 
@@ -112,27 +112,27 @@ def validate_download_config(payload: Any, *, partial: bool = False) -> tuple[di
         value = payload.get("max_concurrent", defaults["max_concurrent"])
         max_concurrent = _to_int(value)
         if max_concurrent is None:
-            return None, "max_concurrent 必须是整数。"
+            return None, "max_concurrent must be an integer."
         if max_concurrent < 0 or max_concurrent > DOWNLOAD_MAX_CONCURRENT_LIMIT:
-            return None, f"max_concurrent 必须在 0 到 {DOWNLOAD_MAX_CONCURRENT_LIMIT} 之间。"
+            return None, f"max_concurrent must be between 0 and {DOWNLOAD_MAX_CONCURRENT_LIMIT}."
         cleaned["max_concurrent"] = max_concurrent
 
     if "cookie_dir" in payload or not partial:
         cookie_dir = str(payload.get("cookie_dir", defaults["cookie_dir"])).strip()
         if not cookie_dir:
-            return None, "cookie_dir 不能为空。"
+            return None, "cookie_dir cannot be empty."
         cleaned["cookie_dir"] = cookie_dir
 
     if "cookie_match_mode" in payload or not partial:
         mode = str(payload.get("cookie_match_mode", defaults["cookie_match_mode"])).strip()
         if mode != COOKIE_MATCH_MODE:
-            return None, f"cookie_match_mode 仅支持 {COOKIE_MATCH_MODE}。"
+            return None, f"cookie_match_mode only supports {COOKIE_MATCH_MODE}."
         cleaned["cookie_match_mode"] = mode
 
     if "gallery_archive_file" in payload or not partial:
         archive_file = str(payload.get("gallery_archive_file", defaults["gallery_archive_file"])).strip()
         if not archive_file:
-            return None, "gallery_archive_file 不能为空。"
+            return None, "gallery_archive_file cannot be empty."
         cleaned["gallery_archive_file"] = archive_file
 
     return cleaned, None
@@ -140,25 +140,25 @@ def validate_download_config(payload: Any, *, partial: bool = False) -> tuple[di
 
 def validate_download_url(payload: Any) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(payload, dict):
-        return None, "请求格式必须是 JSON 对象。"
+        return None, "Request body must be a JSON object."
 
     url = str(payload.get("url", "")).strip()
     if not url:
-        return None, "url 不能为空。"
+        return None, "url cannot be empty."
     if len(url) > DOWNLOAD_MAX_URL_LENGTH:
-        return None, f"url 长度不能超过 {DOWNLOAD_MAX_URL_LENGTH} 个字符。"
+        return None, f"url cannot exceed {DOWNLOAD_MAX_URL_LENGTH} characters."
 
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return None, "只支持 http/https 格式的 URL。"
+        return None, "Only HTTP and HTTPS URLs are supported."
 
     save_mode = str(payload.get("save_mode", "root")).strip() or "root"
     if save_mode != "root":
-        return None, "首版仅支持保存到媒体根目录。"
+        return None, "Downloads can only be saved to the media source root."
 
     engine = str(payload.get("engine", DEFAULT_DOWNLOAD_ENGINE)).strip().lower() or DEFAULT_DOWNLOAD_ENGINE
     if engine not in DOWNLOAD_ENGINES:
-        return None, "engine 必须是 yt-dlp 或 gallery-dl。"
+        return None, "engine must be yt-dlp or gallery-dl."
 
     cookie_mode = str(payload.get("cookie_mode", "")).strip().lower()
     cookie_file_raw = payload.get("cookie_file")
@@ -170,13 +170,13 @@ def validate_download_url(payload: Any) -> tuple[dict[str, Any] | None, str | No
         cookie_mode = "auto"
 
     if cookie_mode not in {"auto", "none", "manual"}:
-        return None, "cookie_mode 必须是 auto、none 或 manual。"
+        return None, "cookie_mode must be auto, none, or manual."
 
     if cookie_mode == "manual":
         if not cookie_file:
-            return None, "手动 cookie 模式需要 cookie_file。"
+            return None, "Manual cookie mode requires cookie_file."
         if not is_safe_cookie_filename(cookie_file):
-            return None, "cookie_file 非法，仅允许文件名。"
+            return None, "cookie_file must be a filename, not a path."
     else:
         cookie_file = ""
 
@@ -461,7 +461,7 @@ class DownloadManager:
     def start(self) -> None:
         with self._lock:
             if self._closed:
-                raise RuntimeError('下载管理器已关闭。')
+                raise RuntimeError('The download manager is closed.')
             self._started = True
 
     def close(self, timeout: float = 5.0) -> None:
@@ -475,7 +475,7 @@ class DownloadManager:
                     job['cancel_requested'] = True
                     if job['status'] == 'queued':
                         job.update(status='canceled', finished_at=_utc_now_iso(),
-                                   error_message='已取消。', eta_sec=None)
+                                   error_message='Canceled.', eta_sec=None)
             self._pending.clear()
             processes = list(self._processes.values())
             workers = list(self._workers.values())
@@ -490,7 +490,7 @@ class DownloadManager:
             for worker in workers:
                 worker.join(max(0, deadline - time.monotonic()))
             if any(worker.is_alive() for worker in workers):
-                raise RuntimeError('下载任务未能及时停止；仍有工作线程等待收尾。')
+                raise RuntimeError('Download jobs did not stop in time; worker threads are still shutting down.')
 
     def probe_dependencies(self) -> dict[str, Any]:
         yt_dlp_path, yt_dlp_version = self._probe_binary("yt-dlp")
@@ -560,7 +560,7 @@ class DownloadManager:
     ) -> dict[str, Any]:
         engine = (engine or DEFAULT_DOWNLOAD_ENGINE).strip().lower()
         if engine not in DOWNLOAD_ENGINES:
-            raise RuntimeError("不支持的下载引擎。")
+            raise RuntimeError("Unsupported download engine.")
 
         chosen_file, chosen_mode, cookie_error = self._resolve_cookie_choice(
             url=url,
@@ -572,9 +572,9 @@ class DownloadManager:
 
         with self._lock:
             if not self._started or self._closed:
-                raise RuntimeError('下载管理器尚未启动或已关闭。')
+                raise RuntimeError('The download manager has not started or is closed.')
             if not self._config.get("enabled", True):
-                raise RuntimeError("下载功能已禁用。")
+                raise RuntimeError("Downloads are disabled.")
 
             job_id = uuid.uuid4().hex[:12]
             now = _utc_now_iso()
@@ -613,23 +613,23 @@ class DownloadManager:
     def upload_cookie_file(self, filename: str, content: bytes, *, replace: bool = False) -> dict[str, Any]:
         safe_name = str(filename or "").strip()
         if not is_safe_cookie_filename(safe_name):
-            raise ValueError("文件名非法，仅支持 .txt/.cookies。")
+            raise ValueError("Invalid filename. Only .txt and .cookies files are supported.")
         if not isinstance(content, (bytes, bytearray)):
-            raise ValueError("文件内容格式错误。")
+            raise ValueError("Invalid file content format.")
         if len(content) == 0:
-            raise ValueError("文件内容不能为空。")
+            raise ValueError("File content cannot be empty.")
         if len(content) > COOKIE_MAX_UPLOAD_BYTES:
-            raise ValueError(f"文件不能超过 {COOKIE_MAX_UPLOAD_BYTES // 1024} KB。")
+            raise ValueError(f"File cannot exceed {COOKIE_MAX_UPLOAD_BYTES // 1024} KB.")
 
         cookie_dir = self._cookie_dir_path()
         target = (cookie_dir / safe_name).resolve()
         try:
             target.relative_to(cookie_dir.resolve())
         except ValueError as exc:
-            raise ValueError("文件路径非法。") from exc
+            raise ValueError("Invalid file path.") from exc
 
         if target.exists() and not replace:
-            raise ValueError(f"文件已存在: {safe_name}")
+            raise ValueError(f"File already exists: {safe_name}")
 
         tmp_path = target.with_suffix(target.suffix + ".tmp")
         with tmp_path.open("wb") as f:
@@ -652,7 +652,7 @@ class DownloadManager:
             if not job:
                 return False, "Job not found"
             if job.get("status") not in TERMINAL_JOB_STATUS:
-                return False, "运行中任务不可删除"
+                return False, "A running job cannot be deleted"
 
             self._jobs.pop(job_id, None)
             self._cancel_events.pop(job_id, None)
@@ -683,18 +683,18 @@ class DownloadManager:
     def retry_job(self, job_id: str) -> tuple[dict[str, Any] | None, str | None]:
         with self._lock:
             if not self._started or self._closed:
-                return None, '下载管理器尚未启动或已关闭。'
+                return None, 'The download manager has not started or is closed.'
             job = self._jobs.get(job_id)
             if not job:
                 return None, "Job not found"
             if job.get("status") not in {"failed", "canceled"}:
-                return None, "仅失败或已取消任务支持重试"
+                return None, "Only failed or canceled jobs can be retried"
             index_only = job.get('failure_stage') == 'index'
             if index_only:
                 for uri in job['output_files_rel']:
                     path = self._resolve_media_file_path(uri)
                     if path is None or not path.is_file():
-                        return None, '已下载文件不存在，无法重新登记；请重新创建下载任务。'
+                        return None, 'The downloaded file no longer exists and cannot be registered. Create a new download job.'
                 job.update(status='queued', error_message='', finished_at=None, cancel_requested=False)
                 self._cancel_events[job_id] = threading.Event()
                 self._persist_locked()
@@ -806,7 +806,7 @@ class DownloadManager:
                 status = str(item.get("status") or "failed")
                 if status in {"queued", "running"}:
                     status = "failed"
-                    item["error_message"] = "任务因服务重启中断。"
+                    item["error_message"] = "The job was interrupted by a service restart."
                     item["finished_at"] = now
                 raw_output_files = item.get("output_files_rel")
                 output_files_rel = raw_output_files if isinstance(raw_output_files, list) else []
@@ -921,7 +921,7 @@ class DownloadManager:
                     self._persist_locked()
                 else:
                     job["status"] = "failed"
-                    job["error_message"] = error_message or "下载失败，请检查 URL 与网络环境。"
+                    job["error_message"] = error_message or "Download failed. Check the URL and network connection."
                     job["finished_at"] = _utc_now_iso()
                     self._persist_locked()
 
@@ -955,10 +955,10 @@ class DownloadManager:
                 job["status"] = "failed"
                 job["finished_at"] = _utc_now_iso()
                 if job.get('failure_stage') == 'index':
-                    job['error_message'] = f'文件已下载，媒体登记失败：{exc}'
+                    job['error_message'] = f'The file was downloaded, but media registration failed: {exc}'
                 elif isinstance(exc, FileNotFoundError):
                     engine = job.get('engine') or DEFAULT_DOWNLOAD_ENGINE
-                    job['error_message'] = f'未检测到 {engine}，请先安装后再使用该引擎。'
+                    job['error_message'] = f'{engine} was not found. Install it before using this engine.'
                 else:
                     job['error_message'] = str(exc)
                 self._persist_locked()
@@ -979,7 +979,7 @@ class DownloadManager:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
-                return 1, "任务不存在。", ""
+                return 1, "Job not found.", ""
             engine = str(job.get("engine") or DEFAULT_DOWNLOAD_ENGINE)
 
         if engine == "gallery-dl":
@@ -994,7 +994,7 @@ class DownloadManager:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
-                return 1, "任务不存在。", []
+                return 1, "Job not found.", []
             url = job["url"]
             allow_playlist = bool(self._config.get("allow_playlist", False))
             cookie_file = str(job.get("cookie_file") or "")
@@ -1078,7 +1078,7 @@ class DownloadManager:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
-                return 1, "任务不存在。", []
+                return 1, "Job not found.", []
             url = str(job.get("url") or "")
             cookie_file = str(job.get("cookie_file") or "")
             cookie_match_mode = str(job.get("cookie_match_mode") or "none")
@@ -1147,7 +1147,7 @@ class DownloadManager:
             moved_outputs = [self._move_file_to_media_root(path) for path in outputs]
             moved_outputs = [path for path in moved_outputs if path]
             if not moved_outputs:
-                return 1, "gallery-dl 未下载到可用文件。", []
+                return 1, "gallery-dl did not download any usable files.", []
             return 0, "", moved_outputs
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -1172,7 +1172,7 @@ class DownloadManager:
     def _mark_canceled_locked(self, job: dict[str, Any]) -> None:
         job["status"] = "canceled"
         job["finished_at"] = _utc_now_iso()
-        job["error_message"] = "已取消。"
+        job["error_message"] = "Canceled."
         job["eta_sec"] = None
         self._persist_locked()
 
@@ -1181,7 +1181,7 @@ class DownloadManager:
         # escape close() while it is taking its process snapshot.
         with self._lock:
             if self._closed or self._cancel_events[job_id].is_set():
-                raise RuntimeError('下载已取消。')
+                raise RuntimeError('Download canceled.')
             process = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT, text=True,
                                bufsize=1, start_new_session=os.name == 'posix')
             self._processes[job_id] = process
@@ -1264,7 +1264,7 @@ class DownloadManager:
 
     def _normalize_execute_result(self, result: Any) -> tuple[int, str, list[str]]:
         if not isinstance(result, tuple):
-            return 1, "下载器返回结果格式错误。", []
+            return 1, "The downloader returned an invalid result.", []
 
         return_code = _to_int(result[0]) if len(result) >= 1 else 1
         if return_code is None:
@@ -1556,14 +1556,14 @@ class DownloadManager:
         cookie_dir = self._expand_cookie_dir(cookie_dir_text)
         if not files:
             if cookie_mode == "manual":
-                return "", "none", f"未找到 cookie 文件目录或文件: {cookie_dir}"
+                return "", "none", f"Cookie directory or file not found: {cookie_dir}"
             return "", "none", None
 
         if cookie_mode == "manual":
             if not cookie_file:
-                return "", "none", "手动模式缺少 cookie_file。"
+                return "", "none", "Manual mode requires cookie_file."
             if cookie_file not in files:
-                return "", "none", f"cookie 文件不存在: {cookie_file}"
+                return "", "none", f"Cookie file not found: {cookie_file}"
             return cookie_file, "manual", None
 
         parsed = urlparse(url)
@@ -1593,12 +1593,12 @@ class DownloadManager:
         info = self.list_cookie_files()
         cookie_dir = Path(info["cookie_dir"]).expanduser().resolve()
         if cookie_file not in info.get("files", []):
-            return None, f"cookie 文件不存在: {cookie_file}"
+            return None, f"Cookie file not found: {cookie_file}"
         path = (cookie_dir / cookie_file).resolve()
         try:
             path.relative_to(cookie_dir)
         except ValueError:
-            return None, "cookie 文件路径非法。"
+            return None, "Invalid cookie file path."
         if not path.exists() or not path.is_file():
-            return None, f"cookie 文件不可用: {cookie_file}"
+            return None, f"Cookie file is unavailable: {cookie_file}"
         return path, None

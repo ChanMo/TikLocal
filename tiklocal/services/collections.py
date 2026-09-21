@@ -157,7 +157,7 @@ class CollectionStore:
     def create(self, name: str, description: str = "") -> dict[str, Any]:
         clean_name = _normalize_text(name)[:MAX_COLLECTION_NAME_LENGTH]
         if not clean_name:
-            raise ValueError("name 不能为空。")
+            raise ValueError("name cannot be empty.")
         clean_desc = _normalize_text(description)[:MAX_COLLECTION_DESCRIPTION_LENGTH]
 
         now = _utc_now_iso()
@@ -199,14 +199,14 @@ class CollectionStore:
             if name is not None:
                 clean = _normalize_text(name)[:MAX_COLLECTION_NAME_LENGTH]
                 if not clean:
-                    raise ValueError("name 不能为空。")
+                    raise ValueError("name cannot be empty.")
                 found["name"] = clean
             if description is not None:
                 found["description"] = _normalize_text(description)[:MAX_COLLECTION_DESCRIPTION_LENGTH]
             if cover_uri is not None:
                 normalized_cover = _normalize_uri(cover_uri)
                 if normalized_cover and all(entry["uri"] != normalized_cover for entry in found["items"]):
-                    raise ValueError("cover_uri 不在集合条目中。")
+                    raise ValueError("cover_uri is not one of the collection items.")
                 found["cover_uri"] = normalized_cover
 
             found["item_count"] = len(found["items"])

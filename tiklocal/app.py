@@ -53,8 +53,8 @@ from tiklocal.config import similarity_enabled
 
 
 def get_app_version():
-    """获取应用版本号，开发模式下从 pyproject.toml 读取"""
-    # 开发模式：优先从 pyproject.toml 读取
+    """Return the app version, reading pyproject.toml during development."""
+    # Prefer pyproject.toml when running from a development checkout.
     pyproject_path = Path(__file__).parent.parent / 'pyproject.toml'
     if pyproject_path.exists():
         try:
@@ -73,7 +73,7 @@ def get_app_version():
             except Exception:
                 pass
 
-    # 生产模式：从已安装的包元数据获取
+    # Installed builds read their package metadata.
     try:
         return version("tiklocal")
     except PackageNotFoundError:
@@ -190,7 +190,7 @@ def create_app(test_config=None):
     app.extensions["media_index_sync"] = index_sync_result
     if index_sync_result["unavailable_sources"]:
         app.logger.warning(
-            "媒体源不可用，已保留其现有索引: %s",
+            "Media source unavailable; preserving its existing index: %s",
             ", ".join(index_sync_result["unavailable_sources"]),
         )
     activity_store = MediaActivityStore(app_database)
@@ -263,7 +263,7 @@ def create_app(test_config=None):
         try:
             return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
         except (ValueError, OSError):
-            return '未知时间'
+            return 'Unknown time'
 
     @app.template_filter('filesizeformat')
     def filesizeformat(num_bytes):

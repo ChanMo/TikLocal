@@ -1,127 +1,115 @@
-# LumaFold 原生 App 真机验收清单
+# LumaFold Device Acceptance Checklist
 
-- 适用版本: `0.1.0 (1)`
-- 状态: JuPhone 本地核心、缩略图与批量导入反馈已通过；完整 P0 继续执行
-- 更新时间: 2026-08-26
+- Target version: `0.1.0 (1)`
+- Status: JuPhone local core, thumbnails, and bulk-import feedback passed; full P0 validation continues
+- Updated: 2026-08-26
 
-## 发布判定
+## Release decision
 
-本地资料库与离线 Flow 是当前首要发布范围；对应 P0 项全部通过后才可提交商店。
-Radio 的后台播放、锁屏控制或耳机操作也只有在对应 P0 通过后才能写入商店文案。
-每项记录设备、系统版本、构建编号和证据；不能以模拟器结果代替。
+The local Library and offline Flow are the primary release scope. All related P0 items must pass before store submission. Background Radio playback, lock-screen controls, and headset behavior may appear in store copy only after their P0 checks pass. Record the device, OS version, build number, and evidence for every item; simulator results are not a substitute.
 
-## 本地资料库与离线 Flow
+## Local Library and offline Flow
 
-- [x] P0 — iOS Release 可安装、冷启动并进入 Home，关闭 Metro 和 TikLocal Server 后仍可使用 My Flow。
-- [ ] P0 — 用户点击 Photos 后才申请照片权限；允许、限制访问和拒绝均有可恢复结果。
-- [ ] P0 — Files 选择器可导入本机与 iCloud Drive 中已下载的图片、短视频和大视频。
-- [ ] P0 — 导入后彻底断网、删除或移动源文件，App 副本仍可从网格和 Flow 打开。
-- [ ] P0 — 重启 App 后资料库仍在；重复导入不会生成意外重复副本或孤立文件。
-- [x] P0 — 图片、视频数量与总空间统计在导入、删除和清空后立即准确更新。
-- [x] P0 — 长按多选删除与 Clear 均有明确破坏性确认，只删除 TikLocal 副本；Photos / Files 原件仍可打开。
-- [ ] P0 — 单个文件删除失败时不删除对应 SQLite 记录，并向用户报告未完成项目。
-- [ ] P0 — 使用最终 iOS 构建核验 `tiklocal-media/` 已设置不进入 iCloud 设备备份的资源标记。
-- [ ] P0 — 视频进入视口后播放、离屏暂停、手动暂停、循环和声音符合预期；图片无闪烁或错误拉伸。
-- [ ] P1 — HEIC、HDR、Live Photo、ProRes 和常见 Files 容器的支持边界已记录，失败时不会破坏资料库。
-- [ ] P1 — 分别以 500、5,000 和 20,000 条媒体记录测量启动、滚动、内存和数据库查询。
-- [ ] P1 — 导入中断、空间不足和 App 被系统终止后不留下不可清理的半成品。
+- [x] P0 — The iOS Release installs, cold-starts into Home, and runs My Flow with Metro and TikLocal Server offline.
+- [ ] P0 — Photos permission is requested only after tapping Photos; full, limited, and denied access all have recoverable outcomes.
+- [ ] P0 — The Files picker imports local and downloaded iCloud Drive photos, short videos, and large videos.
+- [ ] P0 — App copies still open in the grid and Flow after disconnecting all networks and deleting or moving source files.
+- [ ] P0 — The Library survives restart; repeated imports create no unexpected duplicates or orphaned files.
+- [x] P0 — Photo count, video count, and total storage update immediately after import, deletion, and Clear.
+- [x] P0 — Long-press multi-delete and Clear have explicit destructive confirmation, remove only TikLocal copies, and leave Photos/Files originals intact.
+- [ ] P0 — A single-file deletion failure keeps its SQLite record and reports the unfinished item.
+- [ ] P0 — The final iOS build marks `tiklocal-media/` as excluded from iCloud device backup.
+- [ ] P0 — Videos play on entry, pause offscreen, support manual pause, loop, and sound; images neither flicker nor stretch incorrectly.
+- [ ] P1 — Support boundaries for HEIC, HDR, Live Photo, ProRes, and common Files containers are recorded without corrupting the Library on failure.
+- [ ] P1 — Measure startup, scrolling, memory, and database queries with 500, 5,000, and 20,000 media records.
+- [ ] P1 — Interrupted imports, low storage, and OS termination leave no unremovable partial files.
 
-2026-08-26 JuPhone 实测：飞行模式下 Flow 播放正常；删除本地副本后系统原件仍存在；
-空间统计随操作正常更新；Clear 可清空资料库且不影响原件。第二轮 Release 的旧视频
-预览回填、批量导入进度和剩余空间展示也已通过；低空间阻断由自动化测试覆盖，仍未
-在接近满盘的真实设备上强制验证。
+JuPhone testing on 2026-08-26 confirmed Flow playback in airplane mode, originals remaining after local-copy deletion, accurate storage statistics, and Clear leaving originals intact. A second Release also passed old-video preview backfill, bulk-import progress, and remaining-space display. Automated tests cover low-space blocking, which still needs validation on a nearly full real device.
 
-同日 LumaFold 工作品牌 Release 已使用原 bundle identifier 覆盖安装并成功启动；
-显示名、图标、启动页和权限文案生效，本地数据与 TikLocal Server 配对无需迁移。
+The LumaFold working-brand Release installed over the original bundle identifier and launched successfully the same day. The display name, icon, splash screen, and permission copy took effect without migrating local data or TikLocal Server pairing.
 
-当前已知边界：
+Known boundaries:
 
-- `expo-audio` 单播放器已提供系统播放、暂停、进度和锁屏媒体会话。
-- 当前 SDK 没有向该播放器暴露耳机“下一首 / 上一首”回调。`0.1.x` 已决定只支持系统和耳机播放/暂停；远程切歌不属于本次验收与发布承诺。
-- 睡眠定时目前依赖 JavaScript timer，必须验证 App 长时间进入后台后能否按时暂停；未通过时不得把它作为可靠的后台能力宣传。
+- The single `expo-audio` player provides system play, pause, progress, and lock-screen media sessions.
+- The current SDK exposes no headset next/previous callbacks for this player. Version `0.1.x` promises only system and headset play/pause; remote track changes are outside this release scope.
+- The sleep timer currently uses a JavaScript timer. Verify timely pause after extended background time before presenting it as reliable background behavior.
 
-本轮 Android 验收固定使用正式签名产物
-`dist/android/TikLocal-Radio-0.1.0-android.apk`，APK SHA-256 为
-`8d2a73f80e04dd0b434c9192495100d17ad9980ace119da94e0a7b283e4aced4`，签名证书
-SHA-256 为
-`eb883956d85ee395938d63aeccf2294426490475db3df62942a15c962e4db483`。
-若设备已安装 Debug 签名的同包名 App，首次切换必须卸载旧版，因此该次操作不计入
-“升级保留 Profile”验收；后续正式签名版本之间才能验证覆盖升级。
+Android acceptance uses the production-signed `dist/android/TikLocal-Radio-0.1.0-android.apk`. Its APK SHA-256 is `8d2a73f80e04dd0b434c9192495100d17ad9980ace119da94e0a7b283e4aced4`; the signing-certificate SHA-256 is `eb883956d85ee395938d63aeccf2294426490475db3df62942a15c962e4db483`. A device with a debug-signed app under the same package must uninstall it before the first switch, so that run does not count as profile-preserving upgrade acceptance. Test in-place upgrades between later production-signed versions.
 
-## 构建与首次启动
+## Build and first launch
 
-- [ ] P0 — iOS TestFlight / preview build 可安装、冷启动且不依赖 Metro。
-- [ ] P0 — Android 正式签名 Release APK 可安装、冷启动且不依赖 Metro。
-- [ ] P0 — App 名称、图标、启动页、版本 `0.1.0 (1)` 正确。
-- [ ] P0 — 无 Server 时进入 Demo Signal，三段内置音频均可播放和切换。
-- [ ] P1 — 升级安装后已保存的 Server Profile 仍可使用。
-- [ ] P0 — Radio 使用自定义 Safe Area 顶部，Station 位于左上角且更多菜单可操作；Connection 以 Form Sheet 打开，Change Server 可通过 Cancel 返回且不修改当前连接。
-- [ ] P1 — Favorite / Play / Next 使用清晰的系统图标，Signal Dial 播放时旋转，并在开启 Reduce Motion 后保持静止。
-- [ ] P1 — 正常 Radio 不重复展示 Server；Offline / Empty 状态仍有明确且可点击的 Connection 恢复入口。
+- [ ] P0 — The iOS TestFlight/preview build installs and cold-starts without Metro.
+- [ ] P0 — The production-signed Android Release APK installs and cold-starts without Metro.
+- [ ] P0 — App name, icon, splash screen, and version `0.1.0 (1)` are correct.
+- [ ] P0 — Without a server, Demo Signal opens and all three bundled tracks play and switch.
+- [ ] P1 — A saved server profile remains usable after an in-place upgrade.
+- [ ] P0 — Radio uses its custom Safe Area top; Station sits at top left; the more menu works; Connection opens as a Form Sheet; Cancel from Change Server returns without changing the current connection.
+- [ ] P1 — Favorite, Play, and Next use clear system icons; Signal Dial rotates during playback and remains still with Reduce Motion enabled.
+- [ ] P1 — Normal Radio does not repeat the server; Offline and Empty states retain a clear, actionable Connection recovery entry.
 
-## Server 与网络
+## Server and network
 
-- [ ] P0 — Web 设置页明确生成一次性二维码，App 首次点 Scan 时才请求相机权限。
-- [ ] P0 — 扫描有效二维码后先显示正确 Server 地址；只有点击确认才发起兑换并进入 Radio。
-- [ ] P0 — App 未运行时点击 `tiklocal-radio://` 配对链接，会打开配对页、显示目标 Server，且不会自动兑换。
-- [ ] P0 — App 已在前台时点击配对链接同样更新配对页；取消后返回原有 Radio，非法 URL 不改变当前界面。
-- [ ] P0 — 拒绝相机权限、永久拒绝权限和无效二维码都有可恢复说明，仍可粘贴链接或手动配对。
-- [ ] P0 — 过期二维码、已兑换二维码和改密前生成的二维码均不可再次配对，并显示可理解错误。
-- [ ] P0 — 二维码及其预览未被 App 保存到照片、日志或上传到第三方。
-- [ ] P0 — 可信局域网 `http://<IPv4>:<port>` 可配对并播放。
-- [ ] P0 — `http://<hostname>.local:<port>` 可配对并播放。
-- [ ] P0 — 已信任 TikLocal CA 后，内置 HTTPS 地址可配对并播放。
-- [ ] P0 — 未信任证书、错误密码、不可达地址和请求超时均显示可理解错误。
-- [ ] P0 — 空音乐库显示 `NO AUDIO`，播放、下一首、收藏、Encore 和睡眠按钮不可操作，系统媒体面板被清除。
-- [ ] P1 — Server 暂时离线时保留当前界面；恢复后切换电台可重新连接。
+- [ ] P0 — Web Settings explicitly generates a single-use QR code; the app asks for camera permission only after the first Scan tap.
+- [ ] P0 — A valid scan shows the correct server address and exchanges the authorization only after confirmation.
+- [ ] P0 — Opening a `tiklocal-radio://` pairing link while the app is stopped opens pairing and shows the target without automatic exchange.
+- [ ] P0 — Opening a pairing link in the foreground updates pairing; Cancel returns to the existing Radio; an invalid URL does not alter the current screen.
+- [ ] P0 — Denied camera access, permanent denial, and an invalid QR code offer recovery through paste or manual pairing.
+- [ ] P0 — Expired, redeemed, and pre-password-change QR codes cannot pair again and show understandable errors.
+- [ ] P0 — The app never saves the QR code or its preview to Photos, logs, or a third party.
+- [ ] P0 — Trusted-LAN `http://<IPv4>:<port>` pairs and plays.
+- [ ] P0 — `http://<hostname>.local:<port>` pairs and plays.
+- [ ] P0 — Built-in HTTPS pairs and plays after trusting the TikLocal CA.
+- [ ] P0 — Untrusted certificates, wrong passwords, unreachable addresses, and timeouts show understandable errors.
+- [ ] P0 — An empty music library shows `NO AUDIO`; Play, Next, Favorite, Encore, and Sleep are disabled; the system media panel is cleared.
+- [ ] P1 — A temporary server outage preserves the screen and changing stations reconnects after recovery.
 
-## iOS 系统媒体行为
+## iOS system media behavior
 
-- [ ] P0 — 静音开关开启时仍能正常播放音乐。
-- [ ] P0 — 锁屏后连续播放至少 10 分钟，不因进入后台停止。
-- [ ] P0 — 锁屏与控制中心显示正确标题、歌手和专辑。
-- [ ] P0 — 锁屏播放、暂停与进度变化和 App 状态一致。
-- [ ] P0 — 有线 / 蓝牙耳机播放暂停键有效。
-- [ ] P0 — 拔出耳机或断开蓝牙后自动暂停，不从扬声器意外续播。
-- [ ] P1 — 电话、Siri 或其他音频打断后行为符合系统预期，不出现双重播放。
-- [ ] P1 — 杀死 App 后系统媒体信息被清除。
+- [ ] P0 — Music plays with the mute switch enabled.
+- [ ] P0 — Playback continues for at least 10 minutes after locking without stopping in background.
+- [ ] P0 — Lock screen and Control Center show the correct title, artist, and album.
+- [ ] P0 — Lock-screen play, pause, and progress match app state.
+- [ ] P0 — Wired and Bluetooth headset play/pause works.
+- [ ] P0 — Unplugging a headset or disconnecting Bluetooth pauses without unexpected speaker playback.
+- [ ] P1 — Phone, Siri, and other audio interruptions behave normally without double playback.
+- [ ] P1 — Killing the app clears system media information.
 
-## Android 系统媒体行为
+## Android system media behavior
 
-- [ ] P0 — 熄屏或切到后台后连续播放至少 10 分钟。
-- [ ] P0 — 锁屏与通知抽屉显示媒体会话和正确曲目信息。
-- [ ] P0 — 系统播放、暂停与进度变化和 App 状态一致。
-- [ ] P0 — 有线 / 蓝牙耳机播放暂停键有效。
-- [ ] P0 — 拔出耳机或断开蓝牙后自动暂停。
-- [ ] P0 — 从最近任务划走 App 后，播放生命周期符合最终产品决策且不留下僵尸通知。
-- [ ] P1 — 电池优化开启时完成 30 分钟连续播放。
+- [ ] P0 — Playback continues for at least 10 minutes with the screen off or app in background.
+- [ ] P0 — Lock screen and notification shade show a media session with correct track information.
+- [ ] P0 — System play, pause, and progress match app state.
+- [ ] P0 — Wired and Bluetooth headset play/pause works.
+- [ ] P0 — Unplugging a headset or disconnecting Bluetooth pauses.
+- [ ] P0 — Swiping the app from recents follows the final playback-lifecycle decision without leaving a stale notification.
+- [ ] P1 — Playback continues for 30 minutes with battery optimization enabled.
 
-## Radio 状态与凭证
+## Radio state and credentials
 
-- [ ] P0 — 播放、完整听完、跳过、Encore 和收藏反馈进入用户自己的 Server。
-- [ ] P0 — 快速连续点击下一首或切换电台，不出现旧请求覆盖新队列。
-- [ ] P0 — 修改 TikLocal 访问密码后，App 收到 401、只移除失效令牌，保留 Server 名称与地址并进入重新授权页。
-- [ ] P0 — Server 离线、密码错误或请求超时后再次进入连接流程，最近的合法地址仍已填充。
-- [ ] P0 — Forget This Server 经系统破坏性确认后撤销设备令牌并删除本地记录；Server 离线时仍能本地忘记。
-- [ ] P1 — 进入 Demo 不会隐式撤销或忘记已知 Server。
-- [ ] P0 — Web 设置页撤销当前设备后，App 下一次请求回到配对页。
-- [ ] P1 — 配对新 Server 后旧设备令牌被撤销。
+- [ ] P0 — Play, completion, skip, Encore, and favorite feedback reaches the user's own server.
+- [ ] P0 — Rapid Next or station changes never let an old request replace the new queue.
+- [ ] P0 — After changing the TikLocal password, a 401 removes only the invalid token, keeps server name and address, and opens reauthorization.
+- [ ] P0 — After offline, wrong-password, or timeout failures, Connection still contains the most recent valid address.
+- [ ] P0 — **Forget This Server** uses system destructive confirmation, revokes the token, and deletes the local record; local forget still works while offline.
+- [ ] P1 — Entering Demo does not implicitly revoke or forget a known server.
+- [ ] P0 — Revoking the current device in Web Settings returns the app to pairing on its next request.
+- [ ] P1 — Pairing a new server revokes the old device token.
 
-## 定时与长时运行
+## Timers and extended operation
 
-- [ ] P0 — 前台设置 30 分钟睡眠定时，到时暂停且 UI 归零。
-- [ ] P0 — 锁屏并保持后台 30 分钟，睡眠定时仍在目标时间暂停。
-- [ ] P1 — 连续播放 2 小时，切歌、内存、发热和耗电没有明显异常。
-- [ ] P1 — 网络在 Wi-Fi 断开 / 恢复后不会形成请求风暴或重复反馈。
+- [ ] P0 — A 30-minute foreground sleep timer pauses on time and resets the UI.
+- [ ] P0 — A 30-minute sleep timer still pauses on time while locked in background.
+- [ ] P1 — Two hours of playback shows no notable track-switching, memory, heat, or battery issue.
+- [ ] P1 — Wi-Fi disconnect and recovery cause no request storm or duplicate feedback.
 
-## 证据记录
+## Evidence
 
-| 平台 | 设备 / 系统 | Build | 结果 | 失败现象或证据 |
+| Platform | Device / OS | Build | Result | Failure or evidence |
 | --- | --- | --- | --- | --- |
-| iOS | JuPhone / iPhone 15 / iOS 26.6.1 | `0.1.0 (1)` Release | 本地核心通过 | 2026-08-26 已确认飞行模式播放、删除不影响系统原件、空间统计和 Clear；SQLite v2 新版已覆盖安装并成功启动，缩略图回填与批量导入进度待体验复核。 |
-| Android | 待填写 | `0.1.0 (1)` | 待执行 | |
+| iOS | JuPhone / iPhone 15 / iOS 26.6.1 | `0.1.0 (1)` Release | Local core passed | 2026-08-26 confirmed airplane-mode playback, originals surviving deletion, storage statistics, and Clear. SQLite v2 installed over the previous build and launched; preview backfill and bulk-import progress still need experience review. |
+| Android | Pending | `0.1.0 (1)` | Not run | |
 
-## 相关文件
+## Related files
 
 - `apps/radio/src/player.ts`
 - `apps/radio/src/radio.ts`

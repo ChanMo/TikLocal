@@ -39,16 +39,16 @@ class AuthStore:
         try:
             mtime_ns = self.path.stat().st_mtime_ns
         except OSError as exc:
-            raise RuntimeError(f'认证配置无法读取: {self.path}') from exc
+            raise RuntimeError(f'Authentication configuration cannot be read: {self.path}') from exc
         if self._data is not None and self._mtime_ns == mtime_ns:
             return self._data
         try:
             data = json.loads(self.path.read_text(encoding='utf-8'))
         except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f'认证配置无法读取: {self.path}') from exc
+            raise RuntimeError(f'Authentication configuration cannot be read: {self.path}') from exc
         required = {'password_hash', 'secret_key', 'revision'}
         if not isinstance(data, dict) or not required.issubset(data):
-            raise RuntimeError(f'认证配置不完整: {self.path}')
+            raise RuntimeError(f'Authentication configuration is incomplete: {self.path}')
         self._data = data
         self._mtime_ns = mtime_ns
         return data
@@ -110,17 +110,17 @@ class AuthStore:
     def secret_key(self) -> str:
         data = self._load()
         if not data:
-            raise RuntimeError('认证尚未初始化')
+            raise RuntimeError('Authentication has not been initialized')
         return str(data['secret_key'])
 
     @property
     def revision(self) -> int:
         data = self._load()
         if not data:
-            raise RuntimeError('认证尚未初始化')
+            raise RuntimeError('Authentication has not been initialized')
         return int(data['revision'])
 
     @staticmethod
     def _validate_password(password: str) -> None:
         if len(str(password or '')) < MIN_PASSWORD_LENGTH:
-            raise ValueError(f'访问密码至少需要 {MIN_PASSWORD_LENGTH} 个字符')
+            raise ValueError(f'Access password must contain at least {MIN_PASSWORD_LENGTH} characters')

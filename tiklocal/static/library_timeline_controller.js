@@ -31,7 +31,7 @@
 
   function formatCount(value) {
     const count = Number(value || 0);
-    return count > 9999 ? `${(count / 10000).toFixed(count > 99999 ? 0 : 1)} 万项` : `${count} 项`;
+    return new Intl.NumberFormat('en', { notation: count > 9999 ? 'compact' : 'standard' }).format(count) + ' items';
   }
 
   function monthUrl(monthKey, focusName = '') {
@@ -67,7 +67,7 @@
     const meta = document.createElement('span');
     const summary = years.find((item) => String(item.year) === year);
     meta.textContent = summary
-      ? `${summary.month_count} 个月 · ${formatCount(summary.count)}`
+      ? `${summary.month_count} months · ${formatCount(summary.count)}`
       : 'PRIVATE ARCHIVE';
     marker.append(title, meta);
     stream.appendChild(marker);
@@ -77,7 +77,7 @@
     const tile = document.createElement('button');
     tile.type = 'button';
     tile.className = `timeline-tile${index === 0 && visibleCount >= 5 ? ' is-hero' : ''}`;
-    tile.setAttribute('aria-label', `打开 ${month.key} 的媒体`);
+    tile.setAttribute('aria-label', `Open media from ${month.key}`);
 
     const image = document.createElement('img');
     image.dataset.src = String(item.thumb_url || '');
@@ -131,11 +131,11 @@
     title.className = 'timeline-month-title';
     title.href = monthUrl(month.key);
     title.addEventListener('click', () => rememberPosition(month.key));
-    title.innerHTML = `<span class="timeline-month-number">${parts.month}</span><span class="timeline-month-unit">月</span>`;
+    title.innerHTML = `<span class="timeline-month-number">${parts.month}</span><span class="timeline-month-unit">month</span>`;
 
     const meta = document.createElement('span');
     meta.className = 'timeline-month-meta';
-    const videoText = Number(month.video_count || 0) > 0 ? ` · ${month.video_count} 段视频` : '';
+    const videoText = Number(month.video_count || 0) > 0 ? ` · ${month.video_count} videos` : '';
     meta.textContent = `${formatCount(month.count)}${videoText}`;
     head.append(title, meta);
 
@@ -150,7 +150,7 @@
     const open = document.createElement('a');
     open.className = 'timeline-open-month';
     open.href = monthUrl(month.key);
-    open.innerHTML = `<span>查看这个月的全部 ${formatCount(month.count)}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
+    open.innerHTML = `<span>View all ${formatCount(month.count)} from this month</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
     open.addEventListener('click', () => rememberPosition(month.key));
     foot.appendChild(open);
 
@@ -185,7 +185,7 @@
   async function loadMore() {
     if (loadingMore || !hasMore || !nextBefore) return;
     loadingMore = true;
-    statusText.textContent = '正在翻开更早的月份…';
+    statusText.textContent = 'Opening earlier months…';
     loading.hidden = false;
     try {
       const params = new URLSearchParams({ before: nextBefore, limit: '8', preview_limit: '18' });
@@ -199,10 +199,10 @@
       hasMore = data.has_more === true;
       nextBefore = String(data.next_before || '');
       renderMonths(incoming);
-      statusText.textContent = hasMore ? '继续向下，翻阅更早的时光' : '已经来到影像的开端';
+      statusText.textContent = hasMore ? 'Keep scrolling to visit earlier moments' : "You've reached the beginning of your library";
       renderYears();
     } catch (error) {
-      statusText.textContent = '更早的月份暂时没有打开，向下滚动可重试';
+      statusText.textContent = 'Earlier months could not be opened. Scroll down to try again.';
     } finally {
       loadingMore = false;
     }
@@ -283,7 +283,7 @@
       .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
     const month = visible[0]?.target?.dataset?.month;
     const parts = monthParts(month);
-    if (parts) currentLabel.textContent = `${parts.year} 年 ${parts.month} 月`;
+    if (parts) currentLabel.textContent = new Intl.DateTimeFormat('en', { year: 'numeric', month: 'long' }).format(new Date(parts.year, parts.month - 1, 1));
   }, { rootMargin: '-10% 0px -68% 0px', threshold: 0 });
 
   const loadObserver = new IntersectionObserver((entries) => {
@@ -311,12 +311,12 @@
   }, { passive: true });
 
   if (!months.length) {
-    stream.innerHTML = '<div class="timeline-empty">还没有可以写进时间线的图片或视频。</div>';
+    stream.innerHTML = '<div class="timeline-empty">There are no photos or videos for the timeline yet.</div>';
     loading.hidden = true;
   } else {
     renderMonths(months);
     renderYears();
-    statusText.textContent = hasMore ? '继续向下，翻阅更早的时光' : '已经来到影像的开端';
+    statusText.textContent = hasMore ? 'Keep scrolling to visit earlier moments' : "You've reached the beginning of your library";
     loadObserver.observe(sentinel);
     restorePosition();
   }

@@ -109,7 +109,7 @@ def register_similarity_routes(app, library_service, app_database):
     def api_embedding_index_run():
         return {
             'success': False,
-            'error': 'Web 批量构建已停用，请使用 tiklocal vectorize --dry-run 预览，再通过 CLI 执行。',
+            'error': 'Web batch building is disabled. Preview with tiklocal vectorize --dry-run, then run it from the CLI.',
         }, 410
 
     @app.route('/api/ai/embedding-index/cleanup', methods=['POST'])

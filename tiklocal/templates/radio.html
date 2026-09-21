@@ -568,11 +568,11 @@
   </div>
 
   <div class="radio-layout">
-    <section class="signal-stage" aria-label="电台播放器">
+    <section class="signal-stage" aria-label="Radio player">
       <div class="signal-caption" aria-hidden="true">
         <span>TKL</span><span>RADIO · 24/7</span>
       </div>
-      <button id="btn-play" class="signal-disc" type="button" title="播放" aria-label="播放" aria-pressed="false">
+      <button id="btn-play" class="signal-disc" type="button" title="Play" aria-label="Play" aria-pressed="false">
         <span class="disc-halo" aria-hidden="true"></span>
         <span class="record-surface" aria-hidden="true"></span>
         <span class="signal-marker" aria-hidden="true"></span>
@@ -596,7 +596,7 @@
       <div class="station-room-bar">
         <div class="station-chip">
           <span class="station-pulse" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span id="station-name">默认电台</span>
+          <span id="station-name">Default Station</span>
         </div>
         <div class="room-picker">
           <button
@@ -606,23 +606,23 @@
             aria-haspopup="listbox"
             aria-expanded="false"
             aria-controls="room-menu"
-            aria-label="氛围：雨夜，点击选择"
+            aria-label="Ambience: rainy night. Click to select."
           >
             <span class="room-status-dot" aria-hidden="true"></span>
             <span id="room-label">ROOM · RAIN</span>
           </button>
-          <div id="room-menu" class="room-menu" role="listbox" aria-label="选择氛围" hidden>
+          <div id="room-menu" class="room-menu" role="listbox" aria-label="Choose ambience" hidden>
             <button class="room-option" type="button" role="option" data-room="rain" aria-selected="true">
               <span class="room-option-key">RAIN</span>
-              <span class="room-option-name">雨夜窗边</span>
+              <span class="room-option-name">Rainy Window</span>
             </button>
             <button class="room-option" type="button" role="option" data-room="breeze" aria-selected="false">
               <span class="room-option-key">BREEZE</span>
-              <span class="room-option-name">午后微风</span>
+              <span class="room-option-name">Afternoon Breeze</span>
             </button>
             <button class="room-option" type="button" role="option" data-room="off" aria-selected="false">
               <span class="room-option-key">OFF</span>
-              <span class="room-option-name">静止背景</span>
+              <span class="room-option-name">Still Background</span>
             </button>
           </div>
         </div>
@@ -634,29 +634,29 @@
         <div id="track-meta" class="track-meta"></div>
       </section>
 
-      <section class="progress-panel" aria-label="播放进度">
-        <input id="progress-bar" type="range" min="0" max="100" value="0" aria-label="播放进度">
+      <section class="progress-panel" aria-label="Playback progress">
+        <input id="progress-bar" type="range" min="0" max="100" value="0" aria-label="Playback progress">
         <div class="time-row">
           <span id="time-current">0:00</span>
           <span id="time-total">0:00</span>
         </div>
       </section>
 
-      <section class="radio-controls" aria-label="电台操作">
-        <button id="btn-fav" class="radio-button" type="button" title="收藏" aria-label="收藏" aria-pressed="false">
+      <section class="radio-controls" aria-label="Radio controls">
+        <button id="btn-fav" class="radio-button" type="button" title="Add to favorites" aria-label="Add to favorites" aria-pressed="false">
           <i data-feather="heart"></i>
-          <span class="sr-only">收藏</span>
+          <span class="sr-only">Add to favorites</span>
         </button>
-        <button id="btn-encore" class="radio-button" type="button" title="再听" aria-label="再听一遍" aria-pressed="false">
+        <button id="btn-encore" class="radio-button" type="button" title="Encore" aria-label="Play again" aria-pressed="false">
           <i data-feather="repeat"></i>
           <span id="encore-count" class="encore-count" aria-hidden="true"></span>
         </button>
-        <button id="btn-next" class="radio-button is-primary" type="button" title="下一首" aria-label="下一首">
+        <button id="btn-next" class="radio-button is-primary" type="button" title="Next" aria-label="Next track">
           <i data-feather="skip-forward"></i>
         </button>
-        <button id="btn-sleep" class="radio-button" type="button" title="定时" aria-label="定时" aria-pressed="false">
+        <button id="btn-sleep" class="radio-button" type="button" title="Sleep timer" aria-label="Sleep timer" aria-pressed="false">
           <i data-feather="moon"></i>
-          <span id="sleep-label" class="sr-only">定时</span>
+          <span id="sleep-label" class="sr-only">Sleep timer</span>
         </button>
       </section>
     </div>

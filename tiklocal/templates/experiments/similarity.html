@@ -5,38 +5,38 @@
 {% block content %}
 <main class="max-w-6xl mx-auto px-4 py-8 pb-28 space-y-7">
   <header class="space-y-2">
-    <a href="{{ url_for('library_view') }}" class="text-sm underline">返回媒体库</a>
-    <h1 class="text-2xl font-semibold">相似图片 <span class="text-sm font-normal opacity-60">实验</span></h1>
-    <p class="text-sm opacity-70">浏览已生成的相似分组；查看结果不会调用模型。</p>
+    <a href="{{ url_for('library_view') }}" class="text-sm underline">Return to Library</a>
+    <h1 class="text-2xl font-semibold">Similar Images <span class="text-sm font-normal opacity-60">Experiment</span></h1>
+    <p class="text-sm opacity-70">Browse generated similarity groups. Viewing results does not call the model.</p>
   </header>
 
-  <section aria-label="向量状态" class="space-y-3">
+  <section aria-label="Vector status" class="space-y-3">
     <dl class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      {% for label, value in [('图片总数', status.total_images), ('当前可用', status.indexed), ('未构建', status.missing), ('需更新', status.stale)] %}
+      {% for label, value in [('Total Images', status.total_images), ('Available', status.indexed), ('Not Built', status.missing), ('Needs Update', status.stale)] %}
       <div><dt class="text-sm opacity-60">{{ label }}</dt><dd class="text-2xl font-semibold">{{ value }}</dd></div>
       {% endfor %}
     </dl>
     {% if status.stale_reasons %}
-    <p class="text-sm">需更新原因（可能重叠）：
-      {% set labels = {'model': '模型变化', 'dimensions': '向量维度变化', 'image_max_size': '图片尺寸配置变化', 'image_quality': '图片质量配置变化', 'file_changed': '文件变化'} %}
+    <p class="text-sm">Update reasons (may overlap):
+      {% set labels = {'model': 'Model changed', 'dimensions': 'Vector dimensions changed', 'image_max_size': 'Image size setting changed', 'image_quality': 'Image quality setting changed', 'file_changed': 'File changed'} %}
       {% for reason, count in status.stale_reasons.items() %}{{ labels[reason] }} {{ count }}{% if not loop.last %} · {% endif %}{% endfor %}
     </p>
     {% endif %}
-    <p class="text-sm break-words opacity-70">{{ config.model_name }} · {{ config.dimensions }} 维 · 图片最长边 {{ config.image_max_size }}px · JPEG 质量 {{ config.image_quality }}</p>
-    <p class="text-sm">待处理 {{ status.pending }} 张。预计费用未知，取决于模型服务商与实际处理量。</p>
-    {% if not config.enabled %}<p class="text-sm">当前仅查看结果，向量构建未启用。</p>{% endif %}
+    <p class="text-sm break-words opacity-70">{{ config.model_name }} · {{ config.dimensions }} dimensions · longest edge {{ config.image_max_size }}px · JPEG quality {{ config.image_quality }}</p>
+    <p class="text-sm">{{ status.pending }} images pending. Estimated cost depends on the model provider and processed volume.</p>
+    {% if not config.enabled %}<p class="text-sm">Results are view-only because vector building is disabled.</p>{% endif %}
     <details class="text-sm space-y-2">
-      <summary class="cursor-pointer underline">构建与更新说明</summary>
-      <p>在服务器终端使用已配置的媒体目录。先预览处理范围，再执行；没有确认不会开始调用模型。</p>
+      <summary class="cursor-pointer underline">Build and update instructions</summary>
+      <p>Use the configured media directory in the server terminal. Preview the scope first, then run it; the model is not called without confirmation.</p>
       <pre class="overflow-x-auto p-3 rounded-lg bg-gray-100 dark:bg-gray-800">tiklocal vectorize --dry-run --limit 100
 tiklocal vectorize --limit 100
 tiklocal analyze-similar</pre>
-      <p>构建需要配置 embedding.enabled: true 与 API Key。Web 批量构建已停用，避免长时间占用浏览服务。</p>
+      <p>Building requires embedding.enabled: true and an API key. Web batch building is disabled to avoid occupying the browsing service.</p>
     </details>
   </section>
 
-  <section aria-label="相似分组" class="space-y-3">
-    <h2 class="text-lg font-semibold">相似分组</h2>
+  <section aria-label="Similarity groups" class="space-y-3">
+    <h2 class="text-lg font-semibold">Similarity Groups</h2>
     <div class="similar-groups-grid">
       {% for group in page['items'] %}
       {% set visible = group['items'][:6] %}
@@ -53,10 +53,10 @@ tiklocal analyze-similar</pre>
       </article>
       {% endfor %}
     </div>
-    {% if not page['items'] %}<p class="py-8 opacity-70">此页暂无可展示分组。可先构建向量，再运行本地相似分析。</p>{% endif %}
-    <nav aria-label="分组分页" class="flex gap-6 text-sm">
-      {% if page.offset > 0 %}<a class="underline" href="{{ url_for('similarity_view', offset=[0, page.offset-page.limit]|max) }}">上一页</a>{% endif %}
-      {% if page.has_more %}<a class="underline" href="{{ url_for('similarity_view', offset=page.next_offset) }}">下一页</a>{% endif %}
+    {% if not page['items'] %}<p class="py-8 opacity-70">There are no groups to display on this page. Build vectors, then run local similarity analysis.</p>{% endif %}
+    <nav aria-label="Group pagination" class="flex gap-6 text-sm">
+      {% if page.offset > 0 %}<a class="underline" href="{{ url_for('similarity_view', offset=[0, page.offset-page.limit]|max) }}">Previous</a>{% endif %}
+      {% if page.has_more %}<a class="underline" href="{{ url_for('similarity_view', offset=page.next_offset) }}">Next</a>{% endif %}
     </nav>
   </section>
 </main>

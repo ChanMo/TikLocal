@@ -48,7 +48,7 @@ def _wait_for_job(client, job_id, timeout=2.0):
         if job["status"] in {"success", "failed", "canceled"}:
             return job
         time.sleep(0.05)
-    pytest.fail(f'任务未在 {timeout} 秒内完成: {job}')
+    pytest.fail(f'Job did not finish within {timeout} seconds: {job}')
 
 
 @pytest.mark.parametrize('limit,status', [(0, 200), (-1, 400)])
@@ -96,7 +96,7 @@ def test_detail_route_redirects_image_to_image_view(client):
 
 
 @pytest.mark.parametrize('payload,error', [
-    ({'url': 'file:///tmp/a.mp4'}, 'http/https'),
+    ({'url': 'file:///tmp/a.mp4'}, 'HTTP and HTTPS'),
     ({'url': 'https://example.com/video', 'engine': 'wget'}, 'engine'),
     ({'url': 'https://example.com/private', 'cookie_mode': 'manual', 'cookie_file': '../secrets.txt'}, 'cookie_file'),
 ])
@@ -306,13 +306,13 @@ def test_constructing_and_closing_apps_leaves_no_download_threads(tmp_path):
         app = create_app({'TESTING': True, 'MEDIA_ROOT': tmp_path})
         manager = app.extensions['download_manager']
         manager.update_config({'max_concurrent': 3})
-        with pytest.raises(RuntimeError, match='尚未启动'):
+        with pytest.raises(RuntimeError, match='has not started'):
             manager.enqueue('https://example.com/video')
         manager.start()
         manager.start()
         manager.close()
         manager.close()
-        with pytest.raises(RuntimeError, match='关闭'):
+        with pytest.raises(RuntimeError, match='closed'):
             manager.enqueue('https://example.com/video')
     assert set(threading.enumerate()) == before
 
@@ -392,7 +392,7 @@ def test_cli_owns_download_lifecycle_and_skips_reloader_parent(client, monkeypat
         manager = app.extensions['download_manager']
         managers.append(manager)
         if dev and not child:
-            with pytest.raises(RuntimeError, match='尚未启动'):
+            with pytest.raises(RuntimeError, match='has not started'):
                 manager.enqueue('https://example.com/video')
         else:
             manager.enqueue('https://example.com/video')
@@ -407,6 +407,6 @@ def test_cli_owns_download_lifecycle_and_skips_reloader_parent(client, monkeypat
     monkeypatch.setattr(sys, 'argv', ['tiklocal', str(client.application.config['MEDIA_ROOT']), *(['--dev'] if dev else [])])
     with pytest.raises(RuntimeError, match='test server stopped'):
         main()
-    with pytest.raises(RuntimeError, match='关闭'):
+    with pytest.raises(RuntimeError, match='closed'):
         managers[0].enqueue('https://example.com/video')
     assert not any(t.name.startswith('tiklocal-download-') for t in threading.enumerate())

@@ -201,7 +201,7 @@
     function scheduleFlowLoadingStatus() {
       clearTimeout(flowLoadingTimer);
       flowLoadingTimer = setTimeout(() => {
-        showFlowStatus('loading', '正在准备内容');
+        showFlowStatus('loading', 'Preparing your media');
       }, 250);
     }
 
@@ -293,8 +293,8 @@
         if (favoriteBtn.dataset.value !== name) return;
         favoriteBtn.classList.toggle('is-active', !!value);
         favoriteBtn.setAttribute('aria-pressed', String(!!value));
-        favoriteBtn.setAttribute('aria-label', value ? '取消收藏' : '收藏');
-        favoriteBtn.title = value ? '取消收藏' : '收藏';
+        favoriteBtn.setAttribute('aria-label', value ? 'Remove from favorites' : 'Add to favorites');
+        favoriteBtn.title = value ? 'Remove from favorites' : 'Add to favorites';
       },
       onCaptionClear: () => {
         clearCaption();
@@ -310,7 +310,7 @@
           flashCaptionError();
         }
       },
-      confirmCaptionReplace: async () => window.confirm('已存在标题，是否覆盖生成？'),
+      confirmCaptionReplace: async () => window.confirm('A title already exists. Replace it?'),
     });
 
 
@@ -324,7 +324,7 @@
         payload = null;
       }
       if (!response.ok || !(payload && payload.success)) {
-        throw new Error((payload && payload.error) || '请求失败');
+        throw new Error((payload && payload.error) || 'Request failed');
       }
       return payload.data || {};
     }
@@ -342,12 +342,12 @@
       if (!collectionModalMeta) return;
       const items = Array.isArray(names) ? names.filter(Boolean) : [];
       if (!items.length) {
-        collectionModalMeta.textContent = '当前未加入任何集合';
+        collectionModalMeta.textContent = 'Not in any collections';
         return;
       }
-      const preview = items.slice(0, 2).join('、');
+      const preview = items.slice(0, 2).join(', ');
       const rest = items.length - 2;
-      collectionModalMeta.textContent = rest > 0 ? `已加入：${preview} +${rest}` : `已加入：${preview}`;
+      collectionModalMeta.textContent = rest > 0 ? `In: ${preview} +${rest}` : `In: ${preview}`;
     }
 
     function setCollectionButtonState(names) {
@@ -355,9 +355,9 @@
       const count = items.length;
       collectionBtn.classList.toggle('has-collection', count > 0);
       collectionCount.textContent = count > 99 ? '99+' : String(count);
-      const preview = items.slice(0, 2).join('、');
+      const preview = items.slice(0, 2).join(', ');
       const suffix = items.length > 2 ? ` +${items.length - 2}` : '';
-      collectionBtn.title = count > 0 ? `已加入：${preview}${suffix}` : '加入集合';
+      collectionBtn.title = count > 0 ? `In: ${preview}${suffix}` : 'Add to Collection';
     }
 
     async function fetchCollectionMembership(uri, force = false) {
@@ -419,12 +419,12 @@
 
     function renderCollectionList(items, selectedIds) {
       if (!Array.isArray(items) || !items.length) {
-        collectionList.innerHTML = '<div class="collection-modal-empty">暂无集合，先新建一个。</div>';
+        collectionList.innerHTML = '<div class="collection-modal-empty">No collections yet. Create one first.</div>';
         return;
       }
       collectionList.innerHTML = items.map((item) => {
         const id = String(item.id || '');
-        const safeName = escapeHtml(String(item.name || '未命名集合'));
+        const safeName = escapeHtml(String(item.name || 'Untitled collection'));
         const count = Number(item.item_count || 0);
         const checked = selectedIds.has(id) ? 'checked' : '';
         const isSelected = selectedIds.has(id) ? 'is-selected' : '';
@@ -450,7 +450,7 @@
       collectionModalOpenedAt = Date.now();
       collectionModal.classList.add('active');
       collectionModal.setAttribute('aria-hidden', 'false');
-      collectionList.innerHTML = '<div class="collection-modal-empty">加载中...</div>';
+      collectionList.innerHTML = '<div class="collection-modal-empty">Loading...</div>';
       try {
         const [allData, selectedState] = await Promise.all([
           collectionsRequest('/api/collections'),
@@ -464,7 +464,7 @@
         setCollectionMeta(collectionSelectedNames);
         renderCollectionList(allItems, collectionSelectedIds);
       } catch (error) {
-        collectionList.innerHTML = '<div class="collection-modal-empty">加载失败，请重试。</div>';
+        collectionList.innerHTML = '<div class="collection-modal-empty">Failed to load. Please try again.</div>';
       }
       feather.replace();
     }
@@ -999,7 +999,7 @@
         panel.dataset.name = item.name;
         panel.innerHTML = `
           <div class="theme-strip-header">
-            <h2>${escapeHtml(item.title || '主题精选')}</h2>
+            <h2>${escapeHtml(item.title || 'Featured Theme')}</h2>
           </div>
           <div class="theme-strip-rail"></div>
         `;
@@ -1222,7 +1222,7 @@
         if (feedItems.length) {
           hideFlowStatus();
         } else if (!flowSession.hasMore()) {
-          showFlowStatus('empty', '这里还没有可浏览的内容', '添加媒体后刷新索引，内容会出现在这里。');
+          showFlowStatus('empty', 'There is nothing to browse yet', 'Add media and refresh the index to see it here.');
         }
         return result;
       } catch (error) {
@@ -1230,7 +1230,7 @@
         flowLoadingTimer = null;
         const reachedEnd = getCurrentIndex() >= feedItems.length - 1;
         if (isInitialLoad || reachedEnd) {
-          showFlowStatus('error', '内容暂时没有加载出来', '可以重试，或先去媒体库查看现有内容。');
+          showFlowStatus('error', 'Your media could not be loaded', 'Try again or browse the existing media in your library.');
         }
         return null;
       }
@@ -1238,7 +1238,7 @@
 
     function handleMediaFailure(mediaEl) {
       if (currentItem()?.el !== mediaEl) return;
-      showFlowStatus('media-error', '这个媒体暂时无法打开', '文件可能已移动、离线或格式不可用。');
+      showFlowStatus('media-error', 'This media cannot be opened', 'The file may have moved, be offline, or use an unsupported format.');
     }
 
     async function retryCurrentMedia() {
@@ -1263,7 +1263,7 @@
 
     async function retryFlowLoad() {
       flowSession.setHasMore(true);
-      showFlowStatus('loading', '正在重新加载');
+      showFlowStatus('loading', 'Reloading');
       const result = await loadFeed();
       if (result && feedItems.length && getCurrentIndex() < 0) {
         await showItem(0);
@@ -1367,7 +1367,7 @@
         }]);
       } catch (error) {
         if (favoriteBtn.dataset.value === name) {
-          favoriteBtn.title = '收藏未保存，请重试';
+          favoriteBtn.title = 'Favorite was not saved. Please try again.';
           favoriteBtn.setAttribute('aria-label', favoriteBtn.title);
         }
       } finally {

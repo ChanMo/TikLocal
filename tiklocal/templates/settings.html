@@ -276,112 +276,112 @@
 {% block content %}
 <main class="settings-page tool-page">
   <header class="settings-header tool-page-header">
-    <p class="tool-page-overline"><i data-feather="sliders"></i><span>本地偏好</span></p>
-    <h1 class="settings-title">设置</h1>
-    <p class="tool-page-intro">管理显示方式、媒体索引和本机服务。</p>
+    <p class="tool-page-overline"><i data-feather="sliders"></i><span>Local Preferences</span></p>
+    <h1 class="settings-title">Settings</h1>
+    <p class="tool-page-intro">Manage appearance, the media index, and local services.</p>
   </header>
 
   <div class="settings-stack">
     <section aria-labelledby="appearance-title">
-      <h2 id="appearance-title" class="settings-section-title">外观</h2>
+      <h2 id="appearance-title" class="settings-section-title">Appearance</h2>
       <div class="settings-card appearance-card">
         <div class="appearance-heading">
-          <div class="settings-row-title">显示模式</div>
-          <div class="settings-row-copy">选择后立即应用到所有页面。</div>
+          <div class="settings-row-title">Display Mode</div>
+          <div class="settings-row-copy">Your selection applies to every page immediately.</div>
         </div>
-        <div class="theme-options" role="group" aria-label="显示模式">
+        <div class="theme-options" role="group" aria-label="Display mode">
           <button class="theme-option" type="button" data-theme-preference="system" aria-pressed="false">
-            <span class="theme-preview theme-preview-system"><span class="theme-check"><i data-feather="check"></i></span></span><span>跟随系统</span>
+            <span class="theme-preview theme-preview-system"><span class="theme-check"><i data-feather="check"></i></span></span><span>System</span>
           </button>
           <button class="theme-option" type="button" data-theme-preference="light" aria-pressed="false">
-            <span class="theme-preview theme-preview-light"><span class="theme-check"><i data-feather="check"></i></span></span><span>浅色</span>
+            <span class="theme-preview theme-preview-light"><span class="theme-check"><i data-feather="check"></i></span></span><span>Light</span>
           </button>
           <button class="theme-option" type="button" data-theme-preference="dark" aria-pressed="false">
-            <span class="theme-preview theme-preview-dark"><span class="theme-check"><i data-feather="check"></i></span></span><span>深色</span>
+            <span class="theme-preview theme-preview-dark"><span class="theme-check"><i data-feather="check"></i></span></span><span>Dark</span>
           </button>
         </div>
       </div>
     </section>
 
     <section aria-labelledby="radio-devices-title">
-      <h2 id="radio-devices-title" class="settings-section-title">Radio 客户端</h2>
+      <h2 id="radio-devices-title" class="settings-section-title">Radio Clients</h2>
       <div class="settings-card">
         <div class="settings-row">
           <span class="setting-icon"><i data-feather="link"></i></span>
           <div class="settings-row-main">
-            <div class="settings-row-title">配对新手机</div>
-            <div class="settings-row-copy">生成一个两分钟有效、使用一次即失效的安全配对链接。</div>
+            <div class="settings-row-title">Pair a New Phone</div>
+            <div class="settings-row-copy">Generate a secure, single-use pairing link that expires in two minutes.</div>
           </div>
-          <button id="open-radio-pairing" class="settings-action is-primary" type="button">生成</button>
+          <button id="open-radio-pairing" class="settings-action is-primary" type="button">Generate</button>
         </div>
       </div>
       <div id="radio-device-list" class="settings-card radio-device-list">
         <div class="settings-row">
           <span class="setting-icon"><i data-feather="radio"></i></span>
           <div class="settings-row-main">
-            <div class="settings-row-title">已配对设备</div>
-            <div class="settings-row-copy">正在读取设备令牌…</div>
+            <div class="settings-row-title">Paired Devices</div>
+            <div class="settings-row-copy">Loading device tokens…</div>
           </div>
         </div>
       </div>
     </section>
 
     <section aria-labelledby="library-title">
-      <h2 id="library-title" class="settings-section-title">媒体库</h2>
+      <h2 id="library-title" class="settings-section-title">Media Library</h2>
       <div class="settings-card">
         <div class="library-summary">
-          <div class="library-total"><span id="media-total">{{ videos + images }}</span><span class="library-total-unit">个本地媒体</span></div>
-          <div class="library-types"><span id="videos-count">{{ videos }}</span> 个视频 · <span id="images-count">{{ images }}</span> 张图片</div>
-          <div id="index-sync-state" class="library-sync-state"><span class="library-sync-dot"></span><span id="index-sync-copy">正在读取索引状态…</span></div>
+          <div class="library-total"><span id="media-total">{{ videos + images }}</span><span class="library-total-unit">local media items</span></div>
+          <div class="library-types"><span id="videos-count">{{ videos }}</span> videos · <span id="images-count">{{ images }}</span> images</div>
+          <div id="index-sync-state" class="library-sync-state"><span class="library-sync-dot"></span><span id="index-sync-copy">Loading index status…</span></div>
         </div>
         <div class="settings-row">
           <span class="setting-icon"><i data-feather="refresh-cw"></i></span>
           <div class="settings-row-main">
-            <div class="settings-row-title">重新扫描媒体库</div>
-            <div class="settings-row-copy">适用于应用运行期间从外部新增、移动或删除文件。</div>
+            <div class="settings-row-title">Rescan Media Library</div>
+            <div class="settings-row-copy">Use after files are added, moved, or deleted outside TikLocal while it is running.</div>
           </div>
-          <button id="refresh-library" class="settings-action" type="button">扫描</button>
+          <button id="refresh-library" class="settings-action" type="button">Scan</button>
         </div>
         <div class="settings-row">
           <span class="setting-icon"><i data-feather="image"></i></span>
           <div class="settings-row-main">
-            <div class="settings-row-title">缩略图缓存</div>
-            <div class="settings-row-copy"><span id="cache-size">{{ cache_size_mb }} MB</span>，清理后会在浏览时按需重新生成。</div>
+            <div class="settings-row-title">Thumbnail Cache</div>
+            <div class="settings-row-copy"><span id="cache-size">{{ cache_size_mb }} MB</span>; thumbnails regenerate as needed while browsing.</div>
           </div>
-          <button id="clear-cache" class="settings-action" type="button">清理</button>
+          <button id="clear-cache" class="settings-action" type="button">Clear</button>
         </div>
       </div>
     </section>
 
     <section aria-labelledby="privacy-title">
-      <h2 id="privacy-title" class="settings-section-title">隐私与推荐</h2>
+      <h2 id="privacy-title" class="settings-section-title">Privacy and Recommendations</h2>
       <div class="settings-card settings-row">
         <span class="setting-icon"><i data-feather="clock"></i></span>
         <div class="settings-row-main">
-          <div class="settings-row-title">本地浏览记录</div>
-          <div class="settings-row-copy">重置浏览、跳过和完成记录，不影响收藏与集合。</div>
+          <div class="settings-row-title">Local Browsing History</div>
+          <div class="settings-row-copy">Reset views, skips, and completions without changing favorites or collections.</div>
         </div>
-        <button id="reset-recommendations" class="settings-action is-danger" type="button">重置</button>
+        <button id="reset-recommendations" class="settings-action is-danger" type="button">Reset</button>
       </div>
     </section>
 
     <section id="download" aria-labelledby="download-title">
-      <h2 id="download-title" class="settings-section-title">下载</h2>
+      <h2 id="download-title" class="settings-section-title">Downloads</h2>
       <div class="settings-card">
         <div class="settings-row">
           <span class="setting-icon"><i data-feather="activity"></i></span>
           <div class="settings-row-main">
-            <div class="settings-row-title">下载组件</div>
-            <div id="download-dependency-copy" class="settings-row-copy">正在检查运行状态…</div>
+            <div class="settings-row-title">Download Components</div>
+            <div id="download-dependency-copy" class="settings-row-copy">Checking status…</div>
           </div>
         </div>
         <div class="settings-row">
           <span class="setting-icon"><i data-feather="layers"></i></span>
           <div class="settings-row-main">
-            <div class="settings-row-title">同时下载</div>
-            <div class="settings-row-copy">控制并行任务数量，2 个适合大多数设备。</div>
+            <div class="settings-row-title">Concurrent Downloads</div>
+            <div class="settings-row-copy">Control parallel jobs. Two works well for most devices.</div>
           </div>
-          <div id="download-levels" class="download-levels" role="group" aria-label="同时下载任务数">
+          <div id="download-levels" class="download-levels" role="group" aria-label="Concurrent download jobs">
             <button class="download-level" type="button" data-concurrency="1">1</button>
             <button class="download-level" type="button" data-concurrency="2">2</button>
             <button class="download-level" type="button" data-concurrency="4">4</button>
@@ -390,34 +390,34 @@
         <div class="settings-row">
           <span class="setting-icon"><i data-feather="shield"></i></span>
           <div class="settings-row-main">
-            <div class="settings-row-title">网站登录信息</div>
-            <div id="credential-summary" class="settings-row-copy">正在读取…</div>
+            <div class="settings-row-title">Website Credentials</div>
+            <div id="credential-summary" class="settings-row-copy">Loading…</div>
           </div>
-          <button id="manage-credentials" class="settings-action" type="button">管理</button>
+          <button id="manage-credentials" class="settings-action" type="button">Manage</button>
         </div>
       </div>
     </section>
 
     {% if similarity_enabled %}
-    <section aria-label="实验">
-      <h2 class="settings-section-title">实验</h2>
+    <section aria-label="Experiments">
+      <h2 class="settings-section-title">Experiments</h2>
       <a href="{{ url_for('similarity_view') }}" class="settings-card settings-row">
         <div class="settings-row-main">
-          <div class="settings-row-title">相似图片</div>
-          <div class="settings-row-copy">查看本地向量状态和相似分组。</div>
+          <div class="settings-row-title">Similar Images</div>
+          <div class="settings-row-copy">View local vector status and similarity groups.</div>
         </div>
         <span aria-hidden="true">→</span>
       </a>
     </section>
     {% endif %}
 
-    <section aria-label="关于">
+    <section aria-label="About">
       <footer class="about-footer about-card">
         <div class="about-line">
           <span class="about-name">TikLocal</span><span class="about-separator" aria-hidden="true">·</span><span class="about-version">v{{ version }}</span><span class="about-separator" aria-hidden="true">·</span>
           <a class="about-link" href="https://github.com/ChanMo/TikLocal" target="_blank" rel="noopener noreferrer">GitHub</a>
           <span class="about-separator" aria-hidden="true">·</span>
-          <a class="about-link" href="mailto:chan.mo@outlook.com">联系作者</a>
+          <a class="about-link" href="mailto:chan.mo@outlook.com">Contact the Author</a>
         </div>
       </footer>
     </section>
@@ -426,15 +426,15 @@
 <div id="credential-mask" class="credential-mask" hidden>
   <section class="credential-dialog" role="dialog" aria-modal="true" aria-labelledby="credential-title">
     <div class="credential-head">
-      <div><h2 id="credential-title" class="credential-title">网站登录信息</h2><p class="credential-copy">用于访问需要登录的内容，文件只保存在当前设备。</p></div>
-      <button id="close-credentials" class="credential-close" type="button" aria-label="关闭"><i data-feather="x"></i></button>
+      <div><h2 id="credential-title" class="credential-title">Website Credentials</h2><p class="credential-copy">Use them for sign-in-only content. Files remain on this device.</p></div>
+      <button id="close-credentials" class="credential-close" type="button" aria-label="Close"><i data-feather="x"></i></button>
     </div>
-    <div id="credential-list" class="credential-list"><div class="credential-empty">正在读取登录信息…</div></div>
+    <div id="credential-list" class="credential-list"><div class="credential-empty">Loading credentials…</div></div>
     <div class="credential-upload">
-      <div class="credential-upload-title">添加或更新</div>
-      <p class="credential-upload-copy">支持 .txt 和 .cookies；上传同名文件会自动替换。</p>
+      <div class="credential-upload-title">Add or Update</div>
+      <p class="credential-upload-copy">Supports .txt and .cookies files. Uploading the same filename replaces it.</p>
       <input id="credential-file" class="credential-file" type="file" accept=".txt,.cookies,text/plain">
-      <div class="credential-upload-actions"><button id="upload-credential" class="settings-action is-primary" type="button">上传</button></div>
+      <div class="credential-upload-actions"><button id="upload-credential" class="settings-action is-primary" type="button">Upload</button></div>
     </div>
   </section>
 </div>
@@ -442,28 +442,28 @@
   <section class="pairing-dialog" role="dialog" aria-modal="true" aria-labelledby="pairing-title">
     <div class="credential-head">
       <div>
-        <h2 id="pairing-title" class="credential-title">配对 TikLocal Radio</h2>
-        <p class="credential-copy">链接不包含访问密码或长期设备令牌，并会在两分钟后失效。</p>
+        <h2 id="pairing-title" class="credential-title">Pair TikLocal Radio</h2>
+        <p class="credential-copy">The link contains no access password or long-lived device token and expires after two minutes.</p>
       </div>
-      <button id="close-radio-pairing" class="credential-close" type="button" aria-label="关闭"><i data-feather="x"></i></button>
+      <button id="close-radio-pairing" class="credential-close" type="button" aria-label="Close"><i data-feather="x"></i></button>
     </div>
     <label class="pairing-field">
-      <span class="pairing-label">手机能够访问的 Server 地址</span>
+      <span class="pairing-label">Server address reachable from your phone</span>
       <input id="pairing-server-url" class="pairing-input" type="url" inputmode="url" autocomplete="url">
     </label>
     <p id="pairing-warning" class="pairing-warning"></p>
     <div id="pairing-result" class="pairing-result" hidden>
-      <img id="pairing-qr" class="pairing-qr" alt="TikLocal Radio 一次性配对二维码">
+      <img id="pairing-qr" class="pairing-qr" alt="Single-use TikLocal Radio pairing QR code">
       <label class="pairing-field">
-        <span class="pairing-label">在 TikLocal Radio 中粘贴</span>
+        <span class="pairing-label">Paste into TikLocal Radio</span>
         <textarea id="pairing-link" class="pairing-link" readonly></textarea>
       </label>
       <p id="pairing-expiry" class="pairing-expiry" aria-live="polite"></p>
     </div>
     <div class="pairing-actions">
-      <button id="generate-radio-pairing" class="settings-action is-primary" type="button">生成配对链接</button>
-      <button id="copy-radio-pairing" class="settings-action" type="button" hidden>复制链接</button>
-      <a id="open-radio-link" class="settings-action pairing-open" href="#" aria-disabled="true" hidden>在本机打开</a>
+      <button id="generate-radio-pairing" class="settings-action is-primary" type="button">Generate Pairing Link</button>
+      <button id="copy-radio-pairing" class="settings-action" type="button" hidden>Copy Link</button>
+      <a id="open-radio-link" class="settings-action pairing-open" href="#" aria-disabled="true" hidden>Open on This Device</a>
     </div>
   </section>
 </div>
@@ -534,7 +534,7 @@
       const payload = await response.json();
       if (!response.ok || payload.success === false) {
         const message = typeof payload.error === 'object' ? payload.error?.message : payload.error;
-        throw new Error(message || '请求失败');
+        throw new Error(message || 'Request failed');
       }
       return payload;
     }
@@ -542,15 +542,15 @@
     async function requestForm(url, formData) {
       const response = await fetch(url, { method: 'POST', body: formData });
       const payload = await response.json();
-      if (!response.ok || payload.success === false) throw new Error(payload.error || '请求失败');
+      if (!response.ok || payload.success === false) throw new Error(payload.error || 'Request failed');
       return payload;
     }
 
     function formatSyncTime(value) {
-      if (!value) return '尚未完成扫描';
+      if (!value) return 'No scan completed yet';
       const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return '最近已完成扫描';
-      return `最近扫描：${date.toLocaleString()}`;
+      if (Number.isNaN(date.getTime())) return 'A scan completed recently';
+      return `Last scanned: ${date.toLocaleString('en')}`;
     }
 
     async function loadStats() {
@@ -565,14 +565,14 @@
         document.getElementById('index-sync-copy').textContent = formatSyncTime(payload.last_synced_at);
         document.getElementById('index-sync-state').classList.remove('is-error');
       } catch (error) {
-        document.getElementById('index-sync-copy').textContent = '暂时无法读取索引状态';
+        document.getElementById('index-sync-copy').textContent = 'Index status is unavailable';
         document.getElementById('index-sync-state').classList.add('is-error');
       }
     }
 
     function formatDeviceTime(value) {
       const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? '配对时间未知' : `配对于 ${date.toLocaleString()}`;
+      return Number.isNaN(date.getTime()) ? 'Pairing time unknown' : `Paired ${date.toLocaleString('en')}`;
     }
 
     function renderRadioDevices(devices = []) {
@@ -580,7 +580,7 @@
       if (!devices.length) {
         const row = document.createElement('div');
         row.className = 'settings-row';
-        row.innerHTML = '<span class="setting-icon"><i data-feather="radio"></i></span><div class="settings-row-main"><div class="settings-row-title">还没有 Radio 客户端</div><div class="settings-row-copy">在 TikLocal Radio 中输入此 Server 的地址和访问密码即可配对。</div></div>';
+        row.innerHTML = '<span class="setting-icon"><i data-feather="radio"></i></span><div class="settings-row-main"><div class="settings-row-title">No Radio clients yet</div><div class="settings-row-copy">Enter this server address and access password in TikLocal Radio to pair.</div></div>';
         radioDeviceList.appendChild(row);
         feather.replace();
         return;
@@ -599,23 +599,23 @@
         title.textContent = device.name || 'TikLocal Radio';
         const copy = document.createElement('div');
         copy.className = `settings-row-copy radio-device-state${device.active ? '' : ' is-expired'}`;
-        copy.textContent = `${device.active ? '令牌有效' : '已因改密失效'} · ${formatDeviceTime(device.created_at)}`;
+        copy.textContent = `${device.active ? 'Token active' : 'Invalidated by password change'} · ${formatDeviceTime(device.created_at)}`;
         const revoke = document.createElement('button');
         revoke.className = 'settings-action is-danger';
         revoke.type = 'button';
-        revoke.textContent = '撤销';
+        revoke.textContent = 'Revoke';
         revoke.addEventListener('click', () => {
           confirmAction(
-            '撤销这个 Radio 客户端？',
-            `${device.name || '此设备'} 将无法继续访问媒体，需要重新输入访问密码配对。`,
-            '确认撤销',
+            'Revoke this Radio client?',
+            `${device.name || 'This device'} will lose media access and must pair again with the access password.`,
+            'Revoke Client',
             'danger',
             () => {
-              runButton(revoke, '撤销中…', async () => {
+              runButton(revoke, 'Revoking…', async () => {
                 await requestJson(`/api/radio/devices/${encodeURIComponent(device.id)}`, { method: 'DELETE' });
                 await loadRadioDevices();
-                showToast('Radio 客户端已撤销');
-              }).catch(() => showToast('撤销失败，请稍后重试', 'error'));
+                showToast('Radio client revoked');
+              }).catch(() => showToast('Failed to revoke the client. Please try again later.', 'error'));
             },
           );
         });
@@ -631,7 +631,7 @@
         const payload = await requestJson('/api/radio/devices');
         renderRadioDevices(payload.data?.devices || []);
       } catch (_) {
-        radioDeviceList.querySelector('.settings-row-copy').textContent = '暂时无法读取已配对设备。';
+        radioDeviceList.querySelector('.settings-row-copy').textContent = 'Paired devices are unavailable.';
       }
     }
 
@@ -643,7 +643,7 @@
           <h2 id="confirm-title" class="confirm-title"></h2>
           <p class="confirm-copy"></p>
           <div class="confirm-actions">
-            <button class="settings-action" type="button" data-confirm-cancel>取消</button>
+            <button class="settings-action" type="button" data-confirm-cancel>Cancel</button>
             <button class="settings-action" type="button" data-confirm-accept></button>
           </div>
         </section>`;
@@ -670,9 +670,9 @@
 
     function renderCredentials(files = []) {
       const list = document.getElementById('credential-list');
-      document.getElementById('credential-summary').textContent = files.length ? `已保存 ${files.length} 个凭证，下载时按网站自动匹配。` : '尚未添加，公开内容仍可正常下载。';
+      document.getElementById('credential-summary').textContent = files.length ? `${files.length} credential files saved and matched to websites automatically.` : 'None added. Public content can still be downloaded.';
       if (!files.length) {
-        list.innerHTML = '<div class="credential-empty">还没有保存登录信息</div>';
+        list.innerHTML = '<div class="credential-empty">No credentials saved</div>';
       } else {
         list.innerHTML = files.map((name) => `
           <div class="credential-item"><span class="credential-mark"><i data-feather="key"></i></span><span class="credential-name"></span></div>`).join('');
@@ -689,15 +689,15 @@
           requestJson('/api/download/cookies'),
         ]);
         const probe = probePayload.data || {};
-        const missing = [!probe.yt_dlp_available ? '视频' : '', !probe.gallery_dl_available ? '图片' : '', !probe.ffmpeg_available ? '媒体合并' : ''].filter(Boolean);
-        document.getElementById('download-dependency-copy').textContent = missing.length ? `${missing.join('、')}组件尚未准备好。` : '图片与视频下载均已就绪。';
+        const missing = [!probe.yt_dlp_available ? 'video' : '', !probe.gallery_dl_available ? 'image' : '', !probe.ffmpeg_available ? 'media merging' : ''].filter(Boolean);
+        document.getElementById('download-dependency-copy').textContent = missing.length ? `${missing.join(', ')} components are not ready.` : 'Image and video downloads are ready.';
         const configured = Number(configPayload.data?.effective?.max_concurrent ?? 2);
         const shown = [1, 2, 4].includes(configured) ? configured : 2;
         document.querySelectorAll('[data-concurrency]').forEach((button) => button.classList.toggle('is-active', Number(button.dataset.concurrency) === shown));
         renderCredentials(cookiePayload.data?.files || []);
       } catch (_) {
-        document.getElementById('download-dependency-copy').textContent = '暂时无法读取下载状态。';
-        document.getElementById('credential-summary').textContent = '暂时无法读取登录信息。';
+        document.getElementById('download-dependency-copy').textContent = 'Download status is unavailable.';
+        document.getElementById('credential-summary').textContent = 'Credentials are unavailable.';
       }
     }
 
@@ -718,10 +718,10 @@
       try {
         const hostname = new URL(pairingServerUrl.value).hostname;
         if (['localhost', '127.0.0.1', '::1'].includes(hostname)) {
-          warning = '这个地址只指向当前电脑；请改成手机可访问的局域网 IP、.local 主机名或 HTTPS 地址。';
+          warning = 'This address only reaches the current computer. Use a LAN IP, .local hostname, or HTTPS address your phone can reach.';
         }
       } catch (_) {
-        warning = '请输入完整的 http:// 或 https:// 地址。';
+        warning = 'Enter a complete http:// or https:// address.';
       }
       document.getElementById('pairing-warning').textContent = warning;
     }
@@ -738,8 +738,8 @@
         const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
         const minutes = Math.floor(seconds / 60);
         pairingExpiry.textContent = seconds
-          ? `此链接将在 ${minutes}:${String(seconds % 60).padStart(2, '0')} 后失效，使用一次后立即作废。`
-          : '此链接已失效，请重新生成。';
+          ? `This single-use link expires in ${minutes}:${String(seconds % 60).padStart(2, '0')}.`
+          : 'This link has expired. Generate a new one.';
         copyPairingButton.disabled = !seconds;
         openRadioLink.setAttribute('aria-disabled', String(!seconds));
         if (!seconds) stopPairingTimer();
@@ -777,7 +777,7 @@
         pairingLink.select();
         document.execCommand('copy');
       }
-      showToast('配对链接已复制');
+      showToast('Pairing link copied');
     }
 
     themeButtons.forEach((button) => button.addEventListener('click', () => setThemePreference(button.dataset.themePreference)));
@@ -785,31 +785,31 @@
     syncThemeButtons();
 
     refreshButton.addEventListener('click', () => {
-      confirmAction('重新扫描媒体库？', '扫描会校正运行期间发生的文件新增、移动和删除。', '开始扫描', 'primary', () => {
-        runButton(refreshButton, '扫描中…', async () => {
+      confirmAction('Rescan the media library?', 'The scan will reconcile files added, moved, or deleted while TikLocal was running.', 'Start Scan', 'primary', () => {
+        runButton(refreshButton, 'Scanning…', async () => {
           const payload = await requestJson('/api/library/sync', { method: 'POST' });
           await loadStats();
-          showToast(`扫描完成，共索引 ${Number(payload.data?.indexed || 0)} 个媒体`);
-        }).catch(() => showToast('扫描失败，请稍后重试', 'error'));
+          showToast(`Scan complete. Indexed ${Number(payload.data?.indexed || 0)} media items.`);
+        }).catch(() => showToast('Scan failed. Please try again later.', 'error'));
       });
     });
 
     clearCacheButton.addEventListener('click', () => {
-      confirmAction('清理缩略图缓存？', '不会删除原始媒体；缩略图会在下次浏览时按需生成。', '确认清理', 'warning', () => {
-        runButton(clearCacheButton, '清理中…', async () => {
+      confirmAction('Clear the thumbnail cache?', 'Original media will be kept. Thumbnails regenerate as needed while browsing.', 'Clear Cache', 'warning', () => {
+        runButton(clearCacheButton, 'Clearing…', async () => {
           const payload = await requestJson('/api/cache/clear', { method: 'POST' });
           await loadStats();
-          showToast(`已释放 ${Number(payload.freed_mb || 0)} MB`);
-        }).catch(() => showToast('清理失败，请稍后重试', 'error'));
+          showToast(`Freed ${Number(payload.freed_mb || 0)} MB`);
+        }).catch(() => showToast('Cleanup failed. Please try again later.', 'error'));
       });
     });
 
     resetButton.addEventListener('click', () => {
-      confirmAction('重置推荐记录？', '浏览、跳过和完成记录将被清除，收藏与集合保持不变。', '确认重置', 'danger', () => {
-        runButton(resetButton, '重置中…', async () => {
+      confirmAction('Reset recommendation history?', 'Views, skips, and completions will be cleared. Favorites and collections remain unchanged.', 'Reset History', 'danger', () => {
+        runButton(resetButton, 'Resetting…', async () => {
           await requestJson('/api/activity', { method: 'DELETE' });
-          showToast('推荐记录已重置');
-        }).catch(() => showToast('重置失败，请稍后重试', 'error'));
+          showToast('Recommendation history reset');
+        }).catch(() => showToast('Reset failed. Please try again later.', 'error'));
       });
     });
 
@@ -824,8 +824,8 @@
           body: JSON.stringify({ max_concurrent: maxConcurrent }),
         });
         document.querySelectorAll('[data-concurrency]').forEach((item) => item.classList.toggle('is-active', item === button));
-        showToast(`同时下载已设为 ${maxConcurrent} 个任务`);
-      } catch (_) { showToast('下载设置保存失败', 'error'); }
+        showToast(`Concurrent downloads set to ${maxConcurrent}`);
+      } catch (_) { showToast('Failed to save download settings', 'error'); }
     });
 
     document.getElementById('manage-credentials').addEventListener('click', openCredentials);
@@ -839,7 +839,7 @@
     pairingServerUrl.addEventListener('input', updatePairingWarning);
     copyPairingButton.addEventListener('click', () => void copyPairingLink());
     document.getElementById('generate-radio-pairing').addEventListener('click', (event) => {
-      runButton(event.currentTarget, '生成中…', async () => {
+      runButton(event.currentTarget, 'Generating…', async () => {
         const payload = await requestJson('/api/radio/pairing-grants', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -854,21 +854,21 @@
         openRadioLink.href = pairingLink.value;
         openRadioLink.setAttribute('aria-disabled', 'false');
         startPairingTimer(data.expires_in);
-      }).catch((error) => showToast(error.message || '配对链接生成失败', 'error'));
+      }).catch((error) => showToast(error.message || 'Failed to generate pairing link', 'error'));
     });
     document.getElementById('upload-credential').addEventListener('click', (event) => {
       const input = document.getElementById('credential-file');
       const file = input.files?.[0];
-      if (!file) { showToast('请先选择登录信息文件', 'error'); return; }
-      runButton(event.currentTarget, '上传中…', async () => {
+      if (!file) { showToast('Select a credential file first', 'error'); return; }
+      runButton(event.currentTarget, 'Uploading…', async () => {
         const formData = new FormData();
         formData.append('file', file);
         await requestForm('/api/download/cookies/upload', formData);
         input.value = '';
         const payload = await requestJson('/api/download/cookies');
         renderCredentials(payload.data?.files || []);
-        showToast('登录信息已更新');
-      }).catch(() => showToast('登录信息上传失败', 'error'));
+        showToast('Credentials updated');
+      }).catch(() => showToast('Failed to upload credentials', 'error'));
     });
 
     loadStats();

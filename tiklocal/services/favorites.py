@@ -35,7 +35,7 @@ class FavoriteService:
         except FileNotFoundError:
             return set()
         if not isinstance(data, list):
-            raise ValueError('收藏文件格式无效')
+            raise ValueError('Invalid favorites file format')
         return {normalize_media_uri(item) for item in data}
 
     def _import_legacy_if_needed(self) -> None:

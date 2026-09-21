@@ -112,7 +112,7 @@ def test_radio_artwork_falls_back_to_generated_image(client):
 def test_radio_uses_embedded_audio_metadata(tmp_path, monkeypatch):
     output = json.dumps({'format': {
         'duration': '123.45',
-        'tags': {'title': '真实标题', 'artist': '真实艺人', 'album': '真实专辑'},
+        'tags': {'title': 'Real title', 'artist': 'Real artist', 'album': 'Real album'},
     }})
     monkeypatch.setattr('tiklocal.services.radio.sp.run', lambda *args, **kwargs:
                         subprocess.CompletedProcess(args, 0, stdout=output))
@@ -128,9 +128,9 @@ def test_radio_uses_embedded_audio_metadata(tmp_path, monkeypatch):
 
     assert res.status_code == 200
     item = res.get_json()["data"]
-    assert item["title"] == "真实标题"
-    assert item["artist"] == "真实艺人"
-    assert item["album"] == "真实专辑"
+    assert item["title"] == "Real title"
+    assert item["artist"] == "Real artist"
+    assert item["album"] == "Real album"
     assert item["duration"] == 123.45
 
 

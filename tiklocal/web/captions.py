@@ -16,7 +16,7 @@ def register_caption_routes(app, library, metadata, settings):
                 store.set(value)
             return {'success': True, 'data': settings.resolve()[kind]}
         except OSError:
-            return {'success': False, 'error': '配置暂时无法保存，请稍后重试。'}, 503
+            return {'success': False, 'error': 'The configuration could not be saved. Please try again later.'}, 503
 
     @app.route('/api/ai/prompt-config', methods=['GET', 'POST'])
     def api_prompt_config():
@@ -50,7 +50,7 @@ def register_caption_routes(app, library, metadata, settings):
             saved = metadata.get_many(keys)
             existing = next((saved[key] for key in keys if saved.get(key) is not None), None)
         except (OSError, ValueError):
-            return {'success': False, 'error': '图片信息暂时无法读取，请稍后重试。'}, 503
+            return {'success': False, 'error': 'Image information could not be read. Please try again later.'}, 503
         if request.method == 'GET':
             return {'success': True, 'data': existing}
 
@@ -67,7 +67,7 @@ def register_caption_routes(app, library, metadata, settings):
 
         resolved = settings.resolve(override)['vision']
         if not resolved['effective']['enabled']:
-            return {'success': False, 'error': '图片识别未启用，请在配置文件中设置 vision.enabled。'}, 400
+            return {'success': False, 'error': 'Image recognition is disabled. Set vision.enabled in the configuration file.'}, 400
         try:
             result = generate_caption(target, resolved)
             merged = metadata.update_many({uri: result}, defaults={uri: existing or {}})[uri]

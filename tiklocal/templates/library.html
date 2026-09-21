@@ -949,30 +949,30 @@
   <header class="timeline-masthead">
     <div class="timeline-masthead-copy">
       <p class="timeline-kicker">PRIVATE ARCHIVE</p>
-      <h1>时间里的影像</h1>
-      <p class="timeline-intro">沿着月份，重新遇见那些被留在本地的片刻。</p>
+      <h1>Moments in Time</h1>
+      <p class="timeline-intro">Move through the months and rediscover moments kept close.</p>
     </div>
-    <nav class="library-view-switch" aria-label="媒体库视图">
-      <a class="is-active" href="/library" aria-current="page">时间线</a>
-      <a href="/library?view=explore">探索</a>
+    <nav class="library-view-switch" aria-label="Library view">
+      <a class="is-active" href="/library" aria-current="page">Timeline</a>
+      <a href="/library?view=explore">Explore</a>
     </nav>
   </header>
   <div class="timeline-sticky-bar" id="timeline-sticky-bar">
-    <button class="timeline-current-date" id="timeline-current-date" type="button" aria-label="选择年份">
-      <span id="timeline-current-label">最近</span>
+    <button class="timeline-current-date" id="timeline-current-date" type="button" aria-label="Choose year">
+      <span id="timeline-current-label">Recent</span>
       <i data-feather="chevron-down" aria-hidden="true"></i>
     </button>
-    <span class="timeline-time-basis">按媒体时间</span>
+    <span class="timeline-time-basis">By media date</span>
   </div>
   <div class="timeline-year-popover" id="timeline-year-popover" hidden>
     <div class="timeline-year-list" id="timeline-year-list"></div>
   </div>
-  <section id="timeline-stream" class="timeline-stream" aria-label="按月份浏览媒体"></section>
+  <section id="timeline-stream" class="timeline-stream" aria-label="Browse media by month"></section>
   {% elif scope == 'all' and library_view == 'month' %}
   <header class="month-detail-header">
-    <a class="month-detail-back" href="/library?view=timeline#month-{{ timeline_month }}" aria-label="返回时间线">
+    <a class="month-detail-back" href="/library?view=timeline#month-{{ timeline_month }}" aria-label="Return to timeline">
       <i data-feather="arrow-left" aria-hidden="true"></i>
-      <span>时间线</span>
+      <span>Timeline</span>
     </a>
     <div>
       <p>MONTH ARCHIVE</p>
@@ -985,29 +985,29 @@
     <div class="explore-heading-row">
       <div>
         <p class="explore-kicker">DISCOVER</p>
-        <h1 class="explore-title">探索媒体库</h1>
+        <h1 class="explore-title">Explore Your Library</h1>
       </div>
-      <nav class="library-view-switch" aria-label="媒体库视图">
-        <a href="/library">时间线</a>
-        <a class="is-active" href="/library?view=explore" aria-current="page">探索</a>
+      <nav class="library-view-switch" aria-label="Library view">
+        <a href="/library">Timeline</a>
+        <a class="is-active" href="/library?view=explore" aria-current="page">Explore</a>
       </nav>
     </div>
     <div class="library-toolbar-row">
-    <div class="mode-tabs" id="mode-tabs" aria-label="媒体库浏览模式">
-      <button type="button" class="mode-tab" data-mode="all">全部</button>
-      <button type="button" class="mode-tab" data-mode="image_random">图片随机</button>
-      <button type="button" class="mode-tab" data-mode="video_latest">视频最新</button>
-      <button type="button" class="mode-tab" data-mode="big_files">大文件</button>
+    <div class="mode-tabs" id="mode-tabs" aria-label="Library browsing mode">
+      <button type="button" class="mode-tab" data-mode="all">All</button>
+      <button type="button" class="mode-tab" data-mode="image_random">Random Images</button>
+      <button type="button" class="mode-tab" data-mode="video_latest">Latest Videos</button>
+      <button type="button" class="mode-tab" data-mode="big_files">Large Files</button>
     </div>
-    <button id="library-search-toggle" class="library-search-toggle" type="button" aria-label="搜索媒体库" aria-controls="library-search" aria-expanded="{% if request.args.get('q', '') %}true{% else %}false{% endif %}" title="搜索">
+    <button id="library-search-toggle" class="library-search-toggle" type="button" aria-label="Search library" aria-controls="library-search" aria-expanded="{% if request.args.get('q', '') %}true{% else %}false{% endif %}" title="Search">
       <i data-feather="search" aria-hidden="true"></i>
     </button>
     </div>
     <div id="library-search" class="library-search" role="search">
       <i data-feather="search" class="library-search-icon" aria-hidden="true"></i>
-      <label class="sr-only" for="library-search-input">搜索媒体库</label>
-      <input id="library-search-input" type="search" maxlength="200" autocomplete="off" spellcheck="false" placeholder="搜索文件名或路径" value="{{ request.args.get('q', '') }}">
-      <button id="library-search-clear" class="library-search-clear" type="button" aria-label="清除搜索" title="清除搜索"{% if not request.args.get('q', '') %} hidden{% endif %}>
+      <label class="sr-only" for="library-search-input">Search library</label>
+      <input id="library-search-input" type="search" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Search filenames or paths" value="{{ request.args.get('q', '') }}">
+      <button id="library-search-clear" class="library-search-clear" type="button" aria-label="Clear search" title="Clear search"{% if not request.args.get('q', '') %} hidden{% endif %}>
         <i data-feather="x" aria-hidden="true"></i>
       </button>
     </div>
@@ -1021,7 +1021,7 @@
     <div class="collection-nav">
       <a class="collection-nav-back" href="/collections">
         <i data-feather="arrow-left"></i>
-        <span>所有集合</span>
+        <span>All Collections</span>
       </a>
     </div>
     <div class="collection-identity">
@@ -1040,7 +1040,7 @@
       </div>
       <div class="collection-identity-copy">
         <h1 class="collection-identity-title">{{ collection_name }}</h1>
-        <div class="collection-identity-count">{{ collection_count }} 个媒体</div>
+        <div class="collection-identity-count">{{ collection_count }} media items</div>
         {% if collection_description %}<p class="collection-identity-description">{{ collection_description }}</p>{% endif %}
       </div>
     </div>
@@ -1051,10 +1051,10 @@
   <section id="library-grid" class="masonry-grid{% if scope in ['favorite', 'collection'] %} saved-content{% endif %}"></section>
   {% endif %}
   <div id="library-loading" class="library-loading" aria-live="polite">
-    <div id="library-status-text">正在加载...</div>
+    <div id="library-status-text">Loading...</div>
     <div id="library-status-actions" class="library-status-actions" hidden>
-      <button id="library-retry" class="library-status-action" type="button" hidden>重新加载</button>
-      <button id="library-clear-search" class="library-status-action" type="button" hidden>清除搜索</button>
+      <button id="library-retry" class="library-status-action" type="button" hidden>Reload</button>
+      <button id="library-clear-search" class="library-status-action" type="button" hidden>Clear Search</button>
     </div>
   </div>
   <div id="library-sentinel" style="height: 1px;"></div>
@@ -1070,7 +1070,7 @@
     </div>
   </div>
 
-  <button id="quick-close-top" type="button" title="关闭">
+  <button id="quick-close-top" type="button" title="Close">
     <i data-feather="x"></i>
   </button>
   <div class="quick-counter" id="quick-counter">1 / 1</div>
@@ -1086,8 +1086,8 @@
   </div>
 
   <div class="quick-actions">
-    <button id="quick-speed" class="quick-btn" type="button" title="倍速">1x</button>
-    <button id="quick-caption" class="quick-btn" type="button" title="生成标题" hidden>
+    <button id="quick-speed" class="quick-btn" type="button" title="Playback speed">1x</button>
+    <button id="quick-caption" class="quick-btn" type="button" title="Generate Title" hidden>
       <i data-feather="zap"></i>
     </button>
 
@@ -1096,26 +1096,26 @@
         <button type="button" class="quick-zoom-btn active" data-level="2.5">2.5x</button>
         <button type="button" class="quick-zoom-btn" data-level="5">5x</button>
       </div>
-      <button id="quick-magnifier-toggle" class="quick-btn" type="button" title="放大镜">
+      <button id="quick-magnifier-toggle" class="quick-btn" type="button" title="Magnifier">
         <i data-feather="search"></i>
       </button>
     </div>
 
-    <button id="quick-favorite" class="quick-btn" type="button" title="收藏">
+    <button id="quick-favorite" class="quick-btn" type="button" title="Add to Favorites">
       <i data-feather="heart"></i>
     </button>
-    <button id="quick-collection" class="quick-btn" type="button" title="加入集合">
+    <button id="quick-collection" class="quick-btn" type="button" title="Add to Collection">
       <i data-feather="bookmark"></i>
       <span class="collection-count" id="quick-collection-count">0</span>
     </button>
-    <button id="quick-set-cover" class="quick-btn is-hidden" type="button" title="设为集合封面">
+    <button id="quick-set-cover" class="quick-btn is-hidden" type="button" title="Set as Collection Cover">
       <i class="set-cover-default-icon" data-feather="image"></i>
       <i class="set-cover-current-icon" data-feather="check"></i>
     </button>
-    <a id="quick-source" class="quick-btn is-hidden" href="#" target="_blank" rel="noopener noreferrer" title="查看来源">
+    <a id="quick-source" class="quick-btn is-hidden" href="#" target="_blank" rel="noopener noreferrer" title="View Source">
       <i data-feather="external-link"></i>
     </a>
-    <a id="quick-detail" class="quick-btn" href="#" title="查看详情">
+    <a id="quick-detail" class="quick-btn" href="#" title="View Details">
       <i data-feather="info"></i>
     </a>
   </div>
@@ -1135,17 +1135,17 @@
     <div class="coll-drag-handle"></div>
     <div class="quick-collection-header">
       <div class="quick-collection-title-row">
-        <h3>加入集合</h3>
+        <h3>Add to Collection</h3>
         <button id="quick-collection-close" type="button" class="quick-collection-close">
           <i data-feather="x"></i>
         </button>
       </div>
-      <div id="quick-collection-meta" class="quick-collection-meta">当前未加入任何集合</div>
+      <div id="quick-collection-meta" class="quick-collection-meta">Not in any collections</div>
     </div>
     <div id="quick-collection-list" class="quick-collection-list"></div>
     <div class="quick-collection-create">
-      <input id="quick-collection-name" type="text" maxlength="80" placeholder="新建集合名称" />
-      <button id="quick-collection-create-btn" type="button">新建</button>
+      <input id="quick-collection-name" type="text" maxlength="80" placeholder="New collection name" />
+      <button id="quick-collection-create-btn" type="button">Create</button>
     </div>
   </div>
 </div>

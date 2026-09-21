@@ -103,12 +103,12 @@ class DeviceAuthStore:
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"设备认证配置无法读取: {self.path}") from exc
+            raise RuntimeError(f"Device authentication configuration cannot be read: {self.path}") from exc
         if not isinstance(payload, dict):
-            raise RuntimeError(f"设备认证配置不完整: {self.path}")
+            raise RuntimeError(f"Device authentication configuration is incomplete: {self.path}")
         devices = payload.get("devices")
         if payload.get("version") != DEVICE_AUTH_FILE_VERSION or not isinstance(devices, list):
-            raise RuntimeError(f"设备认证配置不完整: {self.path}")
+            raise RuntimeError(f"Device authentication configuration is incomplete: {self.path}")
         return [device for device in devices if isinstance(device, dict)]
 
     def _save(self, devices: list[dict]) -> None:

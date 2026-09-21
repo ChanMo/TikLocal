@@ -32,16 +32,16 @@
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) {
-      throw new Error(payload.error || `请求失败（${response.status}）`);
+      throw new Error(payload.error || `Request failed (${response.status})`);
     }
     return payload.data || {};
   }
 
   function safeHostname(url) {
     try {
-      return new URL(url).hostname.replace(/^www\./, '') || '外部链接';
+      return new URL(url).hostname.replace(/^www\./, '') || 'External link';
     } catch (_) {
-      return '外部链接';
+      return 'External link';
     }
   }
 
@@ -86,13 +86,13 @@
   function statusCopy(job) {
     const fileCount = Number.isInteger(job.file_count) ? job.file_count : outputFiles(job).length;
     const labels = {
-      queued: '等待开始',
-      running: typeof job.progress_percent === 'number' ? `已完成 ${Math.round(job.progress_percent)}%` : '正在下载',
-      success: fileCount > 0 ? `已保存 ${fileCount} 个文件` : '已经保存到媒体库',
-      failed: '下载失败',
-      canceled: '已取消',
+      queued: 'Waiting to start',
+      running: typeof job.progress_percent === 'number' ? `${Math.round(job.progress_percent)}% complete` : 'Downloading',
+      success: fileCount > 0 ? `Saved ${fileCount} files` : 'Saved to the media library',
+      failed: 'Download failed',
+      canceled: 'Canceled',
     };
-    return labels[job.status] || '状态未知';
+    return labels[job.status] || 'Unknown status';
   }
 
   function renderJob(job) {
@@ -106,25 +106,25 @@
       ? 'is-running'
       : (job.status === 'failed' ? 'is-failed' : '');
     const time = formatTime(job.finished_at || job.created_at);
-    const sourceAction = `<a class="download-action" href="${escapeHtml(job.url)}" target="_blank" rel="noopener noreferrer"><i data-feather="external-link"></i><span>访问来源</span></a>`;
+    const sourceAction = `<a class="download-action" href="${escapeHtml(job.url)}" target="_blank" rel="noopener noreferrer"><i data-feather="external-link"></i><span>Visit Source</span></a>`;
     const menu = !isActive ? `
       <div class="download-job-menu">
-        <button class="download-icon-btn" type="button" data-action="menu" data-job-id="${escapeHtml(job.id)}" aria-label="更多操作" aria-expanded="false"><i data-feather="more-horizontal"></i></button>
+        <button class="download-icon-btn" type="button" data-action="menu" data-job-id="${escapeHtml(job.id)}" aria-label="More actions" aria-expanded="false"><i data-feather="more-horizontal"></i></button>
         <div class="download-job-menu-panel" hidden>
-          <button class="download-menu-action" type="button" data-action="delete" data-job-id="${escapeHtml(job.id)}">清除记录</button>
+          <button class="download-menu-action" type="button" data-action="delete" data-job-id="${escapeHtml(job.id)}">Remove Record</button>
         </div>
       </div>` : '';
 
     let actions = '';
     if (isActive) {
-      actions = `${sourceAction}<button class="download-action" type="button" data-action="cancel" data-job-id="${escapeHtml(job.id)}">取消</button>`;
+      actions = `${sourceAction}<button class="download-action" type="button" data-action="cancel" data-job-id="${escapeHtml(job.id)}">Cancel</button>`;
     } else if (job.status === 'success' && firstFile) {
       actions = `
-        <a class="download-action" href="${buildMediaHref(firstFile)}"><i data-feather="eye"></i><span>查看内容</span></a>
+        <a class="download-action" href="${buildMediaHref(firstFile)}"><i data-feather="eye"></i><span>View Media</span></a>
         ${sourceAction}${menu}`;
     } else {
       actions = `
-        ${(job.status === 'failed' || job.status === 'canceled') ? `<button class="download-action is-retry" type="button" data-action="retry" data-job-id="${escapeHtml(job.id)}"><i data-feather="rotate-ccw"></i><span>${job.failure_stage === 'index' ? '重新登记' : '重新下载'}</span></button>` : ''}
+        ${(job.status === 'failed' || job.status === 'canceled') ? `<button class="download-action is-retry" type="button" data-action="retry" data-job-id="${escapeHtml(job.id)}"><i data-feather="rotate-ccw"></i><span>${job.failure_stage === 'index' ? 'Register Again' : 'Download Again'}</span></button>` : ''}
         ${sourceAction}${menu}`;
     }
 
@@ -133,12 +133,12 @@
         <div class="download-job-mark" aria-hidden="true">${escapeHtml(platformMark(job.url))}</div>
         <div class="download-job-main">
           <div class="download-job-top">
-            <div class="download-job-identity"><span class="download-job-domain">${escapeHtml(safeHostname(job.url))}</span><span class="download-job-status">${escapeHtml(job.engine === 'gallery-dl' ? '图片' : '视频')}</span></div>
+            <div class="download-job-identity"><span class="download-job-domain">${escapeHtml(safeHostname(job.url))}</span><span class="download-job-status">${escapeHtml(job.engine === 'gallery-dl' ? 'Images' : 'Video')}</span></div>
             ${time ? `<span class="download-job-time">${escapeHtml(time)}</span>` : ''}
           </div>
           <p class="download-job-copy">${escapeHtml(statusCopy(job))}</p>
           ${progress !== null && isActive ? `<div class="download-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.toFixed(0)}"><div class="download-progress-bar" style="width:${progress.toFixed(1)}%"></div></div>` : ''}
-          ${files.length > 1 ? `<div class="download-job-meta"><span>${files.length} 个项目</span></div>` : ''}
+          ${files.length > 1 ? `<div class="download-job-meta"><span>${files.length} items</span></div>` : ''}
           ${job.error_message ? `<p class="download-error">${escapeHtml(job.error_message)}</p>` : ''}
           <div class="download-job-actions">${actions}</div>
         </div>
@@ -149,8 +149,8 @@
     return `
       <div class="download-empty">
         <div class="download-empty-icon"><i data-feather="download-cloud"></i></div>
-        <div class="download-empty-title">还没有下载记录</div>
-        <div class="download-empty-copy">粘贴链接，新内容会直接进入本地媒体库。</div>
+        <div class="download-empty-title">No download history yet</div>
+        <div class="download-empty-copy">Paste a link to add new media directly to your local library.</div>
       </div>`;
   }
 
@@ -174,9 +174,9 @@
     const historyFooter = document.getElementById('history-footer');
 
     activeSection.hidden = activeJobs.length === 0;
-    document.getElementById('active-count').textContent = activeJobs.length ? `${activeJobs.length} 项` : '';
+    document.getElementById('active-count').textContent = activeJobs.length ? `${activeJobs.length} items` : '';
     activeList.innerHTML = activeJobs.map(renderJob).join('');
-    document.getElementById('history-count').textContent = historyJobs.length ? `${historyJobs.length} 项` : '';
+    document.getElementById('history-count').textContent = historyJobs.length ? `${historyJobs.length} items` : '';
     historyList.innerHTML = historyJobs.length ? historyJobs.map(renderJob).join('') : emptyHistory();
     historyFooter.hidden = historyJobs.length === 0;
     window.feather?.replace();
@@ -217,10 +217,10 @@
     try {
       const url = new URL(value);
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
-      status.textContent = `已识别 · ${safeHostname(value)}`;
+      status.textContent = `Recognized · ${safeHostname(value)}`;
       return true;
     } catch (_) {
-      status.textContent = '请输入完整的 http/https 链接';
+      status.textContent = 'Enter a complete HTTP or HTTPS URL';
       status.classList.add('is-error');
       return false;
     }
@@ -236,7 +236,7 @@
     const alert = document.getElementById('download-inline-alert');
     const unavailable = selectedEngine === 'gallery-dl' && !dependencyMeta.gallery_dl_available;
     alert.hidden = !unavailable;
-    if (unavailable) document.getElementById('download-inline-alert-copy').textContent = '图片下载组件尚未准备好';
+    if (unavailable) document.getElementById('download-inline-alert-copy').textContent = 'The image download component is not ready';
   }
 
   function closeJobMenus(except = null) {
@@ -247,7 +247,7 @@
     });
   }
 
-  function confirmClear({ title = '清除下载记录？', copy = '本地媒体文件会继续保留。' } = {}) {
+  function confirmClear({ title = 'Clear download history?', copy = 'Local media files will be kept.' } = {}) {
     const mask = document.getElementById('download-confirm');
     const titleElement = document.getElementById('download-confirm-title');
     const copyElement = document.getElementById('download-confirm-copy');
@@ -297,7 +297,7 @@
       if (action === 'cancel') await api(`/api/download/jobs/${jobId}/cancel`, { method: 'POST' });
       if (action === 'retry') {
         await api(`/api/download/jobs/${jobId}/retry`, { method: 'POST' });
-        notify('已提交重试');
+        notify('Retry submitted');
       }
       if (action === 'delete') await api(`/api/download/jobs/${jobId}`, { method: 'DELETE' });
       lastJobsSignature = '';
@@ -326,24 +326,24 @@
       if (!url) return;
       if (!updateDetectedSite(urlInput)) return;
       if (selectedEngine === 'gallery-dl' && !dependencyMeta.gallery_dl_available) {
-        notify('图片下载组件尚未安装。', 'error');
+        notify('The image download component is not installed.', 'error');
         return;
       }
       submitButton.disabled = true;
-      submitButton.textContent = '正在加入…';
+      submitButton.textContent = 'Adding…';
       try {
         const payload = { url, save_mode: 'root', engine: selectedEngine, cookie_mode: 'auto' };
         await api('/api/download/jobs', { method: 'POST', body: JSON.stringify(payload) });
         urlInput.value = '';
         updateDetectedSite(urlInput);
-        notify('已加入下载队列');
+        notify('Added to the download queue');
         lastJobsSignature = '';
         await refreshJobs({ force: true });
       } catch (error) {
         notify(error.message, 'error');
       } finally {
         submitButton.disabled = false;
-        submitButton.textContent = '开始下载';
+        submitButton.textContent = 'Start Download';
         urlInput.focus();
       }
     });
@@ -357,10 +357,10 @@
     });
 
     document.getElementById('clear-history-btn')?.addEventListener('click', async () => {
-      if (!await confirmClear({ title: '清除全部下载记录？', copy: '进行中的任务不会受到影响，本地媒体文件会继续保留。' })) return;
+      if (!await confirmClear({ title: 'Clear all download history?', copy: 'Active jobs and local media files will be kept.' })) return;
       try {
         const data = await api('/api/download/jobs/clear', { method: 'POST' });
-        notify(`已清除 ${data.deleted || 0} 条记录`);
+        notify(`Cleared ${data.deleted || 0} records`);
         lastJobsSignature = '';
         await refreshJobs({ force: true });
       } catch (error) {

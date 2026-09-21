@@ -7,8 +7,6 @@ client under `apps/radio`. It can import user-selected photos and videos into a 
 offline Flow without an account, network, or TikLocal Server; Radio remains an
 optional connection to a user-operated server.
 
-[中文](./README_zh.md)
-
 ## Introduction
 
 TikLocal's main features include:
@@ -27,19 +25,19 @@ TikLocal is designed mobile-first, so the phone views are shown first for each p
 
 ### Flow — TikTok-style swipe feed
 
-<img src="docs/screenshots/flow-mobile.png" alt="TikLocal Flow page on a phone, showing a full-screen vertical video swipe feed with like/save/info actions" width="280" />　<img src="docs/screenshots/flow-desktop.png" alt="TikLocal Flow page on desktop, showing the same swipe feed with a sidebar navigation" width="480" />
+<img src="docs/screenshots/flow-mobile.png" alt="TikLocal Flow page on a phone, showing a full-screen vertical video swipe feed with like/save/info actions" width="280" /> <img src="docs/screenshots/flow-desktop.png" alt="TikLocal Flow page on desktop, showing the same swipe feed with a sidebar navigation" width="480" />
 
 *A mixed video/image swipe feed, similar to TikTok, with manual swipe navigation and in-feed actions.*
 
 ### Radio — ambient player
 
-<img src="docs/screenshots/radio-mobile.png" alt="TikLocal Radio page on a phone, showing a vinyl-record player UI over an animated rain-on-window background" width="280" />　<img src="docs/screenshots/radio-desktop.png" alt="TikLocal Radio page on desktop, showing the same vinyl-record player with a wider layout" width="480" />
+<img src="docs/screenshots/radio-mobile.png" alt="TikLocal Radio page on a phone, showing a vinyl-record player UI over an animated rain-on-window background" width="280" /> <img src="docs/screenshots/radio-desktop.png" alt="TikLocal Radio page on desktop, showing the same vinyl-record player with a wider layout" width="480" />
 
 *An ambient audio player with a vinyl-style visualizer, room backgrounds (rain/breeze), and a local track list.*
 
 ### Library — Pinterest-style grid + timeline
 
-<img src="docs/screenshots/library-mobile.png" alt="TikLocal Library page on a phone, showing a year/month timeline with a Pinterest-style grid of photo and video thumbnails" width="280" />　<img src="docs/screenshots/library-desktop.png" alt="TikLocal Library page on desktop, showing the same year/month timeline grid in a wider layout" width="480" />
+<img src="docs/screenshots/library-mobile.png" alt="TikLocal Library page on a phone, showing a year/month timeline with a Pinterest-style grid of photo and video thumbnails" width="280" /> <img src="docs/screenshots/library-desktop.png" alt="TikLocal Library page on desktop, showing the same year/month timeline grid in a wider layout" width="480" />
 
 *A Pinterest-like grid organized as a year/month timeline, for browsing multi-year libraries.*
 
@@ -239,7 +237,7 @@ vision:
   system_prompt: |
     You are an image analysis assistant. Return JSON only.
   user_prompt: |
-    Analyze this image and return a short Chinese title plus up to {tags_limit} Chinese tags.
+    Analyze this image and return a short English title plus up to {tags_limit} English tags.
     Output JSON: {"title":"...","tags":["..."]}
 
 experiments:

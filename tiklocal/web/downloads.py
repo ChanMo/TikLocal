@@ -50,15 +50,15 @@ def register_download_routes(app, download_manager, library_service):
     def api_download_cookies_upload():
         file = request.files.get('file')
         if not file:
-            return {'success': False, 'error': '缺少上传文件。'}, 400
+            return {'success': False, 'error': 'No upload file was provided.'}, 400
 
         filename = str(file.filename or '').strip()
         if not filename:
-            return {'success': False, 'error': '文件名不能为空。'}, 400
+            return {'success': False, 'error': 'The filename cannot be empty.'}, 400
 
         content = file.read()
         try:
-            # 上传语义统一为“同名覆盖更新”，避免多按钮分叉。
+            # Uploading consistently replaces a file with the same name.
             data = download_manager.upload_cookie_file(filename, content, replace=True)
         except ValueError as exc:
             return {'success': False, 'error': str(exc)}, 400
@@ -132,7 +132,7 @@ def register_download_routes(app, download_manager, library_service):
     def api_source_single():
         file_rel = str(request.args.get('file', '')).strip()
         if not file_rel:
-            return {'success': False, 'error': 'file 不能为空。'}, 400
+            return {'success': False, 'error': 'file cannot be empty.'}, 400
         file_rel = library_service.find_existing_uri(file_rel)
         source = download_manager.resolve_source_for_file(file_rel)
         return {'success': True, 'data': {'file': file_rel, 'source': source}}
@@ -142,7 +142,7 @@ def register_download_routes(app, download_manager, library_service):
         payload = request.get_json(silent=True) or {}
         files = payload.get('files')
         if not isinstance(files, list):
-            return {'success': False, 'error': 'files 必须是数组。'}, 400
+            return {'success': False, 'error': 'files must be an array.'}, 400
 
         normalized: list[str] = []
         response_keys: list[tuple[str, str]] = []

@@ -24,7 +24,7 @@
 - Perform manual smoke tests with a temporary media library, browsing `/`, `/flow`, `/library`, `/radio`, and `/download`.
 
 ## Commit & Pull Request Guidelines
-- Match the existing history: short, imperative messages (`fix: 调整视频播放布局`, `Release v0.4.0 …`); include scope prefixes when they clarify intent.
+- Match the existing history: short, imperative messages (`fix: adjust video playback layout`, `Release v0.4.0 …`); include scope prefixes when they clarify intent.
 - Each PR should explain the problem, list functional changes, and link issues; attach screenshots or clips for UI updates.
 - Confirm local testing (`tiklocal` run, Tailwind build, pytest when available) in the PR description and call out config files touched.
 

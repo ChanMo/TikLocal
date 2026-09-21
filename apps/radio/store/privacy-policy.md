@@ -1,9 +1,7 @@
-# LumaFold Privacy Policy / 隐私政策
+# LumaFold Privacy Policy
 
-- Effective date / 生效日期: 2026-08-26
-- Applies to / 适用产品: LumaFold native app
-
-## English
+- Effective date: 2026-08-26
+- Applies to: LumaFold native app
 
 LumaFold is a local-first app for importing and viewing media selected by the
 user. It can also connect to a TikLocal Server operated by the user for the
@@ -87,73 +85,5 @@ information from children.
 
 Material changes will be reflected in this document and its effective date.
 Questions and privacy requests can be filed at:
-
-https://github.com/ChanMo/TikLocal/issues
-
-## 中文
-
-LumaFold 是一款本地优先 App，用于导入和浏览用户主动选择的媒体。它也可以连接
-用户自行运行的 TikLocal Server，提供可选的 Radio 体验。App 不要求 TikLocal 云
-账号，TikLocal 项目也不运营接收用户媒体或活动的云端服务。
-
-### 本地媒体
-
-用户可以通过系统 Photos 或 Files 选择器主动选择图片和视频。LumaFold 会将所选项目
-复制到 App 私有存储，并使用本地 SQLite 索引保存媒体类型、文件名、大小、尺寸、
-时长、导入时间、来源标识和 App 在设备内生成的视频预览路径等文件元数据。
-
-- 导入媒体及其索引留在用户设备上，不会上传到 TikLocal 项目。
-- LumaFold 会将保存导入媒体副本和派生视频预览的目录标记为不进入 iCloud 设备备份；
-  本地 SQLite 索引和偏好设置仍可能随操作系统备份。
-- 删除条目或清空资料库只会移除 LumaFold 管理的副本和索引记录，不会删除 Photos
-  或 Files 中的原件。
-- 卸载 App 会移除其管理的媒体副本和本地数据库，具体遵循操作系统的正常行为。
-
-只有在用户主动开始 Photos 导入后才会请求照片权限。Files 访问由操作系统限定在
-用户明确选择的项目。
-
-### 可选 TikLocal Server 与 Radio
-
-配对 TikLocal Server 时，App 会把 Server 地址、用户填写的访问密码和通用设备名称
-直接发送到该 Server。密码只用于配对且不会保存。用户也可以扫描 Server 生成的
-一次性二维码；相机只在扫描器打开期间工作，App 不保存或发送相机图像。
-
-配对后：
-
-- App 在操作系统安全存储中保存 Server 地址、名称、设备标识和可撤销设备令牌。
-- 用户自有 Server 保存设备名称、配对时间和设备令牌的单向哈希。
-- App 直接从该 Server 请求 Radio 音频、元数据和封面；收藏与轻量收听事件保存在
-  该 Server，用于改善选曲。
-
-Demo Signal 只使用 App 内置媒体，不需要 Server。
-
-### TikLocal 项目不收集的信息
-
-正式版 App 不包含广告 SDK、第三方分析、跨 App 追踪或开发者运营的遥测端点。
-TikLocal 项目不会收到导入媒体、本地媒体索引、Server 地址、访问密码、设备令牌、
-收藏或收听历史。
-
-### 网络安全
-
-TikLocal 支持 HTTPS，也允许连接用户在可信局域网中控制的 HTTP Server。HTTP 流量
-没有加密，可能被能够访问该网络的其他方观察。条件允许时应使用 HTTPS，不要在
-不可信网络中完成配对。
-
-### 保留与删除
-
-断开 Server 会清除本地 Profile，并尝试撤销设备令牌。用户也可以在 TikLocal Web
-设置中撤销已配对客户端；修改 Server 访问密码会让既有令牌失效。
-
-受 iOS Keychain 行为影响，安全存储条目在卸载、重装后可能继续存在。即使如此，
-已在 Server 撤销的令牌也无法再访问该 Server。Radio 收听反馈、收藏和配对设备记录
-保留在用户控制的 Server 上，直到用户删除或重置。
-
-### 儿童
-
-LumaFold 不面向儿童，也不会有意收集儿童个人信息。
-
-### 变更与联系
-
-重要变更会更新本文及其生效日期。如有隐私问题或请求，请通过以下地址联系：
 
 https://github.com/ChanMo/TikLocal/issues

@@ -58,9 +58,9 @@ def register_library_routes(
             mode_seed=page['seed'],
             min_mb=min_mb,
             empty_message={
-                'all': '暂无可展示媒体。',
-                'favorite': '你还没有收藏媒体。',
-                'collection': '该集合暂无可展示媒体。',
+                'all': 'There is no media to display yet.',
+                'favorite': 'You have no favorite media yet.',
+                'collection': 'This collection has no media to display yet.',
             }[scope],
             initial_items=page['items'],
             initial_has_more=page['has_more'],
@@ -237,7 +237,7 @@ def register_library_routes(
         if scope == 'collection':
             collection_id = str(request.args.get('collection_id', '')).strip()
             if not collection_id:
-                return {'success': False, 'error': 'collection_id 不能为空。'}, 400
+                return {'success': False, 'error': 'collection_id cannot be empty.'}, 400
         page = _build_library_page(
             favorites_only=scope == 'favorite', collection_id=collection_id,
             **_read_page_options(scope),
@@ -272,7 +272,7 @@ def register_library_routes(
                 return {'favorite': favorite_service.is_favorite(name)}
             return {'success': True, 'favorite': favorite_service.toggle(name)}
         except (OSError, ValueError):
-            return {'success': False, 'error': '收藏暂时无法保存或读取，请稍后重试。'}, 503
+            return {'success': False, 'error': 'Favorites could not be saved or read. Please try again later.'}, 503
 
     @app.route('/api/collections', methods=['GET', 'POST'])
     def api_collections():
@@ -285,7 +285,7 @@ def register_library_routes(
         name = str(payload.get('name', '')).strip()
         description = str(payload.get('description', '')).strip()
         if not name:
-            return {'success': False, 'error': 'name 不能为空。'}, 400
+            return {'success': False, 'error': 'name cannot be empty.'}, 400
         try:
             created = collection_store.create(name=name, description=description)
         except ValueError as exc:
@@ -344,7 +344,7 @@ def register_library_routes(
             for uri in normalize_collection_mutation_uris(payload.get('uris'))
         ]
         if not uris:
-            return {'success': False, 'error': 'uris 不能为空。'}, 400
+            return {'success': False, 'error': 'uris cannot be empty.'}, 400
 
         if request.method == 'POST':
             updated = collection_store.add_items(collection_id, uris)
@@ -358,7 +358,7 @@ def register_library_routes(
     def api_collections_by_media():
         uri = str(request.args.get('uri', '')).strip()
         if not uri:
-            return {'success': False, 'error': 'uri 不能为空。'}, 400
+            return {'success': False, 'error': 'uri cannot be empty.'}, 400
         canonical_uri = library_service.canonicalize_uri(uri)
         items = collection_store.list_for_media(canonical_uri)
         if not items:

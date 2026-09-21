@@ -118,7 +118,7 @@
       try {
         var data = await actions.getImageMetadata(key);
         if (reqId !== captionRequestId || currentCaptionUri !== key || captionRequests.has(key)) return null;
-        if (!(data && data.success)) throw new Error((data && data.error) || '读取标题失败');
+        if (!(data && data.success)) throw new Error((data && data.error) || 'Failed to load the title');
         var payload = data.data || null;
         captionCache.set(key, payload);
         onCaptionRender(payload, key);
@@ -146,7 +146,7 @@
         if (currentCaptionUri === key) onCaptionLoading(true);
         try {
           var data = await actions.generateImageMetadata(key, conf);
-          if (!(data && data.success)) throw new Error((data && data.error) || '生成标题失败');
+          if (!(data && data.success)) throw new Error((data && data.error) || 'Failed to generate the title');
           var payload = data.data || null;
           captionCache.set(key, payload);
           if (currentCaptionUri === key) {

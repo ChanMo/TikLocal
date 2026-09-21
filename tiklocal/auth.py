@@ -170,11 +170,11 @@ def configure_auth(app, auth_store, *, enabled: bool, device_auth_store=None) ->
             retry_after = limiter.retry_after(client_key)
             if retry_after:
                 minutes = max(1, (retry_after + 59) // 60)
-                error = f'尝试次数过多，请在 {minutes} 分钟后重试。'
+                error = f'Too many attempts. Try again in {minutes} minutes.'
                 status = 429
             elif not auth_store.verify(request.form.get('password', '')):
                 limiter.record_failure(client_key)
-                error = '访问密码不正确，请再试一次。'
+                error = 'The access password is incorrect. Please try again.'
                 status = 401
             else:
                 limiter.clear(client_key)

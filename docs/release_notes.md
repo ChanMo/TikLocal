@@ -1,218 +1,183 @@
 # Release Notes
 
 ## Unreleased
-- Web Radio、媒体详情/传输与设置入口收拢到对应路由模块；Radio 封面由缩略图服务统一生成，设置页与库统计 API 共用统计逻辑，合并重复 Radio 测试。
-- 移除 PWA 安装与内置本地 HTTPS：删除安装界面、证书管理、专属依赖和测试；HTTPS 交给外部反向代理，保留 Cookie、认证与媒体 Range。旧 TLS 配置显式报错，已有证书文件不删除；旧 Service Worker 只负责注销及清理 TikLocal 公共缓存。
-- Flow 页面/API、主题与图集组装集中到 `web/flow.py`，公共媒体字段归入 `web/media_payloads.py`，删除 `view_builders.py` 与多层回调转发；媒体库、收藏和集合共用 `web/library.py`。
-- 下载管理器采用显式启动/关闭与单一并发队列，空闲不保留线程；服务退出取消未完成任务并停止子进程，开发重载父进程不启动下载器。下载与来源 API 集中到独立路由模块，测试保留真实进程关闭边界并合并重复用例。
-- 隔离向量与相似图片实验，新增启动总开关和独立结果页面，保留旧向量数据；普通 Library 移除实验分支，同步 Web 构建下线并沿用 CLI，相关测试改用真实 SQLite。
-- Web 公共媒体能力收敛：CLI/Web 共用缩略图生成、缓存有效性和删除规则，按规范 URI 隔离不同来源；默认来源仍可复用有效旧缓存，生成失败保留已有缓存。Radio 候选与列表改读音频索引，外部新增资源在同步后可见。
-- 将来源、收藏和推荐迁入对应服务模块，更新实际调用方；统一媒体链接生成，修复相似预览使用原图和主题预览未展开所选图片的问题。
-- Web 首批代码收敛：删除未使用的扫描辅助函数和页面源码/样式断言，保留行为、安全及协议测试；测试默认使用隔离数据目录。
-- 修复 Flow 主题卡片与来源图集造成的分页漏项，以及纯图片库提前结束；页大小按基础媒体数量计算，主题能力继续保留。
-- 下载登记失败不再被吞掉：保留文件和输出记录，原重试入口只重新登记；来源扫描不完整时保留该来源的旧索引，避免误清理。
-- 原生 App 以 `Flow / Library / Music / Settings` 取代模式选择 Home：Flow 成为默认入口并独立读取本地资料库，空状态可直接导入，Library 指定媒体可返回 Flow，TikLocal 在 Settings 中降为可选 Folder Source；既有 Radio 位于次级 Music 空间。
-- 原生 App 采用可回退的 `LumaFold` 工作品牌与 The Fold 候选标志，统一显示名称、启动页、Flow、权限说明和本地资料库文案；旧图标继续保留，bundle ID、Expo slug、`tiklocal-radio://` Scheme、SQLite、SecureStore 与 TikLocal Server 协议不变。
-- 原生客户端扩展为本地优先 App：新增无需账号或 Server 的 Photos / Files 媒体导入、App 沙盒副本、SQLite 本地索引和图片 / 视频纵向离线 Flow；既有 TikLocal Radio 作为可选入口完整保留。
-- 本地资料库补齐 SQLite v1 事务迁移、图片 / 视频数量与空间统计、长按多选删除和一键清空；删除仅影响 App 管理的离线副本，iOS 媒体目录与新导入文件标记为不进入 iCloud 设备备份。
-- 本地资料库升级到 SQLite v2：新增跨 iOS / Android 的持久化视频缩略图、旧视频渐进回填、确定导入进度、设备剩余空间展示和带 128 MB 安全余量的复制前空间阻断；缩略图失败不影响原视频播放。
-- 新增独立的 React Native / Expo 客户端 TikLocal Radio：包含编辑式原生播放界面、Demo Signal、后台音频配置、锁屏媒体信息、收藏、有限再听与睡眠定时。
-- TikLocal Radio 新增 iOS 优先的原生页面栈：Connection 使用 Form Sheet，配对改为扫码 / 手动 / 粘贴链接逐步展开并保留系统返回手势；根 Radio 使用独立 Safe Area 顶部，不再受标准导航栏标题与 Server 按钮限制。
-- Radio 首页重构为开放式 Signal Dial：当前 Station 位于左上角并用系统 Action Sheet 切换，SF Symbols 提供 Favorite / Play / Next 与状态图标，Encore、Sleep、Connection 收进右上角菜单；删除巨大方形 Card、Server 重复信息、频道编号、横向 Chip、文字模拟图标和技术页脚。
-- Signal Dial 使用深色唱盘、稀疏频率刻度与曲目 accent，播放时缓慢旋转并尊重系统 Reduce Motion；Loading、Offline、Empty 采用不改变主骨架的专用内容状态。
-- Radio 首页纵向节奏按屏幕高度自适应，并在自定义顶部与 Signal Dial 之间增加 24pt Main 呼吸区；已在 iPhone 17 / iOS 26.5 模拟器完成 Release 构建、安装与实际渲染复核，小屏幕保持紧凑且不引入首屏滚动。
-- 修复通知中心、控制中心、页面返回和前后台切换触发重新 Tune、随机替换队列的问题；正常恢复不再发出网络请求，离线 Retry 在已有队列时也只恢复连接。
-- 新增不含 Token 的本地 Radio 队列快照：冷启动恢复上次 Station、队列、当前曲目和最近历史，使用当前 SecureStore Token 重建媒体 Header；401、Device 变化或 Forget This Server 时自动清理。
-- 修复从 Connection 进入 Change Server 后无法关闭：Pairing modal 现在提供显式 Cancel，返回原页面且不会修改当前连接；已有连接的冷启动深链也保留可取消的 Radio 返回路径。
-- 重构 Radio 连接记忆：SecureStore 支持 `paired` / `known` 两种单 Server 状态并自动迁移旧 Profile；离线、401 和失败重连继续保留地址与名称，只有确认 Forget This Server 才清除。
-- 新增独立 Connection 页面、离线 Retry、破坏性断开确认和 iOS Sleep Timer Action Sheet；移除播放器中的 API / Token 技术文案。
-- 修复已保存 Server 冷启动时的 iOS Release 崩溃：不再向 Expo Audio 的原生 `replace` 传入无效 `null` Source，清空状态改为暂停并移除锁屏控制，并增加 Player 边界回归测试。
-- 新增 `/api/v1` 原生 Radio 协议：支持访问密码配对、哈希设备令牌、Bearer 认证、真实电台队列、HTTP Range 媒体流、元数据、封面、幂等收藏与收听反馈。
-- 客户端使用 SecureStore 保存单 Server Profile；401 自动清除失效令牌，普通网络错误保留当前队列，并支持随时回退到 Demo Mode。
-- 新增设备令牌生命周期管理：客户端断开时自撤销，Web 设置页可列出并撤销单个 Radio 客户端，重新配对时清理旧令牌。
-- 新增两分钟、单次使用的一次性二维码配对：Web 设置页生成授权，App 扫码后显示目标 Server 并经用户确认兑换；保留粘贴链接和地址密码回退，Server 仅在内存中保存授权哈希。
-- 接入 `expo-camera` 的 QR-only 扫描器；仅在用户主动打开后申请相机权限，不保存图像，Android release APK 已核验没有录音权限。
-- 新增 TikLocal Radio 正式图标、Android adaptive icon 与原生启动页，并完成 iOS / Android 生产 bundle 验证。
-- 完成 Android Debug APK、含生产 Hermes bundle 的本地 release APK 和 release AAB 原生编译；显式移除悬浮窗、外部存储与生物识别等未使用权限。
-- 建立 TikLocal Radio 专用的长期 Android Release 密钥，并完成 `0.1.0 (1)` 正式签名 APK / AAB 构建与证书验证；密钥位于仓库外、密码由 macOS Keychain 保存，真机安装与系统媒体行为仍作为发布门槛。
-- 固化 TikLocal Radio `0.1.0 (1)`、EAS preview / production 构建策略和 iOS 标准加密声明；移除 iOS 未使用的麦克风与 Face ID 用途说明。
-- 收敛 EAS 云构建输入：排除本地原生工程、依赖、测试和商店材料，并增加无需物理设备签名的 iOS Simulator preview profile。
-- 使用官方安全区上下文替换 React Native 已弃用的 `SafeAreaView`；保持单一根 Provider，不增加导航或布局抽象，并完成 Android release 与 iOS Pods 自动链接验证。
-- 补齐 `expo-audio` 要求的直接 `expo-asset` peer dependency，Expo Doctor 20/20 通过。
-- 主 GitHub Actions 新增 TikLocal Radio 静态门禁：锁定 Node.js 22，验证 lockfile 安装、TypeScript、Expo 依赖健康度、双平台 production bundle 与内置音频资源解析；Python 发布构建同步依赖该门禁。
-- 新增 73 项客户端测试并纳入主 CI：覆盖 Radio Session、无随机 Tune 的生命周期恢复、本地队列快照、App 凭证生命周期、冷启动/前台深链、API 协议、SecureStore、扫码权限与 Pairing/Radio 页面语义交互；服务端 119 项回归通过，测试只替换原生边界，不增加业务抽象层或结构 Snapshot。
-- 补齐配对输入、Return/Demo/连接动作、电台与功能按钮的显式无障碍名称，并让播放进度以 progressbar 百分比和时间文本进入无障碍树。
-- 完成 Radio 客户端首轮 code-slim 审计：删除不可达 URL 防御、未使用 Promise 分支和冗余测试包装；确认现有 App/Session/Player/API/Storage 边界及 Screen 内联样式应继续保留。
-- 修复原生客户端连接空音乐库时永久停在 TUNING：改为明确的 `NO AUDIO` 状态、禁用无效操作并清除系统媒体会话；SecureStore 写入失败时尽力撤销刚签发的设备令牌。
-- 新增双平台真机 P0/P1 验收表；后台睡眠定时仍是发布决策门槛，耳机远程切歌已明确排除在 `0.1.x` 承诺之外。
-- 完成 Radio 播放器选型与隔离 PoC：`0.1.x` 保留 `expo-audio`，明确系统/耳机只承诺播放暂停，排除存在开源再分发许可门槛的 RN Track Player v5 与不满足新架构要求的 v4。
-- 新增双语隐私政策、App Store 中英文元数据、审核说明与 Google Play Data Safety 初稿，并将未真机验收的系统体验声明保留为发布门槛。
-- 新增原生 API 安全回归测试，覆盖配对限流、令牌哈希与撤销、改密失效、管理端 CSRF、路径穿越防护、Range、收藏幂等和反馈写入。
-- 闭合 `tiklocal-radio://` 原生配对入口：冷启动与前台事件均只打开并预填配对页，展示目标 Server 后等待用户确认；非法 URL 不改变当前 Radio，最终 Android APK 已核验 scheme intent filter。
-- 区分 iOS Development Build 与独立 Release 安装：新增 `ios:device` / `ios:release` 命令，明确 Development Client 只接受 Metro 地址，避免把 TikLocal Web HTML 误作 JavaScript bundle。
-- 完成 TikLocal Radio iPhone 真机 Release 编译、Personal Team 签名、安装与启动；生产 JavaScript bundle 已内嵌，日常使用不再依赖 Metro。
+
+## v0.8.38 (2026-09-21)
+
+- Consolidated Web Radio, media details, transfers, settings, Flow, and Library behavior into their route and service modules. Shared thumbnail, media payload, statistics, source, favorite, and recommendation logic now has one implementation.
+- Removed PWA installation and built-in local HTTPS support. External reverse proxies now provide HTTPS while authentication, secure cookies, media streaming, and Range requests remain supported. Legacy TLS options fail with a clear migration message, and the retirement service worker only unregisters itself and clears TikLocal public caches.
+- Simplified the downloader to one explicit concurrent queue with clean startup and shutdown. Pending work and child processes are stopped during service shutdown, registration failures remain visible and retryable, and incomplete source scans preserve existing index entries.
+- Isolated vector and similar-image experiments behind a startup flag and a dedicated results page. Existing vector data is retained while the regular Library remains independent of experimental code.
+- Fixed Flow pagination gaps caused by themes and source galleries, plus premature completion for image-only libraries. Page sizes now follow base media counts.
+- Replaced the native mode-selection home with `Flow / Library / Music / Settings`. Flow is the default local-first experience, imported photos and videos work without an account or server, and TikLocal remains an optional folder source under Settings.
+- Added a transactional SQLite local library with image and video counts, storage totals, multi-select deletion, clear-all, persistent video thumbnails, import progress, free-space reporting, and a 128 MB copy safety margin. Deletion affects only app-managed offline copies, which are excluded from device backup where supported.
+- Adopted `LumaFold` as the reversible working brand and aligned the app name, launch screen, permissions, and local-library copy. Existing bundle identifiers, schemes, storage, icons, and server protocol remain compatible.
+- Added the React Native and Expo Radio client with native navigation, background audio, lock-screen metadata, favorites, limited encore playback, sleep timers, and a responsive Signal Dial that honors Reduce Motion.
+- Added a single-server connection model with QR, pasted-link, and manual pairing. SecureStore distinguishes paired and known servers, preserves recoverable connection details, clears credentials only on explicit forget or invalid authorization, and supports cancellable server changes.
+- Added a token-free local queue snapshot that restores the station, queue, current track, and recent history using the current SecureStore token. Invalid authorization, device changes, and forgetting the server clear the snapshot.
+- Fixed unwanted retuning during notification-center, control-center, navigation, and app-lifecycle events. Normal restoration performs no network request, and offline retry preserves an existing queue.
+- Added `/api/v1` for native Radio: password pairing, hashed bearer tokens, real station queues, Range streaming, metadata, artwork, idempotent favorites, listening feedback, token revocation, and two-minute single-use QR authorization.
+- Added QR-only camera scanning that requests camera access only when opened and stores no images. Android release artifacts were verified without microphone permission.
+- Added production icons, adaptive Android assets, native launch screens, EAS preview and production profiles, iOS encryption declarations, and dedicated Android release signing outside the repository.
+- Replaced deprecated React Native safe-area APIs, added the required direct `expo-asset` peer dependency, and passed Expo Doctor checks.
+- Added the native client CI gate for Node.js 22, frozen lockfile install, TypeScript, Expo dependency health, production bundles for both platforms, and bundled audio resolution. Client and server regression suites cover session restoration, credentials, links, QR permissions, protocol security, Range handling, and semantic interactions.
+- Improved accessibility labels for pairing, navigation, connection, stations, actions, and progress. The first client simplification audit removed unreachable URL defenses and redundant promise and test wrappers.
+- Added explicit empty-library handling and best-effort token revocation when SecureStore writes fail. Added a dual-platform device acceptance checklist; background sleep timers remain a release decision gate.
+- Kept `expo-audio` for `0.1.x` after an isolated player evaluation. System and headset controls promise play and pause only; track skipping remains outside the `0.1.x` commitment.
+- Added English privacy, store metadata, review notes, and Google Play Data Safety drafts. Claims that require device testing remain release gates.
+- Closed the `tiklocal-radio://` pairing path for cold-start and foreground events. Valid links only open and prefill pairing for confirmation; invalid links do not alter the active Radio session.
+- Distinguished iOS Development Client and standalone Release workflows with `ios:device` and `ios:release`. The iPhone release build embeds its production JavaScript bundle and no longer depends on Metro.
 
 ## v0.8.37 (2026-07-23)
-- Radio 新增有限“再听”机制，可为当前喜欢的歌曲追加 1–3 次播放，并保持控制区简洁。
-- 新增 `RAIN / BREEZE / OFF` Room 氛围选择：提供本地无声雨夜与午后窗纱循环视频，选择会持久保存并随音乐播放状态同步。
-- 两段 Room 视频均经过无缝循环、无音轨、H.264 与轻量化处理；保留 poster，并适配减少动态效果和省流量模式。
-- 按 Rain/BREEZE、亮色/暗色和桌面/移动端分别调校背景强度，以局部无边界渐变保护歌曲信息，提升场景辨识度而不过度干扰长时间聆听。
+
+- Added a limited encore feature that can replay a favorite current track one to three times without expanding the main controls.
+- Added persistent `RAIN / BREEZE / OFF` room ambience using lightweight, silent, seamless H.264 loops with posters.
+- Tuned ambience for theme and viewport size, including reduced-motion and data-saving behavior.
 
 ## v0.8.36 (2026-07-22)
-- 修复 Android/Termux 安装因 `cryptography` 缺少 Android wheel、回退到本地 Rust/OpenSSL 编译而失败的问题：基础安装不再依赖或提前导入 `cryptography`。
-- 自动生成与维护本地 HTTPS 证书改为可选能力，通过 `pip install 'TikLocal[https]'` 安装；缺少依赖时 CLI 会给出明确修复命令。
-- 普通 HTTP 与自备 `--tls-cert/--tls-key` 证书继续使用基础安装；CI 仍安装全部可选依赖，保留自动证书、CA 下载和 HTTPS Range 请求的完整回归覆盖。
-- 补充 Android/Termux 同机访问建议：默认使用 `http://127.0.0.1:8000`，无需离线媒体或证书编译成本。
+
+- Removed the mandatory `cryptography` dependency that caused Android and Termux installs to fall back to local Rust and OpenSSL builds.
+- Moved automatic local HTTPS certificate management to the optional `TikLocal[https]` extra with clear CLI guidance when it is unavailable.
+- Retained regular HTTP, user-provided certificates, HTTPS tests in CI, and same-device Termux guidance using `http://127.0.0.1:8000`.
 
 ## v0.8.35 (2026-07-22)
-- 新增可安装 Web App：提供实例专属 Manifest、运行时生成的 180/192/512 图标、独立窗口元数据，以及设置页安装入口与 iOS/浏览器差异化指引。
-- 新增 `tiklocal tls init/status/renew/trust` 与 `tiklocal --https`：使用独立本地 CA 自动覆盖主机名和局域网 IP、临期续签服务器证书，在服务端 Mac 写入当前用户信任，并支持 `--tls-cert/--tls-key` 自备证书。
-- HTTPS 模式使用 Cheroot 原生 TLS WSGI 服务，HTTP 模式继续使用 Waitress；安全会话 Cookie 会随内置 HTTPS 自动启用。
-- 新增公开 `/install` 安装诊断与根证书下载页，准确区分证书未信任、Safari 系统菜单、iOS 分享菜单和 Chromium 等待安装条件等状态。
-- 注册最小权限 Service Worker，仅缓存带版本号的公共静态资源与应用图标；HTML、API、缩略图和原始媒体不进入离线缓存并保持视频 Range 请求。
-- 修复安装页在旧服务进程与新模板并存时因 DER 证书路由尚未加载而返回 500 的问题。
-- 新增 PWA、缓存边界、本地证书复用、CLI 状态与 HTTPS Range 回归测试。
+
+- Added an installable Web App with instance-specific manifests, generated icons, standalone metadata, and browser-specific installation guidance.
+- Added `tiklocal tls init/status/renew/trust`, automatic local CA and certificate renewal, user-supplied certificate support, and native TLS serving through Cheroot.
+- Added an installation diagnostics and CA download page plus a minimal service worker that cached only versioned public assets and icons.
+- Fixed an installation-page failure when a new template was served by an older process and expanded PWA, certificate, CLI, cache-boundary, and HTTPS Range coverage.
 
 ## v0.8.34 (2026-07-21)
-- Radio 重塑为编辑感唱片电台：新增动态曲目氛围背景、黑胶纹理、ON AIR 指示与更清晰的播放/暂停反馈。
-- 桌面端升级为唱片舞台与播放控制台双栏布局，移动端保持紧凑单列，并完善短屏、深色模式与减少动态效果适配。
-- 播放状态、缓冲、收藏与睡眠定时同步补充可访问语义；封面优先使用 Radio artwork，并保留生成式兜底。
-- 修复媒体详情页 More 菜单错位与遮挡问题，并为文件名、标题、元信息及菜单内容补齐长文本强制换行和边界保护。
+
+- Redesigned Radio as an editorial record station with dynamic ambience, vinyl texture, an on-air state, and clearer playback feedback.
+- Added a two-column desktop stage while retaining a compact mobile layout and support for short screens, dark mode, and reduced motion.
+- Improved semantic playback states and fixed overflow and positioning in the media details menu.
 
 ## v0.8.33 (2026-07-20)
-- Library 新增编辑式年/月时间线：以固定月份章节呈现代表影像，手机最多 9 项、Pad/桌面最多 15 项，并提供年份快速跳转和完整月份入口。
-- 新增媒体时间索引：图片优先读取 EXIF，随后识别文件名日期并回退文件时间；解析结果写入 SQLite 且在文件未变化时复用。
-- 时间线摘要使用独立轻量 API，不触发尺寸探测；缩略图按视口加载并限制为 4 个并发请求，月份详情统一使用缓存缩略图。
-- 原 Library 随机、相似、最新视频和大文件模式收敛到“探索”视图，Favorites 与 Collections 行为保持不变。
-- 下载任务仅在产出文件完成媒体索引后进入成功状态，避免成功提示与媒体库查询之间的短暂竞态。
+
+- Added an editorial year and month Library timeline with representative media, responsive item limits, year navigation, and complete month views.
+- Added a persistent media-time index using EXIF, filename dates, then file timestamps, with cached results for unchanged files.
+- Added a lightweight timeline summary API and bounded concurrent thumbnail loading.
+- Moved random, similar, recent-video, and large-file modes into Explore while keeping Favorites and Collections intact.
+- Required downloaded media to finish indexing before a task reports success.
 
 ## v0.8.32 (2026-07-20)
-- 修复 Python 3.10 下首次初始化和修改访问密码时 `datetime.UTC` 不存在的兼容性错误，并将 Python 3.10 / 3.12 / 3.14 测试纳入发布门禁。
+
+- Fixed Python 3.10 compatibility where `datetime.UTC` was unavailable and added Python 3.10, 3.12, and 3.14 to the release gate.
 
 ## v0.8.31 (2026-07-20)
-- 默认启用单密码访问认证：全局保护页面、API、媒体流与管理操作，登录后保留完整功能权限。
-- 新增独立登录页、长期会话、全局 CSRF 防护、登录限流与安全响应头；首次启动自动生成密码，密码仅以 scrypt 哈希保存。
-- 新增 `tiklocal auth status` 与 `tiklocal auth set-password`，运行中改密会立即使已有会话失效。
-- Flow 视频恢复从开头播放，保留条目顺序随机，移除会破坏叙事并增加切换竞态的随机进度起播。
-- 视频首帧已预加载时直接揭示；尚未准备好时使用同步出现、仅淡出的加载层，避免切换时暴露黑帧、旧帧或遮罩亮度脉冲。
+
+- Enabled single-password access by default across pages, APIs, media streams, and administrative actions.
+- Added a dedicated login page, long-lived sessions, global CSRF protection, login throttling, security headers, scrypt password storage, and authentication CLI commands.
+- Restored Flow video playback from the beginning while retaining randomized item order.
+- Improved first-frame presentation to avoid black frames, stale frames, and brightness pulses during transitions.
 
 ## v0.8.30 (2026-07-19)
-- 新增独立 Home：以 Flow / Radio 双模式入口为主视觉，并聚合最近加入、重新遇见、个人集合与媒体库状态；首页只加载缩略图，不自动播放媒体。
-- 沉浸混合流从 `/` 迁移至 `/flow`，桌面端采用窄侧栏导航，移动端保留 Flow / Radio 极简切换，并统一 Settings 与 Download 的页面顶部设计。
+
+- Added a dedicated Home centered on Flow and Radio, with recent media, rediscovery, collections, and library status using thumbnails only.
+- Moved the immersive feed to `/flow` and unified desktop side navigation, mobile switching, Settings, and Download headers.
 
 ## v0.8.29 (2026-07-13)
-- 优化 Flow 随机起播的首帧体验：随机位置准备完成后再揭示视频，并提前预 seek 下一条视频，避免封面、首帧与随机帧连续跳变。
-- 修复短视频与 Live Photo 偶发闪烁放大的问题：非随机起播视频直达真实首帧，封面完成解码且仍匹配当前视频时才允许显示，隔离快速切换产生的异步竞态。
+
+- Revealed randomly positioned videos only after seeking completed and pre-seeked the next item.
+- Fixed occasional enlargement flashes for short videos and Live Photos by validating decoded covers and isolating asynchronous transitions.
 
 ## v0.8.28 (2026-07-13)
-- 修复 Library、Favorites 与 Collection 在移动端正常滚动时偶发跳回顶部的问题：仅在瀑布流宽度、列数或间距真正变化时执行重排，忽略浏览器地址栏收放引发的高度型 `resize`。
+
+- Fixed mobile Library, Favorites, and Collection pages occasionally jumping to the top during normal scrolling by rebuilding masonry only when width, columns, or gaps change.
 
 ## v0.8.27 (2026-07-12)
-- 新增 SQLite 媒体查询索引与启动校正：统一多媒体源查询、分页、删除及下载入库链路，并安全处理临时离线媒体源。
-- 优化 Flow 与 Library 加载性能：缩小首批数据量、接入按需缩略图和索引导航，并完善请求、媒体加载失败与空状态恢复。
-- 建立轻量本地推荐：基于浏览、跳过和完成记录调整排序，同时保留探索与内容多样性，并支持一键重置画像。
-- 重塑底部 Dock、Library 浏览区、已保存空间与设置页，使主题、搜索、集合和页面交互更加统一细腻。
-- Flow 支持会话内稳定的受控随机起播，并按真实播放时长记录消费进度，避免随机跳转污染推荐反馈。
-- 集合卡片升级为自适应动态拼贴封面，详情页增加紧凑身份区、主封面状态和即时更新体验。
-- 下载页收敛为单链接轻量入口：支持视频/图片模式、网站与凭证自动匹配、清晰的任务操作和低频智能轮询。
-- 下载组件状态、并发数量与网站登录凭证统一迁入设置页管理，保留本机存储与同名安全更新机制。
+
+- Added a SQLite media query index and startup reconciliation for multi-source queries, pagination, deletion, and downloads, including temporarily unavailable sources.
+- Improved Flow and Library startup with smaller initial payloads, on-demand thumbnails, indexed navigation, and clearer recovery from request and media failures.
+- Added local recommendations based on views, skips, and completions while preserving exploration and diversity, plus profile reset.
+- Unified the dock, Library, saved areas, Settings, themes, search, collections, and page interactions.
+- Added stable per-session randomized starts and consumption tracking based on actual play time.
+- Added adaptive collage covers for collections and improved collection details and immediate updates.
+- Simplified Download to a single-link entry with media modes, automatic site and credential matching, clearer actions, and low-frequency polling.
+- Moved downloader status, concurrency, and credentials into Settings with safe local updates.
 
 ## v0.8.26 (2026-07-04)
-- Radio 启动性能优化：`/api/radio/tune` 改为轻量选曲，不再首次进入时逐首读取音频元数据，适配数百首音频库。
-- 新增 `/api/radio/metadata` 单曲元数据接口，前端播放当前曲目后再懒加载 title、artist、album 与 duration，并同步系统播放面板。
-- 新增 Radio 本地反馈画像：记录播放、完整听完、跳过、收藏与错误事件，并将隐式反馈纳入后续选曲权重。
-- Radio 页面交互细化：修复切歌标题闪现、未知时长 `Infinity:NaN`、暂停后封面旋转重置等问题。
-- Radio 布局优化：移除页面不必要上下滚动，收敛 cover、标题、进度与操作按钮的垂直节奏，并让核心内容位置更协调。
-- 新增 Radio 回归测试：覆盖懒加载元数据、轻量 tune 不触发 ffprobe、反馈画像写入与分数计算。
+
+- Made `/api/radio/tune` lightweight for large audio libraries and added `/api/radio/metadata` for lazy per-track metadata.
+- Added a local Radio feedback profile for plays, completions, skips, favorites, and errors.
+- Fixed title flashes, unknown-duration output, cover rotation after pause, vertical rhythm, and unnecessary page scrolling.
+- Added coverage for lazy metadata, tune performance boundaries, feedback persistence, and scoring.
 
 ## v0.8.25 (2026-07-04)
-- 新增 Radio 电台体验：以低决策连续播放替代传统音乐管理播放器，支持默认、最近添加、收藏倾向的后台选曲策略。
-- Radio 页面重构为安静的中心信号物件：支持内嵌封面、无封面生成式唱片标签、慢速碟片/封面动效与更舒适的核心操作按钮。
-- 新增 Radio 前端控制器与后端服务：支持下一首、收藏、30/60/120 分钟定时、最近播放排除与播放进度恢复。
-- 系统播放面板增强：Media Session 增加 artwork、播放状态、时长/进度同步与 seek 支持，适配 macOS 与 iPhone 浏览器控制面板。
-- 新增 Radio artwork fallback：无音频封面时生成 512x512 Radio 风格封面，避免系统播放面板空白。
-- 音频元数据增强：通过 ffprobe 读取 title、artist、album、duration，并在 API 与系统播放面板中优先使用真实音乐信息。
-- 新增 Radio 测试覆盖：包含选曲策略、最近播放排除、收藏优先、fallback artwork 与音频元数据解析。
+
+- Added the low-decision Radio experience with default, recent, and favorite-weighted stations.
+- Added the centered signal design, generated record-label fallback, restrained motion, next, favorite, sleep timers, recent-play exclusion, and progress restoration.
+- Extended Media Session with artwork, state, duration, progress, and seeking for browser and operating-system controls.
+- Added ffprobe title, artist, album, and duration metadata plus Radio selection and artwork tests.
 
 ## v0.8.15 (2026-02-25)
-- release: v0.8.15 视频放大镜与交互统一
-- feat: 支持视频放大镜并统一Flow放大策略
 
+- Added the video magnifier and unified magnification behavior across Flow interactions.
 
 ## v0.8.14 (2026-02-25)
-- release: v0.8.14 集合弹层交互优化
-- feat: 优化集合弹层为移动端抽屉并增强键盘操作
 
+- Reworked the collection overlay as a mobile drawer with improved keyboard interaction.
 
 ## v0.8.13 (2026-02-24)
-- Release v0.8.13: fix 'function' object is not subscriptable on Python 3.12
-- fix: add __future__ annotations to resolve 'function' object is not subscriptable
 
+- Added future annotations to fix `function` object subscription failures on Python 3.12.
 
 ## v0.8.12 (2026-02-23)
-- 架构收敛：新增 `flow_session.js`、`flow_actions_shared.js`、`flow_media_actions_controller.js`，统一 Home / Library / Favorites 的会话状态与媒体动作编排。
-- 清理废弃能力：移除 `/browse`、`/gallery` 旧路由与 `/api/videos`、`/api/random-images` 旧接口，删除未使用模板 `browse.html`、`favorite.html`、`gallery.html`、`index.html`。
-- 新增自定义集合基础能力：增加 `~/.tiklocal/collections.json`、`CollectionStore` 与 `/api/collections*` 接口，支持集合创建、增删媒体、按媒体反查所属集合。
-- 新增集合页面与详情入口：增加 `/collections` 与 `/collection/<id>`，并在 Favorites/Collection 视图提供集合导航。
-- Library/Favorites/Collection Quick Viewer 新增“加入集合”弹层，支持就地新建集合并即时勾选生效（无保存步骤），并显示“已加入数量”状态反馈。
-- Collections 交互增强：集合页卡片改为极简信息展示（仅名称+数量），重命名/删除收敛到 `...` 菜单；重命名从系统 `prompt` 升级为页面内轻量弹层。
-- 集合详情页顶部导航升级为“返回我的集合 + 当前集合名”的极简头部，替代原有可读性较弱的胶囊式导航。
-- 修复 Quick Viewer 集合弹层点击竞态：避免触发打开后被同一次点击瞬间关闭（已加入打开后短时点击保护）。
-- 首页 Flow 增加“加入集合”按钮与集合选择弹层，补齐与 Library/Favorites 的能力一致性。
+
+- Added shared session and media-action controllers across Home, Library, and Favorites.
+- Removed retired browse and gallery routes, APIs, and templates.
+- Added JSON-backed custom collections, collection APIs and pages, reverse media lookup, and consistent collection navigation.
+- Added an inline collection picker and creation flow to quick viewers and Home, with immediate membership updates.
+- Simplified collection cards and moved rename and delete into a menu with an in-page rename dialog.
+- Fixed the click race that immediately closed a newly opened collection picker.
 
 ## v0.8.10 (2026-02-22)
-- 修复 Library/Favorites 的 Quick Viewer 关闭后页面滚动锁死问题：补齐 body 滚动状态恢复逻辑，确保关闭弹层后列表可继续滚动。
-- Library API 增强媒体尺寸返回：`/api/library/items` 新增 `width` / `height` 字段，并在 `~/.tiklocal/metadata.json` 统一缓存图片与视频尺寸信息。
-- 尺寸探测策略优化：图片使用 Pillow 读取，视频使用 ffprobe 读取；缓存命中后直接复用，减少重复探测开销。
-- 修复图片 AI 元数据写入覆盖风险：生成标题/标签时改为 merge 写回，保留 `media_meta` 等已有字段。
-- Library/Favorites 瀑布流渲染升级为固定列最短列分发引擎，替代 CSS 多列自动流，降低滚动加载时右侧列反复跳动与回流重排。
-- 新增瀑布流响应式重排策略：仅在窗口变化时防抖重排，保持无限加载与 Quick Viewer 索引一致性。
-- 更新 `tests/test_library_upgrade.py`，补充瀑布流脚本标记与 `width`/`height` 字段断言，覆盖关键回归点。
+
+- Fixed body scroll remaining locked after closing the Library or Favorites quick viewer.
+- Added width and height to the Library API with cached Pillow and ffprobe probing.
+- Preserved existing metadata when writing generated image titles and tags.
+- Replaced CSS columns with deterministic shortest-column masonry and debounced responsive rebuilding.
+- Expanded regression coverage for dimensions and masonry behavior.
 
 ## v0.8.9 (2026-02-22)
-- 信息架构升级：底部导航调整为 `Flow / Library / Favorites / Download / Settings`，其中 `Library` 成为视频+图片统一入口，`Favorites` 独立为一级入口。
-- Library 交互重构为极简 Masonry：移除顶部传统筛选表单与卡片冗余文本，仅保留媒体本身的沉浸式浏览。
-- 新增 `/api/library/items` 与前端无限加载：支持按 `scope=all/favorite` 分页拉取，满足大规模素材连续浏览。
-- 新增 Library Quick Viewer Flow：列表内就地预览视频/图片，支持上下滑切换并保留“进入独立详情页”入口，降低跳转割裂感。
-- 交互统一收敛：首页与 Library/Favorites 改为同一沉浸状态模型（视频/图片一致），放大镜作为图片工具态独立控制。
-- 新增共享交互内核：`flow_state_controller.js`（状态）与 `flow_ui_shared.js`（时间/放大镜几何），降低多入口行为分叉风险。
-- 兼容迁移：`/browse`、`/gallery` 改为重定向到 `/library`，详情页与删除后的回跳统一指向新 Library 入口。
+
+- Changed the primary navigation to `Flow / Library / Favorites / Download / Settings` and made Library the unified image and video entry point.
+- Added a minimal masonry Library, paginated `/api/library/items`, and an inline image and video quick viewer.
+- Unified the immersive state model and shared time and magnifier geometry across Flow, Library, and Favorites.
+- Redirected legacy browse and gallery paths to Library.
 
 ## v0.8.8 (2026-02-22)
-- 首页沉浸流升级为混合媒体 Feed：在同一滑动流中混排视频与图片，替代原纯视频首页链路。
-- 新增 `/api/feed/mix`，统一返回 typed media items（`video` / `image`），并使用“目标比率 + 轻随机约束”混排，避免固定节奏可预测性。
-- 首页图片条目复用 Gallery 关键交互：AI 标题/标签面板、2.5x/5x 圆形放大镜、单击专注模式（仅隐藏左下信息层）。
-- 交互收敛：视频不显示 AI 按钮，图片不显示倍速按钮；图片不再自动计时切换，改为手动滑动切换。
-- 修复首页放大镜取样计算：按 `object-fit: contain` 的真实内容框计算，避免横向压扁。
-- 修复首页图片 AI 标题/标签不显示问题：调整 `currentCaptionUri` 生命周期，避免异步回写被错误丢弃。
-- 清理首页混合流过期代码：移除无效 `controls-active` 状态切换与不可触发的播放图标点击监听。
-- 新增 `tests/test_feed_mix.py` 覆盖混合 Feed API 基本行为，并新增混合流设计文档索引。
+
+- Upgraded Home to a mixed image and video feed through `/api/feed/mix` with ratio targets and light randomization.
+- Reused Gallery captions, tags, focus mode, and magnification for images while keeping media-specific controls.
+- Fixed contained-image magnifier geometry and stale asynchronous caption updates.
+- Removed obsolete interaction code and added mixed-feed API coverage.
 
 ## v0.8.7 (2026-02-21)
-- 新增“来源回跳”能力：下载成功后将文件与原始 URL 建立映射，并新增 `~/.tiklocal/download_sources.json` 持久化来源索引。
-- 新增来源解析三层兜底：优先来源映射，其次 `.info.json`（`webpage_url/original_url`），最后按文件名结构推断平台链接（x/youtube/tiktok/instagram）。
-- 新增来源查询 API：`GET /api/source` 与 `POST /api/source/batch`，用于详情页与下载列表按文件获取来源信息。
-- 视频/图片详情页“操作”区新增“查看来源”入口；下载列表输出文件旁新增来源链接展示。
-- `yt-dlp` 输出命名升级为结构化短名，并启用 `--write-info-json` 以增强跨平台回跳恢复能力。
-- 新增来源相关测试覆盖：来源映射写入、历史清理保留、info.json/文件名回退、批量查询与删除文件同步清理映射。
+
+- Added persistent source links for downloads with fallbacks to sidecar metadata and filename patterns.
+- Added single and batch source APIs plus source links in media details and download output.
+- Adopted structured short output names and sidecar metadata from yt-dlp.
+- Added coverage for source persistence, cleanup, fallback parsing, batch lookup, and synchronized deletion.
 
 ## v0.8.6 (2026-02-21)
-- URL 下载中心升级为双引擎：支持按任务手动选择 `yt-dlp` / `gallery-dl`，并在运行状态中展示双引擎可用性与版本。
-- 下载任务模型增强：新增 `engine`、`engine_version`、`output_files_rel`、`file_count` 字段；兼容旧任务历史记录恢复。
-- 新增 `gallery-dl` 下载链路：支持 cookie 文件复用、`download-archive` 去重归档、临时目录收敛后写回媒体根目录（含重名自动避让）。
-- 修复下载列表“查看文件”跳转：图片文件改为进入 `/image` 详情页；并为 `/detail/<image>` 增加后端自动重定向兜底。
-- 更新中英文 README 与下载测试覆盖，补充双引擎使用与安装说明。
+
+- Added selectable yt-dlp and gallery-dl engines with availability and version reporting.
+- Extended task history with engine, version, output files, and file counts while retaining compatibility.
+- Added gallery-dl cookie reuse, archive deduplication, temporary staging, and collision-safe moves into the media root.
+- Fixed image output links and added an image redirect fallback from detail routes.
 
 ## v0.8.5 (2026-02-20)
-- 新增 URL 下载中心（`/download`）与后台任务队列：支持任务创建、取消、删除、清空历史与失败重试。
-- 新增 cookie 文件方案：支持 `~/.tiklocal/cookies` 自动匹配/手动指定、页面上传即同名覆盖更新。
-- 下载链路增强网络容错：启用 `yt-dlp` 继续下载与重试参数，提升断网恢复能力。
-- 完成下载页交互重构：单主操作流、上传入口收敛、状态标签降饱和、Toast 反馈替代 alert。
-- 新增 `tests/test_download.py`，覆盖下载配置、cookie 处理、重试与历史清理接口。
+
+- Added the `/download` queue with create, cancel, delete, clear-history, and retry actions.
+- Added automatic and manual cookie-file selection with safe same-name replacement.
+- Added downloader resume and retry options, simplified task controls, lower-emphasis states, and toast feedback.
+- Added download configuration, cookie, retry, and history tests.
 
 ## v0.8.4 (2026-02-20)
-- 新增 AI Prompt 配置能力：支持在设置页自定义 system/user prompt、temperature、tags_limit，并支持重置默认值。
-- 新增 LLM 运行时配置：支持在设置页配置 `base_url`、`model_name`，并展示 API Key 是否已配置。
-- 图片详情页支持“仅本次覆盖生成”高级参数；元数据返回 `prompt_source` 与 `llm_source` 便于追踪来源。
-- Gallery 弹层新增单击图片专注模式：仅隐藏左下角 AI 标题/标签覆层，保留右下角工具按钮可操作。
-- 新增 `tests/test_prompt_config.py`，覆盖 prompt/llm 配置 API 与元数据来源优先级。
+
+- Added configurable image-generation system and user prompts, temperature, tag limits, reset behavior, model URL, model name, and API key status.
+- Added per-request overrides on image details and returned prompt and model source metadata.
+- Added focus mode to the Gallery overlay while retaining access to tools.
+- Added prompt configuration and metadata precedence tests.

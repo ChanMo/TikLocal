@@ -15,7 +15,7 @@ from PIL import Image
 from tiklocal.services.json_storage import write_json_atomic
 
 
-PROMPT_TEMPLATE_VERSION = 2
+PROMPT_TEMPLATE_VERSION = 3
 PROMPT_MAX_SYSTEM_LENGTH = 4000
 PROMPT_MAX_USER_LENGTH = 8000
 PROMPT_TEMPERATURE_MIN = 0.0
@@ -27,14 +27,14 @@ LLM_MODEL_NAME_MAX_LENGTH = 256
 
 DEFAULT_PROMPT_CONFIG = {
     "system_prompt": (
-        "你是一个图片内容分析助手。请根据图片内容生成适合本地媒体库浏览的中文标题和标签。"
-        "只输出 JSON，不要输出 Markdown。"
+        "You analyze images for a local media library. Generate a concise English title and tags "
+        "based on the visible content. Return JSON only, without Markdown."
     ),
     "user_prompt": (
-        "请分析这张图片，生成：\n"
-        "1. 一个简短自然的中文标题\n"
-        "2. 最多 {tags_limit} 个中文标签\n\n"
-        "输出 JSON：{\"title\":\"...\",\"tags\":[\"...\"]}"
+        "Analyze this image and generate:\n"
+        "1. A short, natural English title\n"
+        "2. Up to {tags_limit} concise English tags\n\n"
+        "Output JSON: {\"title\":\"...\",\"tags\":[\"...\"]}"
     ),
     "temperature": 0.6,
     "tags_limit": 5,
@@ -77,7 +77,7 @@ def validate_prompt_config(
     include_enabled: bool = False,
 ) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(payload, dict):
-        return None, "配置格式必须是 JSON 对象。"
+        return None, "Configuration must be a JSON object."
 
     cleaned: dict[str, Any] = {}
 
@@ -85,12 +85,12 @@ def validate_prompt_config(
         if field not in payload:
             if partial:
                 return None, None
-            return None, f"缺少字段: {field}"
+            return None, f"Missing field: {field}"
         value = str(payload.get(field, "")).strip()
         if not value:
-            return None, f"{field} 不能为空。"
+            return None, f"{field} cannot be empty."
         if len(value) > max_length:
-            return None, f"{field} 不能超过 {max_length} 个字符。"
+            return None, f"{field} cannot exceed {max_length} characters."
         return value, None
 
     system_prompt, error = _read_text("system_prompt", PROMPT_MAX_SYSTEM_LENGTH)
@@ -109,9 +109,9 @@ def validate_prompt_config(
         try:
             temperature = float(payload["temperature"])
         except (TypeError, ValueError):
-            return None, "temperature 必须是数字。"
+            return None, "temperature must be a number."
         if not (PROMPT_TEMPERATURE_MIN <= temperature <= PROMPT_TEMPERATURE_MAX):
-            return None, f"temperature 必须在 {PROMPT_TEMPERATURE_MIN} 到 {PROMPT_TEMPERATURE_MAX} 之间。"
+            return None, f"temperature must be between {PROMPT_TEMPERATURE_MIN} and {PROMPT_TEMPERATURE_MAX}."
         cleaned["temperature"] = temperature
     elif not partial:
         cleaned["temperature"] = float(DEFAULT_PROMPT_CONFIG["temperature"])
@@ -120,9 +120,9 @@ def validate_prompt_config(
         try:
             tags_limit = int(payload["tags_limit"])
         except (TypeError, ValueError):
-            return None, "tags_limit 必须是整数。"
+            return None, "tags_limit must be an integer."
         if not (PROMPT_TAGS_MIN <= tags_limit <= PROMPT_TAGS_MAX):
-            return None, f"tags_limit 必须在 {PROMPT_TAGS_MIN} 到 {PROMPT_TAGS_MAX} 之间。"
+            return None, f"tags_limit must be between {PROMPT_TAGS_MIN} and {PROMPT_TAGS_MAX}."
         cleaned["tags_limit"] = tags_limit
     elif not partial:
         cleaned["tags_limit"] = int(DEFAULT_PROMPT_CONFIG["tags_limit"])
@@ -131,7 +131,7 @@ def validate_prompt_config(
         if "enabled" in payload:
             value = payload["enabled"]
             if not isinstance(value, bool):
-                return None, "enabled 必须是布尔值。"
+                return None, "enabled must be a boolean."
             cleaned["enabled"] = value
         elif not partial:
             cleaned["enabled"] = bool(DEFAULT_PROMPT_CONFIG["enabled"])
@@ -145,22 +145,22 @@ def validate_llm_config(
     partial: bool = False,
 ) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(payload, dict):
-        return None, "配置格式必须是 JSON 对象。"
+        return None, "Configuration must be a JSON object."
 
     cleaned: dict[str, Any] = {}
 
     if "base_url" in payload or not partial:
         base_url = str(payload.get("base_url", "")).strip()
         if len(base_url) > LLM_BASE_URL_MAX_LENGTH:
-            return None, f"base_url 不能超过 {LLM_BASE_URL_MAX_LENGTH} 个字符。"
+            return None, f"base_url cannot exceed {LLM_BASE_URL_MAX_LENGTH} characters."
         if base_url and not (base_url.startswith("http://") or base_url.startswith("https://")):
-            return None, "base_url 必须以 http:// 或 https:// 开头。"
+            return None, "base_url must start with http:// or https://."
         cleaned["base_url"] = base_url
 
     if "model_name" in payload or not partial:
         model_name = str(payload.get("model_name", "")).strip()
         if len(model_name) > LLM_MODEL_NAME_MAX_LENGTH:
-            return None, f"model_name 不能超过 {LLM_MODEL_NAME_MAX_LENGTH} 个字符。"
+            return None, f"model_name cannot exceed {LLM_MODEL_NAME_MAX_LENGTH} characters."
         cleaned["model_name"] = model_name
 
     return cleaned, None
@@ -168,7 +168,7 @@ def validate_llm_config(
 
 def validate_vision_config(payload, *, partial=False):
     if not isinstance(payload, dict):
-        return None, "配置格式必须是 JSON 对象。"
+        return None, "Configuration must be a JSON object."
     value = dict(payload) if partial else {**DEFAULT_VISION_CONFIG, **payload}
     if isinstance(payload.get('prompt'), dict):
         for source, target in (('system', 'system_prompt'), ('user', 'user_prompt')):
@@ -314,11 +314,11 @@ class CaptionService:
         self.base_url = base_url
         self.api_key = api_key
         if not self.api_key:
-            raise RuntimeError("未配置 OPENAI_API_KEY。")
+            raise RuntimeError("OPENAI_API_KEY is not configured.")
         if not self.model:
-            raise RuntimeError("未配置 TIKLOCAL_LLM_MODEL。")
+            raise RuntimeError("TIKLOCAL_LLM_MODEL is not configured.")
         if self.base_url and "openrouter.ai" in self.base_url and "/api/v1" not in self.base_url:
-            raise RuntimeError("base_url 需要包含完整 API 路径，例如 https://openrouter.ai/api/v1")
+            raise RuntimeError("base_url must include the full API path, such as https://openrouter.ai/api/v1")
 
     def generate(
         self,
@@ -334,15 +334,15 @@ class CaptionService:
         system_prompt = str(effective_prompt["system_prompt"])
         user_prompt = self._render_user_prompt(str(effective_prompt["user_prompt"]), tags_limit)
         if not system_prompt.strip() or not user_prompt.strip():
-            raise RuntimeError("请先在配置文件中设置 vision Prompt，或使用本次覆盖提示词。")
+            raise RuntimeError("Configure the vision prompt first, or provide a prompt override for this request.")
 
         text = self._request_chat_completion(system_prompt, user_prompt, data_url, temperature)
         if self._looks_like_html(text):
-            raise RuntimeError("模型返回了 HTML 页面，请检查 base_url 或 model 是否正确。")
+            raise RuntimeError("The model returned an HTML page. Check base_url and model.")
 
         parsed = self._parse_output(text, tags_limit)
         if not parsed['title'] and not parsed['tags']:
-            raise RuntimeError('模型未返回标题或标签。')
+            raise RuntimeError('The model returned neither a title nor tags.')
 
         return {
             "title": parsed.get("title", ""),
@@ -361,18 +361,18 @@ class CaptionService:
         return rendered.replace("{tags_limit}", str(tags_limit))
 
     def _to_data_url(self, image_path: Path, max_size: int = 1536, quality: int = 85) -> str:
-        """将图片转换为 base64 data URL，自动压缩以减少 token 消耗。
+        """Convert an image to a compressed base64 data URL to reduce token use.
 
         Args:
-            image_path: 图片文件路径
-            max_size: 最长边最大像素，默认 1536px
-            quality: JPEG 质量 (1-100)，默认 85
+            image_path: Image file path.
+            max_size: Maximum size of the longest edge, 1536px by default.
+            quality: JPEG quality from 1 to 100, 85 by default.
 
         Returns:
-            压缩后的 base64 data URL
+            The compressed base64 data URL.
         """
         with Image.open(image_path) as img:
-            # 转换为 RGB（处理 RGBA、灰度等格式）
+            # Convert RGBA, grayscale, and other modes to RGB.
             if img.mode in ('RGBA', 'LA', 'P'):
                 background = Image.new('RGB', img.size, (255, 255, 255))
                 if img.mode == 'P':
@@ -382,14 +382,14 @@ class CaptionService:
             elif img.mode != 'RGB':
                 img = img.convert('RGB')
 
-            # 调整尺寸
+            # Resize if needed.
             width, height = img.size
             if max(width, height) > max_size:
                 ratio = max_size / max(width, height)
                 new_size = (int(width * ratio), int(height * ratio))
                 img = img.resize(new_size, Image.Resampling.LANCZOS)
 
-            # 压缩为 JPEG
+            # Encode as JPEG.
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG', quality=quality, optimize=True)
             encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
@@ -496,7 +496,7 @@ class CaptionService:
             title = text.strip().splitlines()[0] if text.strip() else ""
 
         if isinstance(tags, str):
-            tags = re.split(r"[，,;/\n]+", tags)
+            tags = re.split(r"[,;/\n]+", tags)
         if isinstance(tags, list):
             tags = [str(t).strip() for t in tags if str(t).strip()]
         else:

@@ -123,10 +123,10 @@ def build_theme_strip_candidates(
         candidates.append({
             'type': 'theme_strip',
             'name': 'theme:favorite-picks',
-            'title': '收藏精选',
-            'subtitle': '快速跳去收藏页继续看。',
+            'title': 'Favorite Picks',
+            'subtitle': 'Jump to your favorites and keep watching.',
             'target_url': '/favorite',
-            'target_label': '打开收藏',
+            'target_label': 'Open Favorites',
             'items': favorite_items,
         })
 
@@ -143,10 +143,10 @@ def build_theme_strip_candidates(
         candidates.append({
             'type': 'theme_strip',
             'name': 'theme:recent-added',
-            'title': '最近加入',
-            'subtitle': '快速跳去媒体库继续看。',
+            'title': 'Recently Added',
+            'subtitle': 'Jump to your library and keep watching.',
             'target_url': '/library',
-            'target_label': '打开媒体库',
+            'target_label': 'Open Library',
             'items': recent_items,
         })
 
@@ -262,8 +262,8 @@ def build_mix_feed_page(
         image_group_candidate = {
             'type': 'image_group',
             'name': f"group:{group_items[0]['name']}",
-            'title': '原始图集',
-            'subtitle': '左右切换查看同一帖子里的图片。',
+            'title': 'Original Gallery',
+            'subtitle': 'Swipe sideways through images from the same post.',
             'items': group_items,
         }
         image_group_names = {str(item.get('name') or '') for item in group_items}

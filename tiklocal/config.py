@@ -29,13 +29,13 @@ def similarity_enabled(experiments=None, embedding=None) -> bool:
     from tiklocal.paths import get_embedding_config_path
 
     if experiments is not None and not isinstance(experiments, dict):
-        raise ValueError('experiments 必须是配置对象')
+        raise ValueError('experiments must be a configuration object')
     similarity = (experiments or {}).get('similarity', {})
     if not isinstance(similarity, dict):
-        raise ValueError('experiments.similarity 必须是配置对象')
+        raise ValueError('experiments.similarity must be a configuration object')
     if 'enabled' in similarity:
         if not isinstance(similarity['enabled'], bool):
-            raise ValueError('experiments.similarity.enabled 必须是布尔值')
+            raise ValueError('experiments.similarity.enabled must be a boolean')
         return similarity['enabled']
 
     path = get_embedding_config_path()

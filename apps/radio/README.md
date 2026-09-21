@@ -1,10 +1,10 @@
-# LumaFold 原生 App
+# LumaFold Native App
 
-LumaFold 是 TikLocal 项目的本地优先消费端品牌。当前版本打开后直接进入私人 Flow，可从 Photos 或 Files 导入图片和视频，在 App 沙盒内建立离线副本与 SQLite 索引，并纵向浏览和播放；无需账号、网络或 TikLocal Server。
+LumaFold is TikLocal's local-first client. It opens directly into a private Flow, imports user-selected photos and videos from Photos or Files, stores offline copies and a SQLite index in the app sandbox, and supports vertical browsing and playback without an account, network connection, or TikLocal Server.
 
-App 使用 `Flow / Library / Music / Settings` 四个顶层空间。Flow 与 Library 是照片和视频主产品；原有 Radio 位于次级 Music 空间，连接管理在 Settings 中表现为可选 TikLocal Folder Source。Music 可扫描 TikLocal Web 设置页生成的一次性二维码完成单 Server 配对，也保留渐进式的粘贴链接、手动地址与访问密码以及内置 Demo Signal。当前用户可见名称与候选图标使用 LumaFold；bundle identifier、Expo slug、URL Scheme、数据库与配对协议继续沿用原内部标识，避免品牌试用阶段触发数据迁移。
+The app has four top-level spaces: `Flow`, `Library`, `Music`, and `Settings`. Flow and Library are the primary photo and video experience. Radio lives under Music, while Settings exposes server connections as an optional TikLocal Folder Source. Music can pair with one server through a single-use QR code from TikLocal Web Settings, a pasted pairing link, or a manually entered address and access password. Demo Signal works without a server. The visible brand and candidate icon use LumaFold; the bundle identifier, Expo slug, URL scheme, database, and pairing protocol retain their existing internal identifiers to avoid migration during brand testing.
 
-## 本地运行
+## Local development
 
 ```bash
 cd apps/radio
@@ -14,56 +14,43 @@ npm test
 npm run ios:device
 ```
 
-`npm run ios:device` 会生成并安装 iOS Development Build。它不包含可独立运行的
-JavaScript bundle；之后日常开发必须先启动 Metro：
+`npm run ios:device` builds and installs an iOS Development Build. It does not include a standalone JavaScript bundle, so start Metro for normal development:
 
 ```bash
 npm start
 ```
 
-在手机打开 LumaFold 后，从 Expo Development Client 选择自动发现的 Metro
-开发服务器。该界面的 URL 是 JavaScript 开发服务器，通常使用 `8081` 端口；不要
-在这里输入 TikLocal Server 地址，否则 HTML 会被当作 JavaScript bundle，并出现
-`Expected MIME-Type ... but got text/html`。
+Open LumaFold on the phone and select the automatically discovered Metro server in Expo Development Client. That screen expects the JavaScript development server, usually on port `8081`. Do not enter a TikLocal Server address there, or its HTML response will be treated as a JavaScript bundle and produce `Expected MIME-Type ... but got text/html`.
 
-进入真正的 LumaFold 配对页后，才输入或扫描 TikLocal Server 地址，例如
-`http://192.168.0.128:8888`。
+Enter or scan the TikLocal Server address only after opening LumaFold's pairing screen, for example `http://192.168.0.128:8888`.
 
-原生模块或 `app.config.ts` 发生变化后，需要重新执行 `npm run ios:device`。本地
-`tiklocal-storage` Expo Module 只承载必须下沉原生的 backup exclusion 和视频帧生成；
-SQLite、导入与文件生命周期仍由单一 TypeScript 资料库模块负责。
+Re-run `npm run ios:device` after changing native modules or `app.config.ts`. The local `tiklocal-storage` Expo Module contains only native backup-exclusion and video-frame functions. SQLite, imports, and file lifecycle remain owned by the single TypeScript library module.
 
-如果希望像普通 App 一样独立启动、不依赖 Metro，安装本地 Release：
+For a standalone app that does not depend on Metro, install a local Release build:
 
 ```bash
 npm run ios:release
 ```
 
-Release 会把生产 JavaScript bundle 和 Demo 音频嵌入 App；安装后直接进入 LumaFold
-Flow，不会显示 Development Client 启动页。
+Release builds embed the production JavaScript bundle and Demo audio, then open directly into LumaFold Flow.
 
-Flow 从 Photos 或 Files 复制用户明确选择的图片与视频到 App 私有目录，并使用
-SQLite 保存本地清单。资料库会显示实际占用空间；长按项目可多选删除，Clear 可清空
-全部 App 副本，两者都不会删除 Photos 或 Files 中的原件。iOS 会将媒体副本目录标记
-为不进入 iCloud 设备备份；SQLite 索引和偏好仍可能随系统备份。视频导入时生成本地
-预览图，旧记录会逐项补齐；多项目导入显示确定进度，复制前按已知大小保留 128 MB
-设备空间安全余量。
+Flow copies explicitly selected media into the app's private directory and stores its local manifest in SQLite. Library shows actual storage use. Long-press selection and Clear remove only app-managed copies, never the originals in Photos or Files. On iOS, media-copy directories are excluded from iCloud device backup; the SQLite index and preferences may still be included in system backups. Video imports receive local previews, older records are backfilled, multi-item imports show deterministic progress, and known file sizes reserve a 128 MB device-space margin before copying.
 
-首次进入 Radio 配对页时，优先在 TikLocal Web 设置页生成两分钟有效的一次性二维码并扫描。App 会显示目标 Server，确认后才兑换设备令牌；也可粘贴配对链接，或手动输入 Server 地址和访问密码，例如：
+For Radio pairing, generate and scan a single-use QR code from TikLocal Web Settings. The app shows the target server and exchanges the authorization only after confirmation. You can also paste a pairing link or manually enter a server address and access password:
 
 ```text
 https://studio-mac.local:8443
 ```
 
-二维码不含访问密码或设备令牌，Server 只在内存中保存一次性授权的哈希。配对成功后，访问密码和一次性授权都不会保存；App 在 SecureStore 中保存 Server 地址、名称和返回的设备令牌。修改 TikLocal 访问密码会让设备令牌失效，但 App 会继续记住 Server 地址与名称，只要求重新授权。
+The QR code contains neither the password nor a device token. The server keeps only a hash of the single-use authorization in memory. After pairing, the password and one-time authorization are discarded; SecureStore retains the server address, name, and returned device token. Changing the TikLocal access password invalidates device tokens while preserving the remembered server address and name for reauthorization.
 
-Server 暂时离线时，App 保留连接并提供重试；连接失败后也会记住格式有效的最近地址。只有在 Connection 页面确认 Forget This Server 才会删除本机连接并尽力撤销设备令牌。也可以在 TikLocal Web 设置页的“Radio 客户端”区域查看并撤销指定设备。
+When a server is offline, the app keeps the connection profile and offers Retry. It also remembers the most recent valid address after a failed connection. Only confirming **Forget This Server** removes the local connection and attempts to revoke the device token. Individual devices can also be revoked under **Radio Clients** in TikLocal Web Settings.
 
-通知中心、控制中心、页面返回或普通前后台切换不会重新 Tune；当前原生播放会话和队列保持不变。进程被终止后的冷启动会从不含凭证的本地快照恢复 Station、队列和当前曲目，并使用 SecureStore 中的当前 Token 重建媒体请求。离线 Retry 在已有队列时只恢复连接，不随机替换队列。
+Notification Center, Control Center, navigation, and ordinary foreground/background transitions do not retune Radio. A cold start restores the station, queue, and current track from a credential-free snapshot and rebuilds media requests with the current SecureStore token. Offline Retry reconnects an existing queue without replacing it randomly.
 
-## 构建分发
+## Distribution builds
 
-首次使用 EAS 时先登录并关联 Expo 项目：
+Sign in and link the Expo project before using EAS for the first time:
 
 ```bash
 npx eas-cli login
@@ -71,39 +58,35 @@ npx eas-cli init
 npx eas-cli build:configure
 ```
 
-`eas init` 会把 Expo 项目的真实 `projectId` 写入 App 配置；不要手工编造该 ID。现有
-`eas.json` 已完成 Build profile 配置，`build:configure` 只用于让 CLI 检查并补齐
-项目状态。
+`eas init` writes the real Expo `projectId`; do not invent it manually. `eas.json` already defines the build profiles, and `build:configure` only checks and completes project state.
 
-内部安装包：
+Internal builds:
 
 ```bash
 npx eas-cli build --profile preview --platform ios
 npx eas-cli build --profile preview --platform android
 ```
 
-iOS Simulator 包不需要物理设备签名，可单独生成：
+iOS Simulator build:
 
 ```bash
 npx eas-cli build --profile preview-simulator --platform ios
 ```
 
-商店构建：
+Store builds:
 
 ```bash
 npx eas-cli build --profile production --platform ios
 npx eas-cli build --profile production --platform android
 ```
 
-应用标识、正式图标、启动页和 EAS profiles 位于 `app.config.ts`、`assets/` 与 `eas.json`。版本从 `0.1.0 (1)` 起步，EAS production 构建会递增远端 build version，避免本地反复改号。
+App identifiers, production artwork, splash configuration, and EAS profiles live in `app.config.ts`, `assets/`, and `eas.json`. Versioning starts at `0.1.0 (1)`; EAS production builds increment the remote build version.
 
-`.easignore` 会排除本地生成的原生工程、依赖、测试、商店材料与构建输出。EAS 上传仍
-包含运行所需的 `src/`、入口、配置、锁文件和 `assets/`；修改忽略规则后应先用
-`eas build:inspect --stage archive` 检查实际上传内容。
+`.easignore` excludes generated native projects, dependencies, tests, store materials, and build output. EAS still uploads the runtime `src/`, entry points, configuration, lockfile, and assets. After changing ignore rules, inspect the archive with `eas build:inspect --stage archive`.
 
-隐私政策、中英文商店文案草案和逐项真机验收表位于 `store/`。仓库已公开，因此合并到 `main` 后可将隐私政策文件的 GitHub 页面用作首版公开 URL；正式外部分发仍需签名账号、商店截图和真机验收结果。
+Privacy policy, store metadata, and device acceptance materials live in `store/`. Once merged to public `main`, the privacy policy's GitHub page can serve as the initial public URL. External distribution still requires signing accounts, store screenshots, and completed device acceptance.
 
-在无法使用真机时，可先执行不安装 App 的静态验证：
+Static verification without installing the app:
 
 ```bash
 npx expo prebuild --no-install
@@ -111,14 +94,11 @@ npx expo export:embed --platform ios --dev false --entry-file index.ts --bundle-
 npx expo export:embed --platform android --dev false --entry-file index.ts --bundle-output /tmp/tiklocal-radio-android.bundle
 ```
 
-仓库主 CI 会在 Node.js 22 下从 `package-lock.json` 执行 `npm ci`、TypeScript、客户端
-自动化测试、固定版本 Expo Doctor，以及带 Demo 音频资源复制的 iOS / Android
-production bundle。该门禁不需要 Expo、Apple 或 Google 凭据，也不替代真机相机、
-媒体导入、删除与播放行为验收。
+The main CI workflow uses Node.js 22 and `package-lock.json` to run `npm ci`, TypeScript, client tests, a pinned Expo Doctor, and production iOS/Android bundle builds with Demo audio copied in. These checks require no Expo, Apple, or Google credentials and do not replace device testing for camera, import, deletion, and playback behavior.
 
-### Android 本地原生构建
+### Local Android native builds
 
-React Native 使用 JDK 17。首次准备构建机：
+React Native uses JDK 17. Prepare a build machine with:
 
 ```bash
 brew install openjdk@17
@@ -131,7 +111,7 @@ sdkmanager --sdk_root="$ANDROID_HOME" \
   "ndk;27.1.12297006" "cmake;3.22.1"
 ```
 
-生成并验证未接入正式凭据的本地安装包：
+Build unsigned-for-production local artifacts:
 
 ```bash
 npx expo prebuild --clean --no-install --platform android
@@ -139,59 +119,47 @@ cd android
 NODE_ENV=production ./gradlew :app:assembleRelease :app:bundleRelease
 ```
 
-生成物位于 `android/app/build/outputs/apk/release/` 与
-`android/app/build/outputs/bundle/release/`。CNG 生成工程默认用 Android Debug
-证书签署 release 产物，仅用于本地验证，不能公开分发或提交商店。
+Artifacts are written under `android/app/build/outputs/apk/release/` and `android/app/build/outputs/bundle/release/`. CNG-generated projects sign release artifacts with the Android debug certificate by default; those builds are only for local verification.
 
-2026-07-26 已在当前发布机建立 TikLocal Radio 专用的独立 keystore，密码保存在
-macOS Keychain，密钥文件保存在仓库外：
+A dedicated TikLocal Radio keystore was created on the current release machine on 2026-07-26. Its password is stored in macOS Keychain and the key file is outside the repository:
 
 ```text
 ~/Library/Application Support/TikLocal/signing/tiklocal-radio-release.jks
 ```
 
-由该密钥签署的 `0.1.0 (1)` APK / AAB 已完成构建和签名验证，便于辨识的副本位于：
+Signed `0.1.0 (1)` APK and AAB copies are stored at:
 
 ```text
 dist/android/TikLocal-Radio-0.1.0-android.apk
 dist/android/TikLocal-Radio-0.1.0-android.aab
 ```
 
-APK 证书 SHA-256 为
-`eb883956d85ee395938d63aeccf2294426490475db3df62942a15c962e4db483`。
-正式分发前必须安全备份 keystore；后续升级必须继续使用同一密钥。设备若已安装相同
-包名的 Debug 签名版本，需要先卸载再安装本次正式签名 APK；此操作会清除 App 本地
-数据。
+The APK certificate SHA-256 is `eb883956d85ee395938d63aeccf2294426490475db3df62942a15c962e4db483`. Back up the keystore securely before distribution; every upgrade must use the same key. A device with a debug-signed build of the same package must uninstall it before installing the production-signed APK, which clears local app data.
 
-当前签名接线只存在于被 Git 忽略的本机生成工程中，执行
-`npx expo prebuild --clean` 会覆盖它。它足以验证本次正式包，但还不是仓库可重复的
-发布流程；真机验收通过后，应将不含密钥和密码的签名接线收敛为受版本控制的构建
-脚本或 Expo config plugin，再进行下一次正式打包。`dist/` 同样不进入版本控制。
+Signing wiring currently exists only in the ignored generated project and is overwritten by `npx expo prebuild --clean`. It is sufficient for release-package verification but is not yet a reproducible repository workflow. After device acceptance, move credential-free signing wiring into a versioned build script or Expo config plugin. `dist/` also remains untracked.
 
-`app.config.ts` 会阻止悬浮窗、外部存储、生物识别和录音等未使用权限。扫码只申请相机权限；修改权限后必须重新 `prebuild`，并以最终 APK / AAB 的 merged Manifest 为准。
+`app.config.ts` blocks unused overlay, external-storage, biometric, and microphone permissions. QR scanning requests only camera permission. After permission changes, run `prebuild` again and inspect the final APK/AAB merged Manifest.
 
-iOS 同样显式移除了依赖默认带入、但当前产品不使用的麦克风和 Face ID 用途说明；`Info.plist` 保留扫码相机、后台音频、局域网访问与标准加密声明所需配置。
+iOS also removes unused microphone and Face ID usage descriptions inherited from dependencies. `Info.plist` retains only the declarations required for QR scanning, background audio, local-network access, and standard encryption reporting.
 
-### iOS 本机构建前置
+### Local iOS prerequisites
 
-首次使用当前 Xcode 时先完成组件初始化：
+Initialize a new Xcode installation with:
 
 ```bash
 sudo xcodebuild -runFirstLaunch
 ```
 
-连接新 iPhone 后，需要在手机信任 Mac、开启 Developer Mode，并在 Xcode 的
-Signing & Capabilities 中选择自己的 Team。若 Xcode 报对应 iOS platform 未安装，
-可执行 `xcodebuild -downloadPlatform iOS`。
+For a new iPhone, trust the Mac, enable Developer Mode, and select your Team under **Signing & Capabilities** in Xcode. If the required iOS platform is missing, run `xcodebuild -downloadPlatform iOS`.
 
-## 代码约束
+## Code constraints
 
-不要在这里预建通用分层。新增依赖、模块或目录前，先检查 `docs/radio-native-client-architecture.md` 中的真实边界与拆分门槛。更换播放器或增加系统远程控制前，还必须复核 `docs/radio-player-selection.md` 的许可、新架构和复杂度门槛。
+Do not prebuild generic layers here. Before adding dependencies, modules, or directories, review the real boundaries and split thresholds in `docs/radio-native-client-architecture.md`. Before replacing the player or adding system remote controls, review the licensing, new-architecture, and complexity constraints in `docs/radio-player-selection.md`.
 
-会话测试直接运行 `useRadioSession`，只在原生播放器边界使用稳定替身，并通过 Fetch 响应驱动真实 API 客户端。不要为了测试把会话复制成 reducer、Repository 或第二套状态机。
+Session tests run `useRadioSession` directly, substitute only the native-player boundary, and drive the real API client with Fetch responses. Do not duplicate the session as a reducer, repository, or second state machine for testing.
 
-App 测试只替换页面渲染、API 和存储边界，验证 Profile 的拥有权、令牌顺序和前后台切换不触发 Retry；Storage 测试直接约束单个 SecureStore JSON 条目，Radio Resume 测试约束不含 Token 的队列文件。测试文件与其边界对应，不按单个动作继续拆分。
+App tests replace only rendering, API, and storage boundaries. They verify profile ownership, token ordering, and that foreground/background transitions do not trigger Retry. Storage tests constrain the single SecureStore JSON entry, and Radio resume tests constrain the token-free queue file. Keep each test file aligned to that boundary.
 
-API 测试直接替换 Fetch，覆盖请求与响应协议，不复制 DTO 或另建假客户端。除超时使用 Jest fake timers 外，测试不依赖真实时钟或网络。
+API tests replace Fetch directly and cover request and response contracts without duplicating DTOs or creating a fake client. Apart from timeouts that use Jest fake timers, tests do not depend on a real clock or network.
 
-Screen 测试以 role、accessible name、state 和 value 驱动真实用户动作，不保存组件树 Snapshot，也不根据 StyleSheet 断言视觉实现。新增控件时应先提供可理解的无障碍名称，再编写语义查询。
+Screen tests drive real user actions through roles, accessible names, state, and values. They do not store component-tree snapshots or assert StyleSheet implementation. Give new controls a clear accessible name before adding semantic queries.

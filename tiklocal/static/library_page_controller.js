@@ -419,7 +419,7 @@
 
   async function loadNextPage() {
     if (flowSession.isLoading() || !flowSession.hasMore()) return;
-    setLoadingText('正在加载...');
+    setLoadingText('Loading...');
     try {
       await flowSession.loadMore(async (cursor) => {
         const offset = Number(cursor?.offset || 0);
@@ -450,17 +450,17 @@
 
       if (!items.length) {
         if (searchQuery) {
-          setLoadingText(`没有找到“${searchQuery}”`, { clearSearch: true });
+          setLoadingText(`No results for "${searchQuery}"`, { clearSearch: true });
         } else {
           setLoadingText(emptyMessage);
         }
       } else if (!flowSession.hasMore()) {
-        setLoadingText('到底了');
+        setLoadingText('You have reached the end');
       } else {
-        setLoadingText('继续下滑加载更多');
+        setLoadingText('Keep scrolling to load more');
       }
     } catch (error) {
-      setLoadingText('加载失败', { retry: true });
+      setLoadingText('Failed to load', { retry: true });
     }
   }
 
@@ -504,7 +504,7 @@
     });
     resetWaterfallLayout();
     activeTab();
-    setLoadingText('正在加载...');
+    setLoadingText('Loading...');
     await loadNextPage();
   }
 
@@ -543,7 +543,7 @@
       payload = null;
     }
     if (!response.ok || !(payload && payload.success)) {
-      throw new Error((payload && payload.error) || '请求失败');
+      throw new Error((payload && payload.error) || 'Request failed');
     }
     return payload.data || {};
   }
@@ -567,12 +567,12 @@
     if (!quickCollectionMeta) return;
     const values = Array.isArray(names) ? names.filter(Boolean) : [];
     if (!values.length) {
-      quickCollectionMeta.textContent = '当前未加入任何集合';
+      quickCollectionMeta.textContent = 'Not in any collections';
       return;
     }
-    const preview = values.slice(0, 2).join('、');
+    const preview = values.slice(0, 2).join(', ');
     const rest = values.length - 2;
-    quickCollectionMeta.textContent = rest > 0 ? `已加入：${preview} +${rest}` : `已加入：${preview}`;
+    quickCollectionMeta.textContent = rest > 0 ? `In: ${preview} +${rest}` : `In: ${preview}`;
   }
 
   function setCollectionButtonState(names) {
@@ -580,9 +580,9 @@
     const count = values.length;
     quickCollection.classList.toggle('has-collection', count > 0);
     quickCollectionCount.textContent = count > 99 ? '99+' : String(count);
-    const preview = values.slice(0, 2).join('、');
+    const preview = values.slice(0, 2).join(', ');
     const suffix = values.length > 2 ? ` +${values.length - 2}` : '';
-    quickCollection.title = count > 0 ? `已加入：${preview}${suffix}` : '加入集合';
+    quickCollection.title = count > 0 ? `In: ${preview}${suffix}` : 'Add to Collection';
   }
 
   async function fetchCollectionMembership(uri, force = false) {
@@ -645,7 +645,7 @@
     }
     const isCurrent = String(item.name) === collectionCoverUri;
     quickSetCover.dataset.currentCover = isCurrent ? 'true' : 'false';
-    quickSetCover.title = isCurrent ? '当前主封面' : '设为主封面';
+    quickSetCover.title = isCurrent ? 'Current cover' : 'Set as Cover';
     quickSetCover.setAttribute('aria-label', quickSetCover.title);
     quickSetCover.disabled = isCurrent;
   }
@@ -688,12 +688,12 @@
   function renderCollectionList(collections, selectedIds) {
     if (!quickCollectionList) return;
     if (!Array.isArray(collections) || !collections.length) {
-      quickCollectionList.innerHTML = '<div class="quick-collection-empty">暂无集合，先新建一个。</div>';
+      quickCollectionList.innerHTML = '<div class="quick-collection-empty">No collections yet. Create one first.</div>';
       return;
     }
     quickCollectionList.innerHTML = collections.map((item) => {
       const id = String(item.id || '');
-      const safeName = escapeHtml(String(item.name || '未命名集合'));
+      const safeName = escapeHtml(String(item.name || 'Untitled collection'));
       const count = Number(item.item_count || 0);
       const checked = selectedIds.has(id) ? 'checked' : '';
       const isSelected = selectedIds.has(id) ? 'is-selected' : '';
@@ -719,7 +719,7 @@
     collectionModalOpenedAt = Date.now();
     quickCollectionModal.classList.add('active');
     quickCollectionModal.setAttribute('aria-hidden', 'false');
-    quickCollectionList.innerHTML = '<div class="quick-collection-empty">加载中...</div>';
+    quickCollectionList.innerHTML = '<div class="quick-collection-empty">Loading...</div>';
     try {
       const [allData, selectedState] = await Promise.all([
         collectionsRequest('/api/collections'),
@@ -733,7 +733,7 @@
       setCollectionMeta(collectionSelectedNames);
       renderCollectionList(allItems, collectionSelectedIds);
     } catch (error) {
-      quickCollectionList.innerHTML = '<div class="quick-collection-empty">加载失败，请重试。</div>';
+      quickCollectionList.innerHTML = '<div class="quick-collection-empty">Failed to load. Please try again.</div>';
     }
     feather.replace();
   }
@@ -808,8 +808,8 @@
   function updateFavoriteButton(favorited) {
     quickFavorite.classList.toggle('is-favorited', !!favorited);
     quickFavorite.setAttribute('aria-pressed', String(!!favorited));
-    quickFavorite.setAttribute('aria-label', favorited ? '取消收藏' : '收藏');
-    quickFavorite.title = favorited ? '取消收藏' : '收藏';
+    quickFavorite.setAttribute('aria-label', favorited ? 'Remove from favorites' : 'Add to favorites');
+    quickFavorite.title = favorited ? 'Remove from favorites' : 'Add to favorites';
   }
 
   function updateSourceButton(sourceMeta) {
@@ -817,12 +817,12 @@
     if (!url) {
       quickSource.classList.add('is-hidden');
       quickSource.removeAttribute('href');
-      quickSource.title = '未记录来源';
+      quickSource.title = 'Source not recorded';
       return;
     }
     const domain = String(sourceMeta?.source_domain || '').trim();
     quickSource.href = url;
-    quickSource.title = domain ? `查看来源（${domain}）` : '查看来源';
+    quickSource.title = domain ? `View source (${domain})` : 'View source';
     quickSource.classList.remove('is-hidden');
   }
 
@@ -1202,7 +1202,7 @@
     } catch (error) {
       await syncFavoriteState(item);
       if (currentItem()?.name === item.name) {
-        quickFavorite.title = '收藏未保存，请重试';
+        quickFavorite.title = 'Favorite was not saved. Please try again.';
         quickFavorite.setAttribute('aria-label', quickFavorite.title);
       }
     }
@@ -1509,7 +1509,7 @@
   }
 
   retryButton.addEventListener('click', async () => {
-    setLoadingText('正在重新加载...');
+    setLoadingText('Reloading...');
     await loadNextPage();
   });
 
@@ -1526,20 +1526,20 @@
   const monthHeading = document.querySelector('[data-month-heading]');
   if (monthHeading && /^\d{4}-\d{2}$/.test(timelineMonth)) {
     const [year, monthNumber] = timelineMonth.split('-');
-    monthHeading.textContent = `${year} 年 ${Number(monthNumber)} 月`;
+    monthHeading.textContent = new Intl.DateTimeFormat('en', { year: 'numeric', month: 'long' }).format(new Date(year, Number(monthNumber) - 1, 1));
   }
   applyZoom(2.5);
   relayoutWaterfall();
   if (!items.length && !flowSession.hasMore()) {
     if (searchQuery) {
-      setLoadingText(`没有找到“${searchQuery}”`, { clearSearch: true });
+      setLoadingText(`No results for "${searchQuery}"`, { clearSearch: true });
     } else {
       setLoadingText(emptyMessage);
     }
   } else if (!flowSession.hasMore()) {
-    setLoadingText('到底了');
+    setLoadingText('You have reached the end');
   } else {
-    setLoadingText('继续下滑加载更多');
+    setLoadingText('Keep scrolling to load more');
   }
   feather.replace();
   syncSearchUI();

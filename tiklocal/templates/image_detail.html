@@ -178,7 +178,7 @@
 <div class="min-h-screen bg-neutral-50 py-3 dark:bg-neutral-950">
   <div class="container mx-auto px-3 max-w-7xl">
     <header class="mb-3 flex h-12 items-center justify-between">
-      <button onclick="history.back()" class="material-icon-btn" aria-label="返回" type="button">
+      <button onclick="history.back()" class="material-icon-btn" aria-label="Back" type="button">
         <i data-feather="arrow-left" class="w-5 h-5"></i>
       </button>
       <div class="relative flex items-center gap-1">
@@ -188,43 +188,43 @@
           type="button"
         >
           <i data-feather="zap" class="w-4 h-4"></i>
-          <span id="caption-primary-label">生成标题</span>
+          <span id="caption-primary-label">Generate Title</span>
         </button>
-        <button id="fullscreen-btn" class="material-icon-btn" aria-label="全屏查看" type="button">
+        <button id="fullscreen-btn" class="material-icon-btn" aria-label="View fullscreen" type="button">
           <i data-feather="maximize" class="w-5 h-5"></i>
         </button>
-        <button id="more-menu-btn" class="material-icon-btn" aria-label="更多操作" type="button" aria-haspopup="menu" aria-controls="detail-action-menu" aria-expanded="false">
+        <button id="more-menu-btn" class="material-icon-btn" aria-label="More actions" type="button" aria-haspopup="menu" aria-controls="detail-action-menu" aria-expanded="false">
           <i data-feather="more-vertical" class="w-5 h-5"></i>
         </button>
-        <div id="detail-action-menu" class="detail-action-menu" role="menu" aria-label="图片操作" hidden>
+        <div id="detail-action-menu" class="detail-action-menu" role="menu" aria-label="Image actions" hidden>
           <button id="caption-advanced-btn" class="detail-action-item" type="button" role="menuitem">
             <i data-feather="sliders" class="w-4 h-4"></i>
-            <span>高级生成</span>
+            <span>Advanced Generation</span>
           </button>
           <button id="copy-link-btn" class="detail-action-item" type="button" role="menuitem">
             <i data-feather="link" class="w-4 h-4"></i>
-            <span>复制链接</span>
+            <span>Copy Link</span>
           </button>
           {% if source_meta and source_meta.url %}
           <a href="{{ source_meta.url }}" target="_blank" rel="noopener noreferrer" class="detail-action-item" role="menuitem">
             <i data-feather="external-link" class="w-4 h-4"></i>
-            <span>查看来源</span>
+            <span>View Source</span>
           </a>
           {% endif %}
           <div class="detail-action-divider" role="separator"></div>
           <button onclick="confirmDelete()" class="detail-action-item is-danger" type="button" role="menuitem">
             <i data-feather="trash-2" class="w-4 h-4"></i>
-            <span>删除图片</span>
+            <span>Delete Image</span>
           </button>
         </div>
       </div>
     </header>
 
     <div class="detail-grid">
-      <!-- 图片展示区域 -->
+      <!-- Image display -->
       <div class="image-area">
         <div>
-          <!-- 图片容器 -->
+          <!-- Image container -->
           <div class="image-stage relative bg-neutral-100 dark:bg-black flex items-center justify-center rounded-xl p-3 sm:p-4" id="image-container">
             <img 
               src="/media?uri={{ uri_query_encoded }}" 
@@ -234,26 +234,26 @@
               loading="lazy"
             />
             
-            <!-- 图片控制按钮 -->
+            <!-- Image controls -->
             <div class="absolute top-4 right-4 flex flex-wrap justify-end gap-2">
               <button 
                 id="zoom-out-btn" 
                 class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-                aria-label="缩小图片"
+                aria-label="Zoom out"
               >
                 <i data-feather="zoom-out" class="w-5 h-5"></i>
               </button>
               <button 
                 id="zoom-in-btn" 
                 class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-                aria-label="放大图片"
+                aria-label="Zoom in"
               >
                 <i data-feather="zoom-in" class="w-5 h-5"></i>
               </button>
               <button
                 id="zoom-reset-btn"
                 class="px-3 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200 text-xs font-semibold"
-                aria-label="重置缩放"
+                aria-label="Reset zoom"
               >
                 <span id="zoom-label">100%</span>
               </button>
@@ -270,17 +270,17 @@
         </div>
         <button id="caption-empty-cta" class="title-empty-cta hidden" type="button" hidden aria-hidden="true">
           <i data-feather="zap" class="w-5 h-5"></i>
-          生成标题
+          Generate Title
         </button>
       </section>
 
       {% if similarity_enabled %}{% include 'experiments/image-similarity.html' %}{% endif %}
 
-      <!-- 侧边栏信息 -->
+      <!-- Sidebar information -->
       <aside class="info-area min-w-0 space-y-6 lg:border-l lg:border-gray-200 lg:pl-6 dark:lg:border-gray-800">
         {% if source_meta and source_meta.url %}
         <section>
-          <div class="mb-1 text-xs text-gray-500 dark:text-gray-400">来源</div>
+          <div class="mb-1 text-xs text-gray-500 dark:text-gray-400">Source</div>
           <a
             href="{{ source_meta.url }}"
             target="_blank"
@@ -288,13 +288,13 @@
             class="detail-source-link inline-flex items-center gap-2 text-sm font-medium text-gray-800 hover:text-gray-950 dark:text-gray-200 dark:hover:text-white"
           >
             <i data-feather="external-link" class="w-4 h-4"></i>
-            <span>{{ source_meta.source_domain or '查看来源' }}</span>
+            <span>{{ source_meta.source_domain or 'View Source' }}</span>
           </a>
         </section>
         {% endif %}
 
         <section>
-          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">文件</div>
+          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">File</div>
           <div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
             <div class="break-all font-medium text-gray-900 dark:text-white">{{image.name}}</div>
             <div>{{ stat.st_size | filesizeformat }}</div>
@@ -304,12 +304,12 @@
 
         <details class="detail-disclosure hidden" id="embedded-generation-card">
           <summary class="flex items-center justify-between gap-3 text-sm font-semibold text-gray-900 dark:text-white">
-            <span>生成信息</span>
+            <span>Generation Details</span>
             <i data-feather="chevron-down" class="w-4 h-4 text-gray-400"></i>
           </summary>
           <div class="mt-4 space-y-4">
             <div>
-              <div class="text-xs text-gray-500 dark:text-gray-400">模型</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">Model</div>
               <div id="embedded-model" class="mt-1 text-sm font-medium text-gray-900 dark:text-white break-all"></div>
             </div>
             <div>
@@ -320,7 +320,7 @@
                   class="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
                   type="button"
                 >
-                  展开全部
+                  Show All
                 </button>
               </div>
               <div id="embedded-prompt" class="text-xs leading-relaxed text-gray-700 dark:text-gray-200"></div>
@@ -331,34 +331,34 @@
     </div>
   </div>
 
-  <!-- 全屏模态框 -->
+  <!-- Fullscreen modal -->
   <div id="fullscreen-modal" class="fixed inset-0 z-50 bg-black bg-opacity-95 backdrop-blur-sm hidden">
     <div class="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
       <button
         id="fullscreen-zoom-out"
         class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-        aria-label="缩小图片"
+        aria-label="Zoom out"
       >
         <i data-feather="zoom-out" class="w-5 h-5"></i>
       </button>
       <button
         id="fullscreen-zoom-in"
         class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-        aria-label="放大图片"
+        aria-label="Zoom in"
       >
         <i data-feather="zoom-in" class="w-5 h-5"></i>
       </button>
       <button
         id="fullscreen-reset"
         class="px-3 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200 text-xs font-semibold"
-        aria-label="重置缩放"
+        aria-label="Reset zoom"
       >
         <span id="fullscreen-zoom-label">100%</span>
       </button>
       <button 
         id="close-fullscreen" 
         class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-        aria-label="关闭全屏"
+        aria-label="Close fullscreen"
       >
         <i data-feather="x" class="w-6 h-6"></i>
       </button>
@@ -373,11 +373,11 @@
     </div>
   </div>
 
-  <!-- 提示词覆盖模态框 -->
+  <!-- Prompt override modal -->
   <div id="caption-prompt-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
     <div class="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
       <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <h3 class="text-lg font-bold text-gray-900 dark:text-white">本次生成覆盖配置</h3>
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white">Generation Override</h3>
         <button id="caption-prompt-close" class="w-8 h-8 inline-flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
           <i data-feather="x" class="w-4 h-4 text-gray-500"></i>
         </button>
@@ -390,7 +390,7 @@
         <div>
           <label for="caption-override-user" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">User Prompt</label>
           <textarea id="caption-override-user" rows="6" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">可使用 <code>{tags_limit}</code> 或 <code>{% raw %}{{tags_limit}}{% endraw %}</code> 占位符。</p>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Use <code>{tags_limit}</code> or <code>{% raw %}{{tags_limit}}{% endraw %}</code> as a placeholder.</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -404,8 +404,8 @@
         </div>
       </div>
       <div class="px-5 py-4 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl flex flex-wrap justify-end gap-3">
-        <button id="caption-override-cancel" class="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">取消</button>
-        <button id="caption-override-generate" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">仅本次覆盖生成</button>
+        <button id="caption-override-cancel" class="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">Cancel</button>
+        <button id="caption-override-generate" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">Generate with Override</button>
       </div>
     </div>
   </div>
@@ -502,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeMoreMenu();
   });
   
-  // 全屏功能
+  // Fullscreen.
   fullscreenBtn?.addEventListener('click', () => {
     fullscreenModal.classList.remove('hidden');
     fullscreenModal.classList.add('flex');
@@ -514,7 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fullscreenModal.classList.remove('flex');
   });
   
-  // 点击模态框背景关闭
+  // Close when the modal backdrop is clicked.
   fullscreenModal?.addEventListener('click', (e) => {
     if (e.target === fullscreenModal) {
       fullscreenModal.classList.add('hidden');
@@ -522,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  // ESC键关闭全屏
+  // Escape closes fullscreen.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (moreMenu && !moreMenu.hidden) {
@@ -540,15 +540,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  // 复制链接功能
+  // Copy link.
   copyLinkBtn?.addEventListener('click', async () => {
     closeMoreMenu();
     try {
       const url = window.location.origin + '/media?uri=' + imageUriEncoded;
       await navigator.clipboard.writeText(url);
-      showNotification('链接已复制到剪贴板', 'success');
+      showNotification('Link copied to clipboard', 'success');
     } catch (err) {
-      showNotification('复制失败，请手动复制', 'error');
+      showNotification('Copy failed. Please copy the link manually.', 'error');
     }
   });
 
@@ -568,12 +568,12 @@ document.addEventListener('DOMContentLoaded', () => {
       captionTitle.classList.add('hidden');
       captionContent.classList.add('hidden');
       setCaptionEmptyVisible(true);
-      if (captionPrimaryLabel) captionPrimaryLabel.textContent = '生成标题';
+      if (captionPrimaryLabel) captionPrimaryLabel.textContent = 'Generate Title';
       return;
     }
     captionContent.classList.remove('hidden');
     setCaptionEmptyVisible(false);
-    if (captionPrimaryLabel) captionPrimaryLabel.textContent = '刷新';
+    if (captionPrimaryLabel) captionPrimaryLabel.textContent = 'Refresh';
     captionTitle.textContent = title;
     captionTitle.classList.toggle('hidden', !title);
     captionTags.innerHTML = '';
@@ -593,9 +593,9 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     onError: (kind, error) => {
       if (kind === 'caption_load') setCaptionEmptyVisible(false);
-      showNotification(error.message || '标题请求失败', 'error');
+      showNotification(error.message || 'Title request failed', 'error');
     },
-    confirmCaptionReplace: () => window.confirm('已存在标题，是否覆盖？'),
+    confirmCaptionReplace: () => window.confirm('A title already exists. Replace it?'),
   });
 
   const renderEmbeddedGeneration = (data) => {
@@ -605,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     embeddedGenerationCard?.classList.remove('hidden');
-    embeddedModel.textContent = embedded.model || '未知';
+    embeddedModel.textContent = embedded.model || 'Unknown';
     embeddedPrompt.textContent = embedded.prompt || '';
     embeddedPromptToggle.hidden = !embedded.prompt;
     if (typeof feather !== 'undefined') feather.replace();
@@ -625,7 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   embeddedPromptToggle?.addEventListener('click', () => {
     const expanded = embeddedPrompt.classList.toggle('is-expanded');
-    embeddedPromptToggle.textContent = expanded ? '收起' : '展开全部';
+    embeddedPromptToggle.textContent = expanded ? 'Collapse' : 'Show All';
   });
 
   const openPromptModal = () => {
@@ -645,7 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const res = await fetch('/api/ai/vision-config');
     const data = await res.json();
     if (!data.success) {
-      throw new Error(data.error || '读取提示词配置失败');
+      throw new Error(data.error || 'Failed to load prompt configuration');
     }
     promptConfigCache = data.data;
     return promptConfigCache;
@@ -662,7 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
       promptTagsInput.value = Number(source.tags_limit ?? 5);
       openPromptModal();
     } catch (err) {
-      showNotification(err.message || '读取提示词配置失败', 'error');
+      showNotification(err.message || 'Failed to load prompt configuration', 'error');
     }
   };
 
@@ -672,13 +672,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const temperature = Number(promptTemperatureInput?.value || 0.6);
     const tagsLimit = Number(promptTagsInput?.value || 5);
     if (!systemPrompt || !userPrompt) {
-      throw new Error('System Prompt 和 User Prompt 不能为空');
+      throw new Error('System Prompt and User Prompt cannot be empty');
     }
     if (temperature < 0 || temperature > 2) {
-      throw new Error('temperature 必须在 0 到 2 之间');
+      throw new Error('temperature must be between 0 and 2');
     }
     if (!Number.isInteger(tagsLimit) || tagsLimit < 1 || tagsLimit > 20) {
-      throw new Error('tags_limit 必须在 1 到 20 之间');
+      throw new Error('tags_limit must be between 1 and 20');
     }
     return {
       system_prompt: systemPrompt,
@@ -692,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const result = await mediaActions.generateCaption(imageUri, {
       confirmExisting: !force, force, promptOverride,
     });
-    if (result?.success) showNotification('标题已更新', 'success');
+    if (result?.success) showNotification('Title updated', 'success');
   };
 
   captionBtn?.addEventListener('click', () => generateCaption());
@@ -714,13 +714,13 @@ document.addEventListener('DOMContentLoaded', () => {
       closePromptModal();
       await generateCaption(false, override);
     } catch (err) {
-      showNotification(err.message || '覆盖配置无效', 'error');
+      showNotification(err.message || 'Invalid override configuration', 'error');
     }
   });
   mediaActions.loadCaption(imageUri);
   loadEmbeddedGeneration();
   
-  // 键盘导航
+  // Keyboard navigation.
   document.addEventListener('keydown', (e) => {
     if (fullscreenModal.classList.contains('hidden')) {
       switch(e.key) {
@@ -739,11 +739,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// 删除确认
+// Delete confirmation.
 function confirmDelete() {
   showModal(
-    '确定要删除这张图片吗？', 
-    '此操作不可撤销，图片将被永久删除。', 
+    'Delete this image?',
+    'This action cannot be undone. The image will be permanently deleted.',
     async () => {
       try {
         const response = await fetch('/delete/{{ uri_path_encoded }}', { method: 'POST' });
@@ -751,15 +751,15 @@ function confirmDelete() {
           window.location.href = '/library';
           return;
         }
-        showNotification('删除失败，请重试', 'error');
+        showNotification('Delete failed. Please try again.', 'error');
       } catch (error) {
-        showNotification('删除失败，请重试', 'error');
+        showNotification('Delete failed. Please try again.', 'error');
       }
     }
   );
 }
 
-// 通知函数（复用设置页面的）
+// Notification helper shared with Settings.
 function showNotification(message, type = 'info') {
   const iconMap = {
     success: 'check-circle',
@@ -794,11 +794,11 @@ function showNotification(message, type = 'info') {
   }, 3000);
 }
 
-// 模态框函数（复用设置页面的）
+// Modal helper shared with Settings.
 function showModal(title, text, onConfirm, options = {}) {
   const existingModal = document.getElementById('confirmation-modal');
   if (existingModal) existingModal.remove();
-  const confirmLabel = options.confirmLabel || '确认删除';
+  const confirmLabel = options.confirmLabel || 'Delete';
   const confirmTone = options.confirmTone || 'red';
   const toneClass = confirmTone === 'blue'
     ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
@@ -829,7 +829,7 @@ function showModal(title, text, onConfirm, options = {}) {
             ${confirmLabel}
           </button>
           <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
-            取消
+            Cancel
           </button>
         </div>
       </div>

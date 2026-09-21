@@ -424,8 +424,8 @@
   <section id="collections-state" class="collections-state" aria-live="polite">
     <div>
       <div class="collections-state-icon"><i data-feather="loader"></i></div>
-      <div id="collections-state-title" class="collections-state-title">正在读取集合</div>
-      <p id="collections-state-copy" class="collections-state-copy">你的整理会保留在这台设备上。</p>
+      <div id="collections-state-title" class="collections-state-title">Loading collections</div>
+      <p id="collections-state-copy" class="collections-state-copy">Your organization stays on this device.</p>
       <button id="collections-state-action" class="ghost-chip collections-state-action" type="button" hidden></button>
     </div>
   </section>
@@ -433,23 +433,23 @@
 
 <div id="create-modal" class="modal-mask" aria-hidden="true">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
-    <h2 id="create-modal-title" class="modal-title">新建集合</h2>
-    <input id="create-name" class="field mb-2" type="text" maxlength="80" placeholder="例如：灵感片段" />
-    <textarea id="create-description" class="field" rows="3" maxlength="280" placeholder="可选描述"></textarea>
+    <h2 id="create-modal-title" class="modal-title">New Collection</h2>
+    <input id="create-name" class="field mb-2" type="text" maxlength="80" placeholder="For example: Inspiration" />
+    <textarea id="create-description" class="field" rows="3" maxlength="280" placeholder="Optional description"></textarea>
     <div class="modal-actions">
-      <button id="cancel-create" class="ghost-chip" type="button">取消</button>
-      <button id="submit-create" class="ghost-chip modal-primary" type="button">创建</button>
+      <button id="cancel-create" class="ghost-chip" type="button">Cancel</button>
+      <button id="submit-create" class="ghost-chip modal-primary" type="button">Create</button>
     </div>
   </div>
 </div>
 
 <div id="rename-modal" class="modal-mask" aria-hidden="true">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">
-    <h2 id="rename-modal-title" class="modal-title">重命名集合</h2>
-    <input id="rename-name" class="field" type="text" maxlength="80" placeholder="输入新名称" />
+    <h2 id="rename-modal-title" class="modal-title">Rename Collection</h2>
+    <input id="rename-name" class="field" type="text" maxlength="80" placeholder="Enter a new name" />
     <div class="modal-actions">
-      <button id="cancel-rename" class="ghost-chip" type="button">取消</button>
-      <button id="submit-rename" class="ghost-chip modal-primary" type="button">保存</button>
+      <button id="cancel-rename" class="ghost-chip" type="button">Cancel</button>
+      <button id="submit-rename" class="ghost-chip modal-primary" type="button">Save</button>
     </div>
   </div>
 </div>
@@ -478,9 +478,9 @@
 
     function showState(kind) {
       const states = {
-        loading: ['正在读取集合', '你的整理会保留在这台设备上。', '', 'loader'],
-        empty: ['还没有集合', '建立一个集合，把想再次看到的媒体放在一起。', '新建第一个集合', 'layers'],
-        error: ['暂时无法读取集合', '请检查连接后重新尝试。', '重新加载', 'wifi-off'],
+        loading: ['Loading collections', 'Your organization stays on this device.', '', 'loader'],
+        empty: ['No collections yet', 'Create a collection for media you want to revisit.', 'Create Your First Collection', 'layers'],
+        error: ['Collections could not be loaded', 'Check your connection and try again.', 'Reload', 'wifi-off'],
       };
       const [title, copy, action, icon] = states[kind] || states.loading;
       stateTitle.textContent = title;
@@ -502,7 +502,7 @@
         payload = {};
       }
       if (!response.ok || !payload.success) {
-        throw new Error(payload.error || '请求失败');
+        throw new Error(payload.error || 'Request failed');
       }
       return payload.data || {};
     }
@@ -554,7 +554,7 @@
         collectionsById.set(id, item);
         const count = Number(item.item_count || 0);
         const detail = String(item.detail_url || '#');
-        const name = escapeHtml(item.name || '未命名集合');
+        const name = escapeHtml(item.name || 'Untitled collection');
         const previewItems = Array.isArray(item.preview_items) ? item.preview_items.slice(0, 4) : [];
         let coverHtml;
         if (!previewItems.length) {
@@ -576,16 +576,16 @@
               <div class="collection-cover">${coverHtml}</div>
               <div class="collection-meta">
                 <div class="collection-name">${name}</div>
-                <div class="collection-sub">${count} 个媒体</div>
+                <div class="collection-sub">${count} media items</div>
               </div>
             </a>
             <div class="collection-menu" data-menu-id="${id}">
-              <button class="collection-menu-btn" type="button" data-menu-toggle="1" data-id="${id}" aria-label="${name}的更多操作" aria-expanded="false">
+              <button class="collection-menu-btn" type="button" data-menu-toggle="1" data-id="${id}" aria-label="More actions for ${name}" aria-expanded="false">
                 <i data-feather="more-horizontal"></i>
               </button>
               <div class="collection-menu-panel">
-                <button class="collection-menu-item" type="button" data-action="rename" data-id="${id}">重命名</button>
-                <button class="collection-menu-item danger" type="button" data-action="delete" data-id="${id}">删除</button>
+                <button class="collection-menu-item" type="button" data-action="rename" data-id="${id}">Rename</button>
+                <button class="collection-menu-item danger" type="button" data-action="delete" data-id="${id}">Delete</button>
               </div>
             </div>
           </article>
@@ -633,7 +633,7 @@
       const description = String(descInput.value || '').trim();
       if (!name) return;
       submitBtn.disabled = true;
-      submitBtn.textContent = '正在创建…';
+      submitBtn.textContent = 'Creating…';
       try {
         await api('/api/collections', {
           method: 'POST',
@@ -643,10 +643,10 @@
         closeCreateModal();
         await loadCollections();
       } catch (error) {
-        alert(error.message || '创建失败');
+        alert(error.message || 'Failed to create collection');
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = '创建';
+        submitBtn.textContent = 'Create';
       }
     }
 
@@ -655,7 +655,7 @@
       const name = String(renameInput.value || '').trim();
       if (!collectionId || !name) return;
       renameSubmitBtn.disabled = true;
-      renameSubmitBtn.textContent = '正在保存…';
+      renameSubmitBtn.textContent = 'Saving…';
       try {
         await api(`/api/collections/${encodeURIComponent(collectionId)}`, {
           method: 'PATCH',
@@ -665,29 +665,29 @@
         closeRenameModal();
         await loadCollections();
       } catch (error) {
-        alert(error.message || '重命名失败');
+        alert(error.message || 'Failed to rename collection');
       } finally {
         renameSubmitBtn.disabled = false;
-        renameSubmitBtn.textContent = '保存';
+        renameSubmitBtn.textContent = 'Save';
       }
     }
 
     async function deleteCollection(collectionId) {
       const item = collectionsById.get(collectionId);
       if (!item) return;
-      const ok = window.confirm(`确认删除集合“${String(item.name || '未命名集合')}”？`);
+      const ok = window.confirm(`Delete the collection "${String(item.name || 'Untitled collection')}"?`);
       if (!ok) return;
       try {
         await api(`/api/collections/${encodeURIComponent(collectionId)}`, { method: 'DELETE' });
         await loadCollections();
       } catch (error) {
-        alert(error.message || '删除失败');
+        alert(error.message || 'Failed to delete collection');
       }
     }
 
     openBtn.addEventListener('click', openCreateModal);
     stateAction.addEventListener('click', () => {
-      if (stateTitle.textContent === '还没有集合') {
+      if (stateTitle.textContent === 'No collections yet') {
         openCreateModal();
         return;
       }

@@ -41,4 +41,4 @@ def test_old_tls_config_does_not_silently_start_http(monkeypatch, capsys, key, v
     with pytest.raises(SystemExit) as stopped:
         main()
     assert stopped.value.code == 2
-    assert '内置 HTTPS 已移除' in capsys.readouterr().err
+    assert 'Built-in HTTPS has been removed' in capsys.readouterr().err

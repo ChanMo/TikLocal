@@ -10,17 +10,17 @@
   var ROOMS = {
     rain: {
       label: 'ROOM · RAIN',
-      ariaLabel: '氛围：雨夜，点击选择',
+      ariaLabel: 'Ambience: rainy night. Click to select.',
       sourceKey: 'Rain',
     },
     breeze: {
       label: 'ROOM · BREEZE',
-      ariaLabel: '氛围：午后微风，点击选择',
+      ariaLabel: 'Ambience: afternoon breeze. Click to select.',
       sourceKey: 'Breeze',
     },
     off: {
       label: 'ROOM · OFF',
-      ariaLabel: '氛围：关闭，点击选择',
+      ariaLabel: 'Ambience: off. Click to select.',
       sourceKey: '',
     },
   };
@@ -177,7 +177,7 @@
         updateStationText();
       })
       .catch(function () {
-        stations = [{ id: 'default', name: '默认电台', description: '' }];
+        stations = [{ id: 'default', name: 'Default Station', description: '' }];
         stationId = 'default';
         updateStationText();
       });
@@ -257,7 +257,7 @@
       audio.removeAttribute('src');
       clearTrackInfoTimers();
       els.radioPage.classList.remove('is-changing-track', 'is-buffering', 'has-error');
-      setTrackInfo('暂无音频', '');
+      setTrackInfo('No audio available', '');
       updateSignalArt(null);
       updateFavorite();
       updateMediaSession();
@@ -269,7 +269,7 @@
     audio.src = track.media_url;
     trackPlayReportedFor = '';
     trackExitReportedFor = '';
-    transitionTrackInfo(track.title || '未命名音频', buildTrackMeta(track));
+    transitionTrackInfo(track.title || 'Untitled audio', buildTrackMeta(track));
     setNeedle();
     updateSignalArt(track);
     updateFavorite();
@@ -331,7 +331,7 @@
     fetch('/api/favorite/' + encodeURIComponent(track.name), { method: 'POST' })
       .then(async function (response) {
         var data = await response.json();
-        if (!response.ok || typeof data.favorite !== 'boolean') throw new Error('收藏操作失败');
+        if (!response.ok || typeof data.favorite !== 'boolean') throw new Error('Failed to update favorite');
         track.is_favorite = data.favorite;
         if (currentTrack === track) updateFavorite();
         if (track.is_favorite) reportFeedback('favorite', track, ratio);
@@ -339,7 +339,7 @@
       })
       .catch(function () {
         if (currentTrack === track) {
-          els.btnFav.title = '收藏未保存，请重试';
+          els.btnFav.title = 'Favorite was not saved. Please try again.';
           els.btnFav.setAttribute('aria-label', els.btnFav.title);
         }
       })
@@ -384,10 +384,10 @@
     if (!els.btnEncore) return;
     var active = encoreRemaining > 0;
     var countText = active ? String(encoreRemaining) : '';
-    var label = '再听一遍';
+    var label = 'Play again';
     if (active) {
-      label = '还会再播放 ' + encoreRemaining + ' 次，点击'
-        + (encoreRemaining === MAX_ENCORE_COUNT ? '关闭' : '增加');
+      label = encoreRemaining + ' more plays queued. Click to '
+        + (encoreRemaining === MAX_ENCORE_COUNT ? 'turn off' : 'add another');
     }
     els.btnEncore.innerHTML = ICONS.repeat
       + '<span id="encore-count" class="encore-count" aria-hidden="true">' + countText + '</span>';
@@ -429,13 +429,13 @@
 
   function updateSleep() {
     if (!sleepEnd) {
-      els.btnSleep.innerHTML = ICONS.moon + '<span id="sleep-label" class="sr-only">定时</span>';
+      els.btnSleep.innerHTML = ICONS.moon + '<span id="sleep-label" class="sr-only">Sleep timer</span>';
       els.sleepLabel = document.getElementById('sleep-label');
       els.btnSleep.style.color = '';
       els.btnSleep.classList.remove('is-active');
       els.btnSleep.setAttribute('aria-pressed', 'false');
-      els.btnSleep.setAttribute('aria-label', '定时');
-      els.btnSleep.setAttribute('title', '定时');
+      els.btnSleep.setAttribute('aria-label', 'Sleep timer');
+      els.btnSleep.setAttribute('title', 'Sleep timer');
       return;
     }
     var minutes = SLEEP_OPTIONS[sleepIndex];
@@ -444,8 +444,8 @@
     els.btnSleep.style.color = 'var(--radio-accent)';
     els.btnSleep.classList.add('is-active');
     els.btnSleep.setAttribute('aria-pressed', 'true');
-    els.btnSleep.setAttribute('aria-label', minutes + ' 分钟后停止');
-    els.btnSleep.setAttribute('title', minutes + ' 分钟后停止');
+    els.btnSleep.setAttribute('aria-label', 'Stop in ' + minutes + ' minutes');
+    els.btnSleep.setAttribute('title', 'Stop in ' + minutes + ' minutes');
   }
 
   function renderStations() {
@@ -493,8 +493,8 @@
   }
 
   function updatePlayIcon() {
-    els.btnPlay.setAttribute('aria-label', isPlaying ? '暂停' : '播放');
-    els.btnPlay.setAttribute('title', isPlaying ? '暂停' : '播放');
+    els.btnPlay.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+    els.btnPlay.setAttribute('title', isPlaying ? 'Pause' : 'Play');
     els.btnPlay.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
   }
 
@@ -603,12 +603,12 @@
 
   function updateFavorite() {
     var active = Boolean(currentTrack && currentTrack.is_favorite);
-    els.btnFav.innerHTML = (active ? ICONS.heartFilled : ICONS.heart) + '<span class="sr-only">' + (active ? '已收藏' : '收藏') + '</span>';
+    els.btnFav.innerHTML = (active ? ICONS.heartFilled : ICONS.heart) + '<span class="sr-only">' + (active ? 'Favorited' : 'Favorite') + '</span>';
     els.btnFav.classList.toggle('is-active', active);
     els.btnFav.style.color = active ? 'var(--radio-accent)' : '';
     els.btnFav.setAttribute('aria-pressed', active ? 'true' : 'false');
-    els.btnFav.setAttribute('aria-label', active ? '取消收藏' : '收藏');
-    els.btnFav.setAttribute('title', active ? '取消收藏' : '收藏');
+    els.btnFav.setAttribute('aria-label', active ? 'Remove from favorites' : 'Add to favorites');
+    els.btnFav.setAttribute('title', active ? 'Remove from favorites' : 'Add to favorites');
   }
 
   function onTimeUpdate() {
@@ -689,7 +689,7 @@
         currentTrack.artist = metadata.artist || '';
         currentTrack.album = metadata.album || '';
         currentTrack.duration = metadata.duration || null;
-        queueTrackInfo(currentTrack.title || '未命名音频', buildTrackMeta(currentTrack));
+        queueTrackInfo(currentTrack.title || 'Untitled audio', buildTrackMeta(currentTrack));
         updateMediaSession();
       })
       .catch(function () {});
@@ -806,14 +806,14 @@
 
   function getStationName() {
     var station = stations.find(function (item) { return item.id === stationId; });
-    return station ? station.name : '默认电台';
+    return station ? station.name : 'Default Station';
   }
 
   function showLoadError(error) {
     if (window.console && console.error) {
       console.error('Radio load failed:', error);
     }
-    els.trackTitle.textContent = '加载失败';
+    els.trackTitle.textContent = 'Failed to load';
     els.radioPage.classList.add('has-error');
     setBuffering(false);
     if (els.trackMeta) {
