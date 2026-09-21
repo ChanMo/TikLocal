@@ -1,333 +1,84 @@
 {% extends "base.html" %}
 
-{% block extra_head %}
-<style>
-  :root {
-    --download-bg: #f4f3ef;
-    --download-card: rgba(255, 255, 252, 0.88);
-    --download-ink: #292822;
-    --download-muted: rgba(41, 40, 34, 0.48);
-    --download-faint: rgba(41, 40, 34, 0.34);
-    --download-line: rgba(41, 40, 34, 0.09);
-    --download-soft: rgba(41, 40, 34, 0.055);
-    --download-accent: #292822;
-  }
-  [data-theme="dark"] {
-    --download-bg: #11110f;
-    --download-card: rgba(34, 34, 30, 0.9);
-    --download-ink: rgba(255, 255, 255, 0.92);
-    --download-muted: rgba(255, 255, 255, 0.45);
-    --download-faint: rgba(255, 255, 255, 0.3);
-    --download-line: rgba(255, 255, 255, 0.085);
-    --download-soft: rgba(255, 255, 255, 0.06);
-    --download-accent: #f3efe4;
-  }
-  body[data-nav-context="download"] {
-    padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
-    background:
-      radial-gradient(circle at 50% -15rem, rgba(169, 151, 113, 0.09), transparent 34rem),
-      var(--download-bg) !important;
-  }
-  .download-page {
-    width: min(100%, 760px);
-    min-height: calc(100dvh - 104px - env(safe-area-inset-bottom));
-    margin: 0 auto;
-    padding: 28px 14px 24px;
-    color: var(--download-ink);
-  }
-  .download-composer {
-    padding: 7px;
-    border: 1px solid var(--download-line);
-    border-radius: 21px;
-    background: var(--download-card);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(35,34,30,.035), 0 14px 36px rgba(35,34,30,.045);
-    transition: border-color 160ms ease, box-shadow 180ms ease;
-  }
-  [data-theme="dark"] .download-composer { box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
-  .download-composer:focus-within {
-    border-color: rgba(41,40,34,.2);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 0 0 3px rgba(41,40,34,.045), 0 18px 42px rgba(35,34,30,.07);
-  }
-  [data-theme="dark"] .download-composer:focus-within { border-color: rgba(255,255,255,.18); box-shadow: 0 0 0 3px rgba(255,255,255,.035); }
-  .download-input-row { display: flex; align-items: center; gap: 7px; }
-  .download-input {
-    min-width: 0;
-    flex: 1;
-    height: 48px;
-    padding: 0 10px;
-    border: 0;
-    outline: 0;
-    background: transparent;
-    color: var(--download-ink);
-    font-size: 15px;
-    letter-spacing: -.01em;
-  }
-  .download-input::placeholder { color: var(--download-faint); }
-  .download-submit {
-    min-width: 92px;
-    height: 42px;
-    padding: 0 16px;
-    border: 0;
-    border-radius: 14px;
-    background: var(--download-accent);
-    color: var(--download-bg);
-    font-size: 13px;
-    font-weight: 680;
-    cursor: pointer;
-    box-shadow: 0 1px 2px rgba(25,24,20,.12), 0 6px 16px rgba(25,24,20,.1);
-    transition: transform 120ms ease, opacity 150ms ease, box-shadow 160ms ease;
-  }
-  .download-submit:hover { box-shadow: 0 2px 3px rgba(25,24,20,.15), 0 9px 22px rgba(25,24,20,.13); }
-  .download-submit:active { transform: scale(.97); }
-  .download-submit:disabled { cursor: wait; opacity: .5; box-shadow: none; }
-  .download-submit:focus-visible, .download-action:focus-visible, .download-icon-btn:focus-visible {
-    outline: 2px solid var(--download-ink);
-    outline-offset: 2px;
-  }
-  .download-stack { display: grid; gap: 27px; margin-top: 30px; }
-  .download-section[hidden] { display: none; }
-  .download-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 4px 10px; }
-  .download-section-title { margin: 0; font-size: 12px; font-weight: 660; letter-spacing: .01em; }
-  .download-section-count { color: var(--download-muted); font-size: 10px; }
-  .download-list {
-    overflow: hidden;
-    border: 1px solid var(--download-line);
-    border-radius: 18px;
-    background: var(--download-card);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 8px 26px rgba(35,34,30,.025);
-  }
-  [data-theme="dark"] .download-list { box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
-  .download-job { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 11px; align-items: start; padding: 15px; }
-  .download-job + .download-job { border-top: 1px solid var(--download-line); }
-  .download-job-mark {
-    width: 38px; height: 38px; display: grid; place-items: center;
-    border-radius: 12px; background: var(--download-soft); color: var(--download-muted);
-    font-size: 11px; font-weight: 720; text-transform: uppercase;
-  }
-  .download-job.is-running .download-job-mark { color: #8a681e; background: rgba(190,145,45,.11); }
-  [data-theme="dark"] .download-job.is-running .download-job-mark { color: #e5c77e; background: rgba(211,170,73,.12); }
-  .download-job.is-failed .download-job-mark { color: #9f3d3d; background: rgba(188,75,75,.09); }
-  .download-job-main { min-width: 0; }
-  .download-job-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .download-job-identity { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
-  .download-job-domain { overflow: hidden; color: var(--download-ink); font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-  .download-job-status { color: var(--download-muted); font-size: 10px; }
-  .download-job-time { flex: 0 0 auto; color: var(--download-faint); font-size: 10px; }
-  .download-job-copy { margin: 5px 0 0; color: var(--download-muted); font-size: 11px; line-height: 1.45; }
-  .download-progress { height: 3px; margin-top: 10px; overflow: hidden; border-radius: 99px; background: var(--download-soft); }
-  .download-progress-bar { height: 100%; border-radius: inherit; background: #b28b36; transition: width 300ms ease; }
-  .download-job-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 10px; margin-top: 6px; color: var(--download-faint); font-size: 10px; }
-  .download-job-actions { display: flex; align-items: center; gap: 6px; margin-top: 11px; }
-  .download-action, .download-icon-btn {
-    min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px;
-    border: 1px solid var(--download-line); border-radius: 11px; text-decoration: none;
-    background: transparent; color: var(--download-muted); font-size: 10px; font-weight: 650; cursor: pointer;
-  }
-  .download-action svg, .download-icon-btn svg { width: 13px; height: 13px; stroke-width: 1.9; }
-  .download-action:hover, .download-icon-btn:hover { color: var(--download-ink); background: var(--download-soft); }
-  [data-theme="dark"] .download-action:hover, [data-theme="dark"] .download-icon-btn:hover { background: rgba(255,255,255,.1); }
-  .download-action.is-retry { color: var(--download-ink); background: var(--download-soft); }
-  .download-action:disabled, .download-icon-btn:disabled { cursor: wait; opacity: .45; }
-  .download-icon-btn { width: 34px; padding: 0; margin-left: auto; border-color: transparent; }
-  .download-job-menu { position: relative; margin-left: auto; }
-  .download-job-menu-panel { position: absolute; right: 0; bottom: calc(100% + 5px); z-index: 15; min-width: 116px; padding: 5px; border: 1px solid var(--download-line); border-radius: 12px; background: var(--download-card); box-shadow: 0 14px 36px rgba(24,23,20,.14); }
-  .download-job-menu-panel[hidden] { display: none; }
-  .download-menu-action { width: 100%; min-height: 34px; padding: 0 9px; border: 0; border-radius: 8px; color: #a54a43; background: transparent; font-size: 10px; font-weight: 620; text-align: left; cursor: pointer; }
-  .download-menu-action:hover { background: rgba(165,74,67,.07); }
-  .download-error { margin: 8px 0 0; color: #9f3d3d; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
-  [data-theme="dark"] .download-error { color: #e58a8a; }
-  .download-empty { padding: 30px 20px; color: var(--download-muted); text-align: center; }
-  .download-empty-icon { width: 38px; height: 38px; display: grid; place-items: center; margin: 0 auto 9px; border-radius: 13px; background: var(--download-soft); }
-  .download-empty-icon svg { width: 17px; height: 17px; stroke-width: 1.7; }
-  .download-empty-title { color: var(--download-ink); font-size: 12px; font-weight: 630; }
-  .download-empty-copy { margin-top: 4px; font-size: 10px; }
-  .download-history-footer { display: flex; justify-content: center; padding-top: 12px; }
-  .download-clear { border: 0; background: transparent; color: var(--download-faint); font-size: 10px; cursor: pointer; }
-  .download-clear:hover { color: var(--download-muted); }
-  .download-toast-wrap { position: fixed; top: 18px; right: 14px; z-index: 120; display: grid; gap: 7px; width: min(310px, calc(100vw - 28px)); }
-  .download-toast { padding: 11px 13px; border: 1px solid var(--download-line); border-radius: 13px; background: color-mix(in srgb, var(--download-card) 96%, transparent); color: var(--download-ink); font-size: 11px; box-shadow: 0 12px 34px rgba(25,24,20,.12); animation: downloadToastIn 160ms ease both; backdrop-filter: blur(16px); }
-  .download-toast.error { border-color: rgba(181,68,68,.25); }
-  @keyframes downloadToastIn { from { opacity: 0; transform: translateY(-5px); } }
-  @media (max-width: 560px) {
-    .download-page { padding-top: 22px; }
-    .download-input-row { align-items: stretch; flex-direction: column; }
-    .download-input { width: 100%; height: 46px; }
-    .download-submit { width: 100%; }
-    .download-job { grid-template-columns: 34px minmax(0, 1fr); padding: 14px 12px; }
-    .download-job-mark { width: 34px; height: 34px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .download-submit, .download-progress-bar, .download-toast { transition-duration: .01ms !important; animation-duration: .01ms !important; }
-  }
-
-  /* Single-link composer */
-  .download-composer { padding: 5px; overflow: hidden; border-radius: 21px; }
-  .download-editor { position: relative; display: flex; align-items: center; min-height: 46px; padding: 0 13px; }
-  .download-input {
-    display: block;
-    width: 100%;
-    height: 46px;
-    padding: 0;
-    line-height: 46px;
-  }
-  .download-detected {
-    position: absolute;
-    right: 13px;
-    bottom: 2px;
-    color: var(--download-muted);
-    font-size: 10px;
-    pointer-events: none;
-  }
-  .download-detected.is-error { color: #9f3d3d; }
-  .download-composer-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 2px 4px 4px;
-    border-top: 0;
-    background: transparent;
-  }
-  .media-switch {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 164px;
-    padding: 3px;
-    border-radius: 13px;
-    background: var(--download-soft);
-  }
-  .media-switch::before {
-    content: '';
-    position: absolute;
-    top: 3px;
-    bottom: 3px;
-    left: 3px;
-    width: calc(50% - 3px);
-    border: 1px solid var(--download-line);
-    border-radius: 10px;
-    background: var(--download-card);
-    box-shadow: 0 1px 3px rgba(30, 29, 25, .08);
-    transform: translateX(0);
-    transition: transform 190ms cubic-bezier(.22, 1, .36, 1);
-  }
-  .media-switch[data-value="gallery-dl"]::before { transform: translateX(100%); }
-  .media-switch-option {
-    position: relative;
-    z-index: 1;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    border: 0;
-    border-radius: 10px;
-    background: transparent;
-    color: var(--download-muted);
-    font-size: 11px;
-    font-weight: 650;
-    cursor: pointer;
-  }
-  .media-switch-option[aria-pressed="true"] { color: var(--download-ink); }
-  .media-switch-option svg { width: 13px; height: 13px; stroke-width: 1.9; }
-  .media-switch-option:focus-visible { outline: 2px solid var(--download-ink); outline-offset: 2px; }
-  .download-submit { height: 36px; min-width: 78px; border-radius: 12px; box-shadow: 0 1px 2px rgba(25,24,20,.1), 0 4px 12px rgba(25,24,20,.08); }
-  .download-inline-alert {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: 10px;
-    padding: 10px 12px;
-    border: 1px solid rgba(159, 61, 61, .14);
-    border-radius: 13px;
-    color: #9f3d3d;
-    background: rgba(188, 75, 75, .055);
-    font-size: 10px;
-  }
-  .download-inline-alert[hidden] { display: none; }
-  .download-inline-alert a { color: inherit; font-weight: 650; text-decoration: none; white-space: nowrap; }
-  .download-confirm[hidden] { display: none; }
-  .download-confirm { position: fixed; inset: 0; z-index: 280; display: grid; place-items: center; padding: 16px; background: rgba(18,18,16,.43); backdrop-filter: blur(9px); }
-  .download-confirm-card { width: min(100%, 370px); padding: 19px; border: 1px solid var(--download-line); border-radius: 20px; color: var(--download-ink); background: var(--download-bg); box-shadow: 0 24px 70px rgba(20,19,16,.23); }
-  .download-confirm-title { margin: 0; font-size: 17px; font-weight: 660; letter-spacing: -.02em; }
-  .download-confirm-copy { margin: 7px 0 0; color: var(--download-muted); font-size: 11px; line-height: 1.55; }
-  .download-confirm-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 18px; }
-  .download-action.is-danger { color: #a54a43; border-color: rgba(165,74,67,.15); background: rgba(165,74,67,.06); }
-  @media (max-width: 560px) {
-    .download-editor { min-height: 46px; padding: 0 11px; }
-    .download-input { height: 46px; line-height: 46px; }
-    .download-detected { right: 11px; }
-    .download-input-row { display: block; }
-    .download-submit { width: auto; }
-    .download-composer-footer { align-items: stretch; }
-    .media-switch { width: 158px; }
-  }
-</style>
-{% endblock %}
-
 {% block content %}
-<main class="download-page tool-page">
-  <header class="download-header tool-page-header">
-    <p class="tool-page-overline"><i data-feather="arrow-down-circle"></i><span>Media Import</span></p>
-    <h1 class="download-title">Download</h1>
-    <p class="download-intro tool-page-intro">Paste a link to save an online image or video to your local library.</p>
+<main class="mx-auto w-full max-w-[660px] px-3.5 pt-7 pb-3 sm:px-5 sm:pt-9">
+  <header class="px-1 pb-6">
+    <p class="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] opacity-50">
+      <i data-feather="arrow-down-circle" class="size-3.5"></i><span>Media Import</span>
+    </p>
+    <h1 class="text-[29px] font-bold leading-tight tracking-tight sm:text-4xl">Download</h1>
+    <p class="mt-2 max-w-[440px] text-xs leading-relaxed opacity-60">Paste a link to save an online image or video to your local library.</p>
   </header>
 
-  <form id="download-form" class="download-composer">
-    <div class="download-editor">
-      <input id="download-url" class="download-input" type="url" required autocomplete="url" inputmode="url" placeholder="Paste an image or video URL…" aria-label="Media URL">
-      <div id="download-detected" class="download-detected" aria-live="polite"></div>
-    </div>
-    <div class="download-composer-footer">
-      <div id="media-switch" class="media-switch" data-value="yt-dlp" role="group" aria-label="Download media type">
-        <button class="media-switch-option" type="button" data-engine="yt-dlp" aria-pressed="true"><i data-feather="play"></i><span>Video</span></button>
-        <button class="media-switch-option" type="button" data-engine="gallery-dl" aria-pressed="false"><i data-feather="image"></i><span>Images</span></button>
+  <form id="download-form" class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-3 p-4">
+      <div>
+        <input
+          id="download-url" class="input w-full" type="url" required
+          autocomplete="url" inputmode="url"
+          placeholder="Paste an image or video URL…" aria-label="Media URL"
+        >
+        <div id="download-detected" class="mt-1.5 min-h-[16px] text-[11px] opacity-60" aria-live="polite"></div>
       </div>
-      <button id="download-submit" class="download-submit" type="submit">Download</button>
+      <div class="flex items-center justify-between gap-3">
+        <div id="media-switch" class="join" data-value="yt-dlp" role="group" aria-label="Download media type">
+          <button class="btn btn-sm join-item gap-1.5" type="button" data-engine="yt-dlp" aria-pressed="true">
+            <i data-feather="play" class="size-3.5"></i><span>Video</span>
+          </button>
+          <button class="btn btn-sm join-item gap-1.5" type="button" data-engine="gallery-dl" aria-pressed="false">
+            <i data-feather="image" class="size-3.5"></i><span>Images</span>
+          </button>
+        </div>
+        <button id="download-submit" class="btn btn-primary btn-sm" type="submit">Download</button>
+      </div>
     </div>
   </form>
-  <div id="download-inline-alert" class="download-inline-alert" hidden>
-    <span id="download-inline-alert-copy"></span><a href="/settings#download">Open Settings</a>
+
+  <div id="download-inline-alert" class="alert alert-warning alert-soft mt-3 text-xs" hidden>
+    <span id="download-inline-alert-copy"></span>
+    <a class="link link-hover font-semibold" href="/settings#download">Open Settings</a>
   </div>
 
-  <div class="download-stack">
-    <section id="active-section" class="download-section" hidden aria-labelledby="active-title">
-      <div class="download-section-head">
-        <h2 id="active-title" class="download-section-title">In Progress</h2>
-        <span id="active-count" class="download-section-count"></span>
+  <div id="download-stack" class="mt-7 grid gap-7">
+    <section id="active-section" hidden aria-labelledby="active-title">
+      <div class="mb-2 flex items-baseline justify-between px-1">
+        <h2 id="active-title" class="text-xs font-semibold opacity-55">In Progress</h2>
+        <span id="active-count" class="text-[10px] opacity-45"></span>
       </div>
-      <div id="active-list" class="download-list" aria-live="polite"></div>
+      <div id="active-list" class="grid gap-2" aria-live="polite"></div>
     </section>
 
-    <section class="download-section" aria-labelledby="history-title">
-      <div class="download-section-head">
-        <h2 id="history-title" class="download-section-title">Recent Downloads</h2>
-        <span id="history-count" class="download-section-count"></span>
+    <section aria-labelledby="history-title">
+      <div class="mb-2 flex items-baseline justify-between px-1">
+        <h2 id="history-title" class="text-xs font-semibold opacity-55">Recent Downloads</h2>
+        <span id="history-count" class="text-[10px] opacity-45"></span>
       </div>
-      <div id="history-list" class="download-list" aria-live="polite">
-        <div class="download-empty"><div class="download-empty-icon"><i data-feather="loader"></i></div><div class="download-empty-title">Loading</div></div>
+      <div id="history-list" class="grid gap-2" aria-live="polite">
+        <div class="flex flex-col items-center gap-2 py-10 opacity-55">
+          <span class="loading loading-spinner loading-sm"></span>
+          <div class="text-xs font-semibold">Loading</div>
+        </div>
       </div>
-      <div id="history-footer" class="download-history-footer" hidden>
-        <button id="clear-history-btn" class="download-clear" type="button">Clear Download History</button>
+      <div id="history-footer" class="mt-3 flex justify-center" hidden>
+        <button id="clear-history-btn" class="btn btn-ghost btn-xs" type="button">Clear Download History</button>
       </div>
     </section>
   </div>
-
 </main>
 
-<div id="download-confirm" class="download-confirm" hidden>
-  <section class="download-confirm-card" role="dialog" aria-modal="true" aria-labelledby="download-confirm-title">
-    <h2 id="download-confirm-title" class="download-confirm-title">Clear download history?</h2>
-    <p id="download-confirm-copy" class="download-confirm-copy">Local media files will be kept.</p>
-    <div class="download-confirm-actions">
-      <button class="download-action" type="button" data-confirm-cancel>Cancel</button>
-      <button class="download-action is-danger" type="button" data-confirm-accept>Clear History</button>
+<dialog id="download-confirm" class="modal" aria-labelledby="download-confirm-title">
+  <div class="modal-box">
+    <h2 id="download-confirm-title" class="text-lg font-bold">Clear download history?</h2>
+    <p id="download-confirm-copy" class="mt-2 text-sm leading-relaxed opacity-70">Local media files will be kept.</p>
+    <div class="modal-action">
+      <button class="btn btn-sm" type="button" data-confirm-cancel>Cancel</button>
+      <button class="btn btn-error btn-sm" type="button" data-confirm-accept>Clear History</button>
     </div>
-  </section>
-</div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Cancel">close</button></form>
+</dialog>
 
-<div id="toast-wrap" class="download-toast-wrap" aria-live="polite"></div>
+<div id="toast-wrap" class="toast toast-end z-[280] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-4" aria-live="polite"></div>
 {% endblock %}
 
 {% block extra_body %}

@@ -1,7 +1,6 @@
-/* Navigation chrome that daisyUI does not cover: the page-context offsets the
- * immersive Flow and Radio surfaces need, and the shared heading rhythm for the
- * utility pages. The nav itself is daisyUI `dock` (phones) and `menu` (md up);
- * see base.html.
+/* The little that daisyUI does not cover: page-context tokens and the layout
+ * offsets the immersive Flow and Radio surfaces need. The navigation itself is
+ * daisyUI `dock` on phones and `menu` from md up; see base.html.
  */
 
 :root {
@@ -84,59 +83,6 @@ body[data-nav-context="flow"] .controls-sidebar {
 body[data-nav-context="radio"] .radio-page {
   padding-top: clamp(0.75rem, 2dvh, 1.15rem);
   padding-bottom: clamp(0.75rem, 2dvh, 1.15rem);
-}
-
-/* Shared heading rhythm for the utility surfaces (Settings, Download). */
-.tool-page {
-  min-height: 100dvh;
-  padding-top: 24px;
-}
-
-.tool-page-header {
-  position: relative;
-  padding: 0 3px 25px;
-}
-
-.tool-page-overline {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 0 8px;
-  color: var(--settings-muted, var(--download-muted, var(--app-nav-ink)));
-  font-size: 9px;
-  font-weight: 720;
-  letter-spacing: 0.14em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.tool-page-overline svg {
-  width: 13px;
-  height: 13px;
-  stroke-width: 1.8;
-}
-
-.tool-page-header .settings-title,
-.tool-page-header .download-title {
-  margin: 0;
-  font-size: clamp(29px, 6vw, 34px);
-  font-weight: 680;
-  letter-spacing: -0.045em;
-  line-height: 1.06;
-}
-
-.tool-page-intro {
-  max-width: 440px;
-  margin: 8px 0 0;
-  color: var(--settings-muted, var(--download-muted, var(--app-nav-ink)));
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-@media (min-width: 640px) {
-  .tool-page {
-    padding-top: 32px;
-  }
 }
 
 @media (min-width: 768px) {

@@ -19,7 +19,7 @@
     const wrap = document.getElementById('toast-wrap');
     if (!wrap) return;
     const toast = document.createElement('div');
-    toast.className = `download-toast ${type}`;
+    toast.className = `alert ${type === 'error' ? 'alert-error' : 'alert-success'} alert-soft text-xs`;
     toast.textContent = message;
     wrap.appendChild(toast);
     window.setTimeout(() => toast.remove(), 2800);
@@ -102,55 +102,60 @@
     const progress = typeof job.progress_percent === 'number'
       ? Math.max(0, Math.min(100, job.progress_percent))
       : null;
-    const className = job.status === 'running' || job.status === 'queued'
-      ? 'is-running'
-      : (job.status === 'failed' ? 'is-failed' : '');
     const time = formatTime(job.finished_at || job.created_at);
-    const sourceAction = `<a class="download-action" href="${escapeHtml(job.url)}" target="_blank" rel="noopener noreferrer"><i data-feather="external-link"></i><span>Visit Source</span></a>`;
+    const accent = job.status === 'failed' ? 'border-error/40' : 'border-base-300';
+    const sourceAction = `<a class="btn btn-ghost btn-xs gap-1" href="${escapeHtml(job.url)}" target="_blank" rel="noopener noreferrer"><i data-feather="external-link" class="size-3.5"></i><span>Visit Source</span></a>`;
+
+    // daisyUI's dropdown opens on focus, so the menu needs no open/close script.
     const menu = !isActive ? `
-      <div class="download-job-menu">
-        <button class="download-icon-btn" type="button" data-action="menu" data-job-id="${escapeHtml(job.id)}" aria-label="More actions" aria-expanded="false"><i data-feather="more-horizontal"></i></button>
-        <div class="download-job-menu-panel" hidden>
-          <button class="download-menu-action" type="button" data-action="delete" data-job-id="${escapeHtml(job.id)}">Remove Record</button>
-        </div>
+      <div class="dropdown dropdown-end dropdown-top">
+        <button tabindex="0" class="btn btn-ghost btn-xs btn-circle" type="button" aria-label="More actions"><i data-feather="more-horizontal" class="size-3.5"></i></button>
+        <ul tabindex="0" class="dropdown-content menu z-10 w-44 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
+          <li><button type="button" data-action="delete" data-job-id="${escapeHtml(job.id)}">Remove Record</button></li>
+        </ul>
       </div>` : '';
 
     let actions = '';
     if (isActive) {
-      actions = `${sourceAction}<button class="download-action" type="button" data-action="cancel" data-job-id="${escapeHtml(job.id)}">Cancel</button>`;
+      actions = `${sourceAction}<button class="btn btn-ghost btn-xs" type="button" data-action="cancel" data-job-id="${escapeHtml(job.id)}">Cancel</button>`;
     } else if (job.status === 'success' && firstFile) {
       actions = `
-        <a class="download-action" href="${buildMediaHref(firstFile)}"><i data-feather="eye"></i><span>View Media</span></a>
+        <a class="btn btn-ghost btn-xs gap-1" href="${buildMediaHref(firstFile)}"><i data-feather="eye" class="size-3.5"></i><span>View Media</span></a>
         ${sourceAction}${menu}`;
     } else {
       actions = `
-        ${(job.status === 'failed' || job.status === 'canceled') ? `<button class="download-action is-retry" type="button" data-action="retry" data-job-id="${escapeHtml(job.id)}"><i data-feather="rotate-ccw"></i><span>${job.failure_stage === 'index' ? 'Register Again' : 'Download Again'}</span></button>` : ''}
+        ${(job.status === 'failed' || job.status === 'canceled') ? `<button class="btn btn-ghost btn-xs gap-1" type="button" data-action="retry" data-job-id="${escapeHtml(job.id)}"><i data-feather="rotate-ccw" class="size-3.5"></i><span>${job.failure_stage === 'index' ? 'Register Again' : 'Download Again'}</span></button>` : ''}
         ${sourceAction}${menu}`;
     }
 
     return `
-      <article class="download-job ${className}" data-job-id="${escapeHtml(job.id)}">
-        <div class="download-job-mark" aria-hidden="true">${escapeHtml(platformMark(job.url))}</div>
-        <div class="download-job-main">
-          <div class="download-job-top">
-            <div class="download-job-identity"><span class="download-job-domain">${escapeHtml(safeHostname(job.url))}</span><span class="download-job-status">${escapeHtml(job.engine === 'gallery-dl' ? 'Images' : 'Video')}</span></div>
-            ${time ? `<span class="download-job-time">${escapeHtml(time)}</span>` : ''}
+      <article class="card card-sm border ${accent} bg-base-100" data-job-id="${escapeHtml(job.id)}">
+        <div class="card-body flex-row items-start gap-3 p-3">
+          <div class="grid size-9 shrink-0 place-items-center rounded-lg bg-base-200 text-[11px] font-bold opacity-70" aria-hidden="true">${escapeHtml(platformMark(job.url))}</div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="truncate text-sm font-semibold">${escapeHtml(safeHostname(job.url))}</span>
+                <span class="badge badge-ghost badge-xs shrink-0">${escapeHtml(job.engine === 'gallery-dl' ? 'Images' : 'Video')}</span>
+              </div>
+              ${time ? `<span class="shrink-0 text-[10px] opacity-45">${escapeHtml(time)}</span>` : ''}
+            </div>
+            <p class="mt-1 text-xs opacity-60">${escapeHtml(statusCopy(job))}</p>
+            ${progress !== null && isActive ? `<progress class="progress progress-primary mt-2 h-1.5 w-full" value="${progress.toFixed(1)}" max="100" aria-label="Download progress"></progress>` : ''}
+            ${files.length > 1 ? `<div class="mt-1 text-[10px] opacity-45">${files.length} items</div>` : ''}
+            ${job.error_message ? `<p class="mt-1 text-xs text-error">${escapeHtml(job.error_message)}</p>` : ''}
+            <div class="mt-2 flex flex-wrap items-center gap-1">${actions}</div>
           </div>
-          <p class="download-job-copy">${escapeHtml(statusCopy(job))}</p>
-          ${progress !== null && isActive ? `<div class="download-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.toFixed(0)}"><div class="download-progress-bar" style="width:${progress.toFixed(1)}%"></div></div>` : ''}
-          ${files.length > 1 ? `<div class="download-job-meta"><span>${files.length} items</span></div>` : ''}
-          ${job.error_message ? `<p class="download-error">${escapeHtml(job.error_message)}</p>` : ''}
-          <div class="download-job-actions">${actions}</div>
         </div>
       </article>`;
   }
 
   function emptyHistory() {
     return `
-      <div class="download-empty">
-        <div class="download-empty-icon"><i data-feather="download-cloud"></i></div>
-        <div class="download-empty-title">No download history yet</div>
-        <div class="download-empty-copy">Paste a link to add new media directly to your local library.</div>
+      <div class="flex flex-col items-center gap-1.5 py-10 text-center">
+        <i data-feather="download-cloud" class="size-6 opacity-35"></i>
+        <div class="text-sm font-semibold opacity-70">No download history yet</div>
+        <div class="text-xs opacity-50">Paste a link to add new media directly to your local library.</div>
       </div>`;
   }
 
@@ -209,7 +214,7 @@
   function updateDetectedSite(input) {
     const value = input.value.trim();
     const status = document.getElementById('download-detected');
-    status.classList.remove('is-error');
+    status.classList.remove('text-error');
     if (!value) {
       status.textContent = '';
       return true;
@@ -221,7 +226,7 @@
       return true;
     } catch (_) {
       status.textContent = 'Enter a complete HTTP or HTTPS URL';
-      status.classList.add('is-error');
+      status.classList.add('text-error');
       return false;
     }
   }
@@ -231,7 +236,9 @@
     const switchElement = document.getElementById('media-switch');
     switchElement.dataset.value = selectedEngine;
     switchElement.querySelectorAll('[data-engine]').forEach((button) => {
-      button.setAttribute('aria-pressed', String(button.dataset.engine === selectedEngine));
+      const active = button.dataset.engine === selectedEngine;
+      button.setAttribute('aria-pressed', String(active));
+      button.classList.toggle('btn-active', active);
     });
     const alert = document.getElementById('download-inline-alert');
     const unavailable = selectedEngine === 'gallery-dl' && !dependencyMeta.gallery_dl_available;
@@ -239,43 +246,30 @@
     if (unavailable) document.getElementById('download-inline-alert-copy').textContent = 'The image download component is not ready';
   }
 
-  function closeJobMenus(except = null) {
-    document.querySelectorAll('.download-job-menu-panel').forEach((panel) => {
-      if (panel === except) return;
-      panel.hidden = true;
-      panel.parentElement.querySelector('[data-action="menu"]')?.setAttribute('aria-expanded', 'false');
-    });
-  }
-
   function confirmClear({ title = 'Clear download history?', copy = 'Local media files will be kept.' } = {}) {
-    const mask = document.getElementById('download-confirm');
-    const titleElement = document.getElementById('download-confirm-title');
-    const copyElement = document.getElementById('download-confirm-copy');
-    titleElement.textContent = title;
-    copyElement.textContent = copy;
-    mask.hidden = false;
-    document.body.style.overflow = 'hidden';
-    const cancel = mask.querySelector('[data-confirm-cancel]');
-    const accept = mask.querySelector('[data-confirm-accept]');
-    cancel.focus();
+    const dialog = document.getElementById('download-confirm');
+    document.getElementById('download-confirm-title').textContent = title;
+    document.getElementById('download-confirm-copy').textContent = copy;
+    const cancel = dialog.querySelector('[data-confirm-cancel]');
+    const accept = dialog.querySelector('[data-confirm-accept]');
+
     return new Promise((resolve) => {
       const finish = (result) => {
-        mask.hidden = true;
-        document.body.style.overflow = '';
         cancel.removeEventListener('click', onCancel);
         accept.removeEventListener('click', onAccept);
-        mask.removeEventListener('click', onMaskClick);
-        mask.removeEventListener('keydown', onKeydown);
+        dialog.removeEventListener('close', onClose);
+        if (dialog.open) dialog.close();
         resolve(result);
       };
       const onCancel = () => finish(false);
       const onAccept = () => finish(true);
-      const onMaskClick = (event) => { if (event.target === mask) finish(false); };
-      const onKeydown = (event) => { if (event.key === 'Escape') finish(false); };
+      // Covers Escape and the backdrop, both handled by the browser.
+      const onClose = () => finish(false);
       cancel.addEventListener('click', onCancel);
       accept.addEventListener('click', onAccept);
-      mask.addEventListener('click', onMaskClick);
-      mask.addEventListener('keydown', onKeydown);
+      dialog.addEventListener('close', onClose);
+      dialog.showModal();
+      cancel.focus();
     });
   }
 
@@ -283,14 +277,8 @@
     const action = button.dataset.action;
     const jobId = button.dataset.jobId;
     if (!action || !jobId) return;
-    if (action === 'menu') {
-      const panel = button.parentElement.querySelector('.download-job-menu-panel');
-      const willOpen = panel.hidden;
-      closeJobMenus(panel);
-      panel.hidden = !willOpen;
-      button.setAttribute('aria-expanded', String(willOpen));
-      return;
-    }
+    // A daisyUI dropdown stays open while it holds focus.
+    document.activeElement?.blur();
     if (action === 'delete' && !await confirmClear()) return;
     button.disabled = true;
     try {
@@ -343,19 +331,15 @@
         notify(error.message, 'error');
       } finally {
         submitButton.disabled = false;
-        submitButton.textContent = 'Start Download';
+        submitButton.textContent = 'Download';
         urlInput.focus();
       }
     });
 
-    document.querySelector('.download-stack')?.addEventListener('click', (event) => {
+    document.getElementById('download-stack')?.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-action]');
       if (button) handleJobAction(button);
     });
-    document.addEventListener('click', (event) => {
-      if (!event.target.closest('.download-job-menu')) closeJobMenus();
-    });
-
     document.getElementById('clear-history-btn')?.addEventListener('click', async () => {
       if (!await confirmClear({ title: 'Clear all download history?', copy: 'Active jobs and local media files will be kept.' })) return;
       try {
