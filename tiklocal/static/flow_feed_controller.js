@@ -53,6 +53,9 @@
     });
     const feedItems = flowSession.items;
     let seed = '';
+    // Server-rendered first page, consumed once by the first loadFeed() call.
+    let bootFeed = window.__TIKLOCAL_FLOW_BOOT__ || null;
+    delete window.__TIKLOCAL_FLOW_BOOT__;
     const activitySessionId = globalThis.crypto?.randomUUID?.()
       || `flow-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     let activeActivity = null;
@@ -1171,9 +1174,16 @@
           });
           if (seed) query.set('seed', seed);
 
-          const res = await fetch(`/api/feed/mix?${query.toString()}`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
+          // The first page ships with the document, so the feed starts without
+          // waiting on a round trip. Later pages always go to the API.
+          let data = bootFeed;
+          if (data) {
+            bootFeed = null;
+          } else {
+            const res = await fetch(`/api/feed/mix?${query.toString()}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            data = await res.json();
+          }
 
           if (!seed && data.seed) seed = String(data.seed);
           const incoming = Array.isArray(data.items) ? data.items : [];

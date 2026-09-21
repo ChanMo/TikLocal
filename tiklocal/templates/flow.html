@@ -531,9 +531,6 @@ body.immersive-mode .controls-sidebar {
   pointer-events: none;
   transform: translateX(20px);
 }
-body.immersive-mode .floating-dock {
-  transform: translate(-50%, 150%) !important;
-}
 .controls-sidebar {
   position: absolute;
   right: 16px;
@@ -1102,11 +1099,14 @@ em.coll-count {
 {% endblock %}
 
 {% block extra_body %}
+<script>
+  window.__TIKLOCAL_FLOW_BOOT__ = {{ initial_feed | tojson }};
+</script>
 <script src="{{ static_asset('flow_ui_shared.js') }}"></script>
 <script src="{{ static_asset('flow_state_controller.js') }}"></script>
 <script src="{{ static_asset('flow_session.js') }}"></script>
 <script src="{{ static_asset('flow_actions_shared.js') }}"></script>
 <script src="{{ static_asset('flow_media_actions_controller.js') }}"></script>
 <script src="{{ static_asset('hammer.min.js') }}"></script>
-<script src="{{ static_asset('home_feed_controller.js') }}"></script>
+<script src="{{ static_asset('flow_feed_controller.js') }}"></script>
 {% endblock %}

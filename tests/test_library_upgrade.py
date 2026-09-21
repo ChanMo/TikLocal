@@ -35,9 +35,24 @@ def client(tmp_path, monkeypatch):
     return app.test_client()
 
 
-@pytest.mark.parametrize('url', ['/', '/flow', '/library', '/library?view=explore', '/radio', '/download', '/settings/', '/favorite', '/collections'])
+@pytest.mark.parametrize('url', [
+    '/', '/library', '/library?view=explore', '/radio',
+    '/download', '/settings', '/settings/', '/saved', '/saved/collections',
+])
 def test_web_pages_are_available(client, url):
     assert client.get(url).status_code == 200
+
+
+@pytest.mark.parametrize('url, target', [
+    ('/flow', '/'),
+    ('/favorite', '/saved'),
+    ('/collections', '/saved/collections'),
+])
+def test_pre_flow_landing_urls_still_resolve(client, url, target):
+    response = client.get(url)
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith(target)
+    assert client.get(url, follow_redirects=True).status_code == 200
 
 
 def test_library_timeline_groups_months_and_month_detail_filters(client):

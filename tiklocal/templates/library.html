@@ -944,7 +944,7 @@
 {% endblock %}
 
 {% block content %}
-<main class="{% if scope in ['favorite', 'collection'] %}saved-page{% elif library_view == 'timeline' %}timeline-page-shell{% else %}container mx-auto px-2 pt-2 pb-1 md:px-3{% endif %}">
+<main class="{% if scope in ['favorite', 'collection'] %}w-full max-w-[1040px] mx-auto px-3.5 pt-2.5 pb-2 md:px-[18px]{% elif library_view == 'timeline' %}timeline-page-shell{% else %}container mx-auto px-2 pt-2 pb-1 md:px-3{% endif %}">
   {% if scope == 'all' and library_view == 'timeline' %}
   <header class="timeline-masthead">
     <div class="timeline-masthead-copy">
@@ -1019,7 +1019,7 @@
   {% elif scope == 'collection' %}
   <section>
     <div class="collection-nav">
-      <a class="collection-nav-back" href="/collections">
+      <a class="collection-nav-back" href="/saved/collections">
         <i data-feather="arrow-left"></i>
         <span>All Collections</span>
       </a>
@@ -1048,7 +1048,7 @@
   {% endif %}
 
   {% if not (scope == 'all' and library_view == 'timeline') %}
-  <section id="library-grid" class="masonry-grid{% if scope in ['favorite', 'collection'] %} saved-content{% endif %}"></section>
+  <section id="library-grid" class="masonry-grid{% if scope in ['favorite', 'collection'] %} w-full{% endif %}"></section>
   {% endif %}
   <div id="library-loading" class="library-loading" aria-live="polite">
     <div id="library-status-text">Loading...</div>

@@ -3,7 +3,7 @@
 import random
 from urllib.parse import quote
 
-from flask import render_template, request
+from flask import redirect, render_template, request, url_for
 
 from tiklocal.web import read_int_arg
 from tiklocal.web.media_payloads import build_feed_media_item
@@ -326,15 +326,34 @@ def register_flow_routes(
     app, *, media_index, recommend_service, favorite_service,
     download_source_store, activity_store,
 ):
-    @app.route('/flow')
+    FEED_PAGE_SIZE = 24
+
+    @app.route('/')
     def flow_view():
-        return render_template('tiktok.html', menu='flow')
+        """Flow is the landing page: opening TikLocal starts playing, not choosing."""
+        return render_template(
+            'flow.html',
+            menu='flow',
+            initial_feed=build_mix_feed_page(
+                page=1,
+                size=FEED_PAGE_SIZE,
+                seed=str(random.randint(1, 999999)),
+                recommend_service=recommend_service,
+                media_index=media_index,
+                favorite_service=favorite_service,
+                download_source_store=download_source_store,
+            ),
+        )
+
+    @app.route('/flow')
+    def flow_legacy_view():
+        return redirect(url_for('flow_view'))
 
     @app.route('/api/feed/mix')
     def api_feed_mix():
         result = build_mix_feed_page(
             page=read_int_arg('page', 1, minimum=1),
-            size=read_int_arg('size', 24, minimum=8, maximum=200),
+            size=read_int_arg('size', FEED_PAGE_SIZE, minimum=8, maximum=200),
             seed=request.args.get('seed') or str(random.randint(1, 999999)),
             recommend_service=recommend_service,
             media_index=media_index,

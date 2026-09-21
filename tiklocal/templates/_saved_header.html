@@ -1,17 +1,17 @@
-<section class="saved-header" aria-labelledby="saved-title">
-  <div class="saved-heading">
+<header class="mb-3 pt-3" aria-labelledby="saved-title">
+  <div class="mb-3 flex items-end justify-between gap-4">
     <div>
-      <p class="saved-eyebrow">TikLocal</p>
-      <h1 id="saved-title" class="saved-title">Saved</h1>
+      <p class="mb-0.5 text-[10px] font-bold uppercase tracking-[0.14em] opacity-45">TikLocal</p>
+      <h1 id="saved-title" class="text-2xl font-bold leading-tight tracking-tight sm:text-3xl">Saved</h1>
     </div>
     {% if saved_active == 'collections' %}
-    <button id="open-create-collection" class="create-collection-btn" type="button">
-      <i data-feather="plus" aria-hidden="true"></i><span>New Collection</span>
+    <button id="open-create-collection" class="btn btn-primary btn-sm gap-1.5" type="button">
+      <i data-feather="plus" class="size-4"></i><span>New Collection</span>
     </button>
     {% endif %}
   </div>
-  <nav class="saved-tabs" aria-label="Saved content">
-    <a class="saved-tab{% if saved_active == 'favorite' %} is-active{% endif %}" href="/favorite"{% if saved_active == 'favorite' %} aria-current="page"{% endif %}>Favorites</a>
-    <a class="saved-tab{% if saved_active == 'collections' %} is-active{% endif %}" href="/collections"{% if saved_active == 'collections' %} aria-current="page"{% endif %}>Collections</a>
+  <nav class="tabs tabs-box" aria-label="Saved content">
+    <a class="tab{% if saved_active == 'favorite' %} tab-active{% endif %}" href="/saved"{% if saved_active == 'favorite' %} aria-current="page"{% endif %}>Favorites</a>
+    <a class="tab{% if saved_active == 'collections' %} tab-active{% endif %}" href="/saved/collections"{% if saved_active == 'collections' %} aria-current="page"{% endif %}>Collections</a>
   </nav>
-</section>
+</header>

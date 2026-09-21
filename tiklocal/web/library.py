@@ -46,7 +46,7 @@ def register_library_routes(
         collection = collection or {}
         return render_template(
             'library.html',
-            menu='library' if scope == 'all' else 'favorite',
+            menu='library' if scope == 'all' else 'saved',
             scope=scope,
             collection_id=collection.get('id', ''),
             collection_name=collection.get('name', ''),
@@ -205,7 +205,7 @@ def register_library_routes(
             timeline_payload=timeline_payload,
         )
 
-    @app.route('/favorite')
+    @app.route('/saved')
     def favorite_view():
         page = _build_library_page(
             favorites_only=True,
@@ -213,9 +213,18 @@ def register_library_routes(
         )
         return _render_library_page(page, scope='favorite')
 
-    @app.route('/collections')
+    @app.route('/saved/collections')
     def collections_view():
-        return render_template('collections.html', menu='favorite')
+        return render_template('collections.html', menu='saved')
+
+    # Saved used to be two sibling pages under two unrelated URLs.
+    @app.route('/favorite')
+    def favorite_legacy_view():
+        return redirect(url_for('favorite_view'))
+
+    @app.route('/collections')
+    def collections_legacy_view():
+        return redirect(url_for('collections_view'))
 
     @app.route('/collection/<collection_id>')
     def collection_detail_view(collection_id):

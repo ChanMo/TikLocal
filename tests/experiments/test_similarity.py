@@ -198,7 +198,7 @@ import sys
 from tiklocal.app import create_app
 app = create_app({'TESTING': True, 'MEDIA_ROOT': sys.argv[1]})
 client = app.test_client()
-for url in ('/', '/flow', '/library', '/radio', '/download'):
+for url in ('/', '/library', '/radio', '/saved', '/download'):
     assert client.get(url).status_code == 200, url
 for part in ('embedding', 'groups', 'web', 'cli'):
     assert 'tiklocal.experiments.similarity.' + part not in sys.modules, part

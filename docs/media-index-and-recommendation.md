@@ -114,7 +114,7 @@
 - `tiklocal/thumbs.py`：缩略图 CLI 编排。
 - `tiklocal/view_builders.py`
 - `tiklocal/app.py`
-- `tiklocal/static/home_feed_controller.js`
+- `tiklocal/static/flow_feed_controller.js`
 - `tiklocal/static/library_page_controller.js`
 - `tests/test_feed_mix.py`
 - `tests/test_library_upgrade.py`

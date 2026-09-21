@@ -232,33 +232,6 @@
     gap: 8px;
     margin-top: 12px;
   }
-  .create-collection-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    min-height: 38px;
-    padding: 0 14px;
-    border: 1px solid rgba(35, 34, 30, 0.09);
-    border-radius: 999px;
-    color: #f8f7f2;
-    background: #292822;
-    box-shadow: 0 1px 2px rgba(32, 30, 24, 0.16), 0 7px 18px rgba(32, 30, 24, 0.1);
-    font-size: 12px;
-    font-weight: 620;
-    transition: transform 120ms ease, background-color 140ms ease, box-shadow 160ms ease;
-  }
-  .create-collection-btn svg { width: 15px; height: 15px; }
-  .create-collection-btn:hover { background: #151512; box-shadow: 0 2px 3px rgba(32, 30, 24, 0.16), 0 9px 24px rgba(32, 30, 24, 0.14); }
-  .create-collection-btn:active { transform: scale(0.97); }
-  .create-collection-btn:focus-visible { outline: 2px solid #292822; outline-offset: 3px; }
-  [data-theme="dark"] .create-collection-btn {
-    border-color: rgba(255, 255, 255, 0.16);
-    color: #22211d;
-    background: #e9e5da;
-    box-shadow: 0 7px 22px rgba(0, 0, 0, 0.22);
-  }
-  [data-theme="dark"] .create-collection-btn:hover { background: #fffdf5; }
-  [data-theme="dark"] .create-collection-btn:focus-visible { outline-color: #e9e5da; }
   .collection-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px 10px;
@@ -411,16 +384,16 @@
     .collection-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 16px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .collection-card, .create-collection-btn, .collection-menu-btn, .collection-cover-tile img { transition-duration: 0.01ms !important; }
+    .collection-card, .collection-menu-btn, .collection-cover-tile img { transition-duration: 0.01ms !important; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<main class="saved-page collections-shell">
+<main class="w-full max-w-[1040px] mx-auto px-3.5 pt-2.5 pb-2 md:px-[18px] collections-shell">
   {% set saved_active = 'collections' %}
   {% include '_saved_header.html' %}
-  <section id="collections-grid" class="saved-content collection-grid"></section>
+  <section id="collections-grid" class="w-full collection-grid"></section>
   <section id="collections-state" class="collections-state" aria-live="polite">
     <div>
       <div class="collections-state-icon"><i data-feather="loader"></i></div>

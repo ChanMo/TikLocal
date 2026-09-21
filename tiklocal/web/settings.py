@@ -1,14 +1,12 @@
-"""Home, settings and shared library/cache statistics."""
+"""Settings and shared library/cache statistics."""
 
 from flask import render_template
 
 
 def register_settings_routes(app, media_index, favorite_service, thumbnail_service, app_version):
-    @app.route('/')
-    def home_view():
-        """Quiet launchpad for the local media library."""
-        return render_template('home.html', menu='home')
-
+    # Both spellings are served directly; the nav used to link `/settings` and
+    # take a 308 to `/settings/` on every click.
+    @app.route('/settings')
     @app.route('/settings/')
     def settings_view():
         stats = library_stats()
