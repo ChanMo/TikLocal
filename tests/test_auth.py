@@ -167,3 +167,53 @@ def test_cli_password_change_invalidates_running_sessions(authenticated_app):
     response = client.get('/')
     assert response.status_code == 302
     assert '/login?' in response.headers['Location']
+
+
+def _change_password(client, csrf_token, current=PASSWORD, replacement='a-much-longer-password'):
+    return client.post(
+        '/api/auth/password',
+        json={'current_password': current, 'new_password': replacement},
+        headers={'X-CSRF-Token': csrf_token},
+    )
+
+
+def test_password_change_from_settings_keeps_caller_and_signs_out_other_devices(authenticated_app):
+    app, auth_path = authenticated_app
+    client = app.test_client()
+    other_device = app.test_client()
+    _login(client)
+    _login(other_device)
+    csrf_token = _csrf_from(client.get('/settings'))
+
+    changed = _change_password(client, csrf_token)
+
+    assert changed.status_code == 200
+    assert changed.get_json()['success'] is True
+    # The caller keeps browsing; every other signed-in device is dropped.
+    assert client.get('/settings').status_code == 200
+    assert other_device.get('/settings').status_code == 302
+    assert AuthStore(auth_path).verify('a-much-longer-password')
+
+
+def test_password_change_rejects_wrong_current_password_and_short_replacement(authenticated_app):
+    app, auth_path = authenticated_app
+    client = app.test_client()
+    _login(client)
+    csrf_token = _csrf_from(client.get('/settings'))
+
+    wrong = _change_password(client, csrf_token, current='not-the-password')
+    short = _change_password(client, csrf_token, replacement='sh0rt')
+
+    assert wrong.status_code == 401
+    assert short.status_code == 400
+    assert AuthStore(auth_path).verify(PASSWORD)
+
+
+def test_password_change_requires_a_session_and_a_csrf_token(authenticated_app):
+    app, _ = authenticated_app
+    signed_out = app.test_client()
+    client = app.test_client()
+    _login(client)
+
+    assert signed_out.post('/api/auth/password', json={}).status_code == 401
+    assert _change_password(client, 'forged-csrf-token').status_code == 403

@@ -193,6 +193,41 @@ def configure_auth(app, auth_store, *, enabled: bool, device_auth_store=None) ->
             error=error,
         ), status
 
+    @app.post('/api/auth/password')
+    def change_password_view():
+        """Change the access password without dropping to a terminal."""
+        payload = request.get_json(silent=True) or {}
+        client_key = request.remote_addr or 'unknown'
+
+        retry_after = limiter.retry_after(client_key)
+        if retry_after:
+            minutes = max(1, (retry_after + 59) // 60)
+            return {'success': False, 'error': f'Too many attempts. Try again in {minutes} minutes.'}, 429
+
+        if not auth_store.verify(str(payload.get('current_password') or '')):
+            limiter.record_failure(client_key)
+            return {'success': False, 'error': 'The current password is incorrect.'}, 401
+
+        try:
+            auth_store.set_password(str(payload.get('new_password') or ''))
+        except ValueError as exc:
+            return {'success': False, 'error': str(exc)}, 400
+
+        limiter.clear(client_key)
+        # set_password bumps the revision, which signs out every session -- this
+        # one included. Re-establish the caller in place, keeping its CSRF token
+        # so the page's already-rendered forms stay valid.
+        csrf = session.get('_csrf_token')
+        remembered = bool(session.permanent)
+        session.clear()
+        session['authenticated'] = True
+        session['auth_revision'] = auth_store.revision
+        if csrf:
+            session['_csrf_token'] = csrf
+        session.permanent = remembered
+        ensure_csrf_token()
+        return {'success': True, 'data': {'signed_out_others': True}}
+
     @app.post('/logout')
     def logout_view():
         session.clear()

@@ -365,6 +365,40 @@
       </div>
     </section>
 
+    {% if auth_enabled %}
+    <section id="security" aria-labelledby="security-title">
+      <h2 id="security-title" class="settings-section-title">Security</h2>
+      <div class="settings-card">
+        <form id="password-form" class="flex flex-col gap-3 p-4">
+          <div>
+            <div class="settings-row-title">Access Password</div>
+            <div class="settings-row-copy">Changing it signs out every browser and paired Radio client, including this one's other tabs.</div>
+          </div>
+
+          <fieldset class="fieldset p-0">
+            <legend class="fieldset-legend">Current password</legend>
+            <input id="current-password" name="current_password" type="password" class="input w-full" autocomplete="current-password" required>
+          </fieldset>
+
+          <fieldset class="fieldset p-0">
+            <legend class="fieldset-legend">New password</legend>
+            <input id="new-password" name="new_password" type="password" class="input w-full" autocomplete="new-password" minlength="8" required>
+            <p class="label">At least 8 characters.</p>
+          </fieldset>
+
+          <fieldset class="fieldset p-0">
+            <legend class="fieldset-legend">Confirm new password</legend>
+            <input id="confirm-password" name="confirm_password" type="password" class="input w-full" autocomplete="new-password" minlength="8" required>
+          </fieldset>
+
+          <div class="flex justify-end">
+            <button id="submit-password" class="btn btn-primary btn-sm" type="submit">Update Password</button>
+          </div>
+        </form>
+      </div>
+    </section>
+    {% endif %}
+
     <section id="download" aria-labelledby="download-title">
       <h2 id="download-title" class="settings-section-title">Downloads</h2>
       <div class="settings-card">
@@ -811,6 +845,29 @@
           showToast('Recommendation history reset');
         }).catch(() => showToast('Reset failed. Please try again later.', 'error'));
       });
+    });
+
+    const passwordForm = document.getElementById('password-form');
+    passwordForm?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const current = document.getElementById('current-password');
+      const next = document.getElementById('new-password');
+      const confirm = document.getElementById('confirm-password');
+      if (next.value !== confirm.value) {
+        showToast('The new passwords do not match.', 'error');
+        confirm.focus();
+        return;
+      }
+      const submit = document.getElementById('submit-password');
+      runButton(submit, 'Updating…', async () => {
+        await requestJson('/api/auth/password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current_password: current.value, new_password: next.value }),
+        });
+        passwordForm.reset();
+        showToast('Password updated. Other devices must sign in again.');
+      }).catch((error) => showToast(error.message || 'Could not update the password.', 'error'));
     });
 
     document.getElementById('download-levels').addEventListener('click', async (event) => {
