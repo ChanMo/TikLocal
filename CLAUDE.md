@@ -9,7 +9,7 @@ TikLocal is a Flask-based web application that provides a TikTok-like interface 
 ## Key Dependencies
 
 - **Backend**: Flask 3.1.0, Waitress (WSGI server), PyYAML 6.0 (config file support)
-- **Frontend**: TailwindCSS v4, Feather Icons, Hammer.js
+- **Frontend**: TailwindCSS v4 + daisyUI 5 (MIT), Feather Icons, Hammer.js
 - **Python**: Requires Python >=3.10,<4.0
 - **Package Management**: Poetry for Python dependencies, npm for CSS building
 
@@ -53,26 +53,35 @@ tiklocal --help
 
 ### Core Application Structure
 
-- **`tiklocal/app.py`**: Main Flask application factory with all routes and view functions
+- **`tiklocal/app.py`**: Flask application factory; builds services and registers route modules
+- **`tiklocal/web/`**: HTTP entry points grouped by feature (`flow.py`, `library.py`, `media.py`, `radio.py`, `downloads.py`, `settings.py`, `captions.py`)
+- **`tiklocal/services/`**: Business logic with no HTTP concerns
 - **`tiklocal/run.py`**: CLI entry point with argument parsing, config file loading, and Waitress server startup
-- **`tiklocal/config.py`**: Configuration file (currently empty, configuration handled via config file/env vars)
+- **`tiklocal/auth.py`**: Session auth, CSRF, login rate limiting, password change endpoint
 
 ### Key Routes and Features
 
-- **`/`** (tiktok.html): TikTok-like vertical scrolling video interface with random shuffle
-- **`/browse`**: Paginated video browser with file management capabilities
-- **`/gallery`**: Pinterest-style image gallery with directory navigation
-- **`/settings`**: Application settings and statistics
-- **`/detail/<name>`**: Individual video detail view with navigation
-- **`/favorite`**: Favorited media management using JSON storage
-- **`/media/<name>`** and **`/media2`**: Media file serving endpoints
+Four primary destinations, plus Settings as a utility entry point.
+
+- **`/`** (flow.html): TikTok-like vertical swipe feed of mixed video and images. The first page is server-rendered
+- **`/library`**: Year/month timeline (`view=timeline`) and Pinterest-style grid (`view=explore`)
+- **`/radio`**: Ambient audio player
+- **`/saved`** and **`/saved/collections`**: Favorites and user collections
+- **`/settings`**: Appearance, media index, Radio clients, security, downloads
+- **`/download`**: URL download queue, reachable from Settings
+- **`/detail/<name>`** and **`/image`**: Video and image detail views
+- **`/media/<name>`**, **`/media?uri=`**, **`/thumb`**: Media serving endpoints
+
+`/flow`, `/favorite` and `/collections` are kept as redirects to the routes above.
 
 ### Frontend Structure
 
 - **Templates**: Located in `tiklocal/templates/` using Jinja2
-- **CSS**: TailwindCSS v4 with custom theme including dark mode support
+- **CSS**: daisyUI 5 components first, TailwindCSS v4 utilities to fill gaps. Write bespoke CSS only where neither offers a fit (the Flow feed, the Radio player, and the Library masonry/timeline)
+- **Themes**: `light` and `dark` are daisyUI themes defined in `tiklocal/static/input.css`. `data-theme` is set on both `<html>` (daisyUI colors the page from there) and `<body>` (page styles pair it with `data-nav-context`)
+- **Navigation**: daisyUI `dock` on phones, a `menu` rail from `md` up; both in `base.html`. `aria-current="page"` is the active state
 - **JavaScript**: Vanilla JS with Feather icons and Hammer.js for touch gestures
-- **Theme System**: Light/dark mode toggle with localStorage persistence
+- **Dialogs**: Native `<dialog class="modal">` + `showModal()`; the browser supplies the backdrop, focus trap and Escape
 
 ### Media Management
 
@@ -109,6 +118,8 @@ The application supports multiple configuration methods with the following prior
 
 ## Development Notes
 
+- CSS is built by the Tailwind v4 CLI from `tiklocal/static/input.css`; there is no `tailwind.config.js` (v4 does not read one without an `@config` directive). daisyUI and the themes are configured with `@plugin` inside that file
+- Run `npm run build` after changing any template class, or the class will be missing from `output.css`
 - Configuration priority: CLI args > Environment variables > Config file > Defaults
 - Config file locations: `~/.config/tiklocal/config.yaml` or `~/.tiklocal/config.yaml`
 - Templates include responsive design optimized for mobile and tablet usage

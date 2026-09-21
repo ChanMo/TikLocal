@@ -6,6 +6,7 @@ This directory records TikLocal's key design decisions, release changes, and imp
 
 ## Documents
 
+- `docs/navigation-and-ui-system.md`: Flow 作为首页的信息架构决策、四项导航结构，以及 daisyUI 组件优先的样式基线与保留自写 CSS 的边界。
 - [Web convergence plan](web-convergence-plan.md): implementation plan and delivery record for consolidating backend routes, shared resources, title handling, and experimental features.
 - `docs/mixed-feed-design.md`: design and implementation notes for the mixed video and image Flow feed.
 - `docs/flow-interaction-unification.md`: the shared interaction model for Flow, Library, and Favorites, including title entry points and asynchronous state rules.
