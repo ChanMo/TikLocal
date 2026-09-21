@@ -144,30 +144,40 @@
           <i data-feather="maximize" class="w-5 h-5"></i>
         </button>
 
-        <button id="more-menu-btn" class="material-icon-btn" aria-label="More actions" type="button" aria-haspopup="menu" aria-controls="detail-action-menu" aria-expanded="false">
-          <i data-feather="more-vertical" class="w-5 h-5"></i>
-        </button>
+        <div class="dropdown dropdown-end">
+          <button id="more-menu-btn" tabindex="0" class="material-icon-btn" aria-label="More actions" type="button">
+            <i data-feather="more-vertical" class="w-5 h-5"></i>
+          </button>
 
-        <div id="detail-action-menu" class="detail-action-menu" role="menu" aria-label="Video actions" hidden>
-          <button id="set-thumb-btn" class="detail-action-item" type="button" role="menuitem">
-            <i data-feather="camera" class="w-4 h-4"></i>
-            <span>Use Current Frame as Cover</span>
-          </button>
-          <button id="copy-link-btn" class="detail-action-item" type="button" role="menuitem">
-            <i data-feather="link" class="w-4 h-4"></i>
-            <span>Copy Link</span>
-          </button>
-          {% if source_meta and source_meta.url %}
-          <a href="{{ source_meta.url }}" target="_blank" rel="noopener noreferrer" class="detail-action-item" role="menuitem">
-            <i data-feather="external-link" class="w-4 h-4"></i>
-            <span>View Source</span>
-          </a>
-          {% endif %}
-          <div class="detail-action-divider" role="separator"></div>
-          <button onclick="confirmDelete()" class="detail-action-item is-danger" type="button" role="menuitem">
-            <i data-feather="trash-2" class="w-4 h-4"></i>
-            <span>Delete Video</span>
-          </button>
+          <ul id="detail-action-menu" tabindex="0" class="dropdown-content menu z-[70] w-60 gap-0.5 rounded-box border border-base-300 bg-base-100 p-1.5 shadow-lg" aria-label="Video actions">
+            <li>
+              <button id="set-thumb-btn" type="button">
+                <i data-feather="camera" class="w-4 h-4"></i>
+                <span>Use Current Frame as Cover</span>
+              </button>
+            </li>
+            <li>
+              <button id="copy-link-btn" type="button">
+                <i data-feather="link" class="w-4 h-4"></i>
+                <span>Copy Link</span>
+              </button>
+            </li>
+            {% if source_meta and source_meta.url %}
+            <li>
+              <a href="{{ source_meta.url }}" target="_blank" rel="noopener noreferrer">
+                <i data-feather="external-link" class="w-4 h-4"></i>
+                <span>View Source</span>
+              </a>
+            </li>
+            {% endif %}
+            <li class="my-1 h-px bg-base-300" role="separator" aria-hidden="true"></li>
+            <li>
+              <button class="text-error" onclick="confirmDelete()" type="button">
+                <i data-feather="trash-2" class="w-4 h-4"></i>
+                <span>Delete Video</span>
+              </button>
+            </li>
+          </ul>
         </div>
       </div>
     </header>
@@ -274,31 +284,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileName = {{ file|tojson }};
   let isFavorited = false;
 
+  // daisyUI dropdowns stay open while the trigger or the panel holds focus,
+  // so closing one means dropping that focus; there is no toggle state to keep.
+  const moreMenuIsOpen = () => {
+    const active = document.activeElement;
+    return !!active && (active === moreMenuBtn || !!moreMenu?.contains(active));
+  };
+
   const closeMoreMenu = () => {
-    if (!moreMenu || !moreMenuBtn) return;
-    moreMenu.hidden = true;
-    moreMenuBtn.setAttribute('aria-expanded', 'false');
+    if (moreMenuIsOpen()) document.activeElement.blur();
   };
-
-  const toggleMoreMenu = () => {
-    if (!moreMenu || !moreMenuBtn) return;
-    const nextOpen = moreMenu.hidden;
-    moreMenu.hidden = !nextOpen;
-    moreMenuBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
-  };
-
-  moreMenuBtn?.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    toggleMoreMenu();
-  });
-
-  document.addEventListener('click', (event) => {
-    if (!moreMenu || moreMenu.hidden) return;
-    const target = event.target;
-    if (moreMenu.contains(target) || moreMenuBtn?.contains(target)) return;
-    closeMoreMenu();
-  });
 
   // Initialize favorite state.
   async function initFavoriteStatus() {
