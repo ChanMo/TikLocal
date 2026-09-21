@@ -1,378 +1,131 @@
 {% extends "base.html" %}
 
-{% block extra_head %}
-<style>
-  :root {
-    --settings-bg: #f4f3ef;
-    --settings-card: rgba(255, 255, 252, 0.9);
-    --settings-ink: #292822;
-    --settings-muted: rgba(41, 40, 34, 0.5);
-    --settings-line: rgba(41, 40, 34, 0.085);
-    --settings-soft: rgba(41, 40, 34, 0.055);
-  }
-  [data-theme="dark"] {
-    --settings-bg: #11110f;
-    --settings-card: rgba(34, 34, 30, 0.9);
-    --settings-ink: rgba(255, 255, 255, 0.92);
-    --settings-muted: rgba(255, 255, 255, 0.44);
-    --settings-line: rgba(255, 255, 255, 0.085);
-    --settings-soft: rgba(255, 255, 255, 0.06);
-  }
-  body[data-nav-context="settings"] {
-    padding-bottom: calc(104px + env(safe-area-inset-bottom)) !important;
-    background:
-      radial-gradient(circle at 50% -13rem, rgba(169, 151, 113, 0.08), transparent 31rem),
-      var(--settings-bg) !important;
-  }
-  .settings-page {
-    width: min(100%, 660px);
-    min-height: calc(100dvh - 104px - env(safe-area-inset-bottom));
-    margin: 0 auto;
-    padding: 27px 14px 10px;
-    color: var(--settings-ink);
-  }
-  .settings-stack { display: grid; gap: 27px; }
-  .settings-section-title {
-    margin: 0 0 9px 4px;
-    color: var(--settings-muted);
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0.04em;
-  }
-  .settings-card {
-    overflow: hidden;
-    border: 1px solid var(--settings-line);
-    border-radius: 18px;
-    background: var(--settings-card);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), 0 1px 2px rgba(35, 34, 30, 0.035), 0 9px 28px rgba(35, 34, 30, 0.025);
-  }
-  [data-theme="dark"] .settings-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035); }
-  .settings-row {
-    min-height: 68px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 13px 15px;
-  }
-  .settings-row + .settings-row { border-top: 1px solid var(--settings-line); }
-  .settings-row-main { min-width: 0; flex: 1; }
-  .settings-row-title { font-size: 14px; font-weight: 620; letter-spacing: -0.012em; line-height: 1.35; }
-  .settings-row-copy {
-    margin-top: 3px;
-    color: var(--settings-muted);
-    font-size: 11px;
-    line-height: 1.45;
-  }
-  .radio-device-state {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .radio-device-state::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #668b7d;
-  }
-  .radio-device-state.is-expired::before { background: #a58a67; }
-  .radio-device-list { margin-top: 8px; }
-  .appearance-card { padding: 15px; }
-  .appearance-heading { margin-bottom: 13px; }
-  .theme-options {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .theme-option {
-    min-width: 0;
-    min-height: 104px;
-    display: grid;
-    place-items: center;
-    align-content: center;
-    gap: 8px;
-    border: 1px solid transparent;
-    border-radius: 14px;
-    color: var(--settings-muted);
-    background: transparent;
-    font-size: 12px;
-    font-weight: 610;
-    cursor: pointer;
-    transition: color 140ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 160ms ease, transform 120ms ease;
-  }
-  .theme-preview {
-    position: relative;
-    width: min(100%, 92px);
-    height: 52px;
-    overflow: hidden;
-    border: 1px solid rgba(36, 35, 30, 0.1);
-    border-radius: 9px;
-    background: #f4f2ec;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  }
-  .theme-preview::before,
-  .theme-preview::after {
-    content: '';
-    position: absolute;
-    left: 11px;
-    height: 3px;
-    border-radius: 99px;
-    background: rgba(38, 37, 32, 0.58);
-  }
-  .theme-preview::before { top: 15px; width: 42%; }
-  .theme-preview::after { top: 24px; width: 62%; opacity: 0.34; }
-  .theme-preview-dark { border-color: rgba(255, 255, 255, 0.12); background: #1b1b18; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055); }
-  .theme-preview-dark::before, .theme-preview-dark::after { background: rgba(255, 255, 255, 0.78); }
-  .theme-preview-system { background: linear-gradient(90deg, #f4f2ec 0 50%, #1b1b18 50%); }
-  .theme-preview-system::before { background: linear-gradient(90deg, rgba(38, 37, 32, 0.58) 0 48%, rgba(255, 255, 255, 0.78) 52%); }
-  .theme-preview-system::after { background: linear-gradient(90deg, rgba(38, 37, 32, 0.35) 0 48%, rgba(255, 255, 255, 0.48) 52%); }
-  .theme-check {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 15px;
-    height: 15px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    color: white;
-    background: #4c6c62;
-    opacity: 0;
-    transform: scale(0.65);
-    transition: opacity 140ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .theme-check svg { width: 9px; height: 9px; stroke-width: 2.8; }
-  .theme-option:hover { color: var(--settings-ink); }
-  .theme-option:active { transform: scale(0.97); }
-  .theme-option:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 2px; }
-  .theme-option.is-active {
-    color: var(--settings-ink);
-    border-color: var(--settings-line);
-    background: rgba(255, 255, 255, 0.62);
-    box-shadow: 0 1px 2px rgba(32, 30, 24, 0.06), 0 7px 18px rgba(32, 30, 24, 0.045);
-  }
-  .theme-option.is-active .theme-check { opacity: 1; transform: scale(1); }
-  [data-theme="dark"] .theme-option.is-active { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055); }
-  .library-summary { padding: 18px 16px 16px; }
-  .library-total { font-size: 29px; font-weight: 670; letter-spacing: -0.045em; line-height: 1; }
-  .library-total-unit { margin-left: 5px; color: var(--settings-muted); font-size: 12px; font-weight: 560; letter-spacing: 0; }
-  .library-types { margin-top: 9px; color: var(--settings-muted); font-size: 11px; }
-  .library-sync-state { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--settings-muted); font-size: 11px; }
-  .library-sync-dot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: #668b7d; box-shadow: 0 0 0 3px rgba(102, 139, 125, 0.11); }
-  .library-sync-state.is-error .library-sync-dot { background: #bd6259; box-shadow: 0 0 0 3px rgba(189, 98, 89, 0.11); }
-  .download-levels { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: var(--settings-soft); }
-  .download-level {
-    width: 31px; height: 29px; border: 0; border-radius: 999px; color: var(--settings-muted);
-    background: transparent; font-size: 11px; font-weight: 650; cursor: pointer;
-  }
-  .download-level.is-active { color: var(--settings-ink); background: var(--settings-card); box-shadow: 0 1px 3px rgba(30,29,25,.09); }
-  .download-level:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 2px; }
-  .setting-icon {
-    width: 31px;
-    height: 31px;
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
-    border-radius: 10px;
-    color: var(--settings-muted);
-    background: var(--settings-soft);
-  }
-  .setting-icon svg { width: 15px; height: 15px; stroke-width: 1.8; }
-  .settings-action {
-    flex: 0 0 auto;
-    min-height: 34px;
-    padding: 0 12px;
-    border: 1px solid var(--settings-line);
-    border-radius: 999px;
-    color: var(--settings-ink);
-    background: var(--settings-soft);
-    font-size: 11px;
-    font-weight: 620;
-    cursor: pointer;
-    transition: background-color 140ms ease, transform 120ms ease, opacity 140ms ease;
-  }
-  .settings-action:hover { background: color-mix(in oklab, var(--settings-ink) 10%, transparent); }
-  .settings-action:active { transform: scale(0.97); }
-  .settings-action:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 2px; }
-  .settings-action:disabled { opacity: 0.45; cursor: wait; }
-  .settings-action.is-danger { color: #b4433b; background: rgba(180, 67, 59, 0.065); }
-  .settings-action.is-primary { color: #f7f6f1; border-color: #34332d; background: #34332d; }
-  .settings-action.is-warning { color: #8a622f; border-color: rgba(138, 98, 47, 0.16); background: rgba(138, 98, 47, 0.075); }
-  [data-theme="dark"] .settings-action.is-danger { color: #e69a93; background: rgba(230, 154, 147, 0.075); }
-  [data-theme="dark"] .settings-action.is-primary { color: #24231f; border-color: #e9e5da; background: #e9e5da; }
-  [data-theme="dark"] .settings-action.is-warning { color: #d8b57d; border-color: rgba(216, 181, 125, 0.16); background: rgba(216, 181, 125, 0.08); }
-  .about-footer { padding: 1px 4px 9px; color: var(--settings-muted); text-align: center; }
-  .about-card { padding: 0; }
-  .about-line { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 7px; }
-  .about-name { color: color-mix(in oklab, var(--settings-ink) 82%, transparent); font-size: 11px; font-weight: 620; }
-  .about-separator { color: color-mix(in oklab, var(--settings-muted) 44%, transparent); font-size: 9px; }
-  .about-version { color: var(--settings-muted); font-size: 10px; }
-  .about-link { color: var(--settings-muted); font-size: 10px; font-weight: 560; text-decoration: none; }
-  .about-link:hover { color: var(--settings-ink); }
-  .about-link:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 3px; border-radius: 3px; }
-  .confirm-mask {
-    position: fixed;
-    inset: 0;
-    z-index: 270;
-    display: grid;
-    place-items: center;
-    padding: 16px;
-    background: rgba(18, 18, 16, 0.42);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-  }
-  .confirm-card { width: min(100%, 390px); padding: 19px; border: 1px solid var(--settings-line); border-radius: 20px; color: var(--settings-ink); background: var(--settings-bg); box-shadow: 0 24px 70px rgba(20, 19, 16, 0.22); }
-  .confirm-title { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
-  .confirm-copy { margin: 7px 0 0; color: var(--settings-muted); font-size: 12px; line-height: 1.55; }
-  .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
-  .credential-mask[hidden] { display: none; }
-  .credential-mask { position: fixed; inset: 0; z-index: 275; display: grid; place-items: center; padding: 16px; background: rgba(18,18,16,.44); backdrop-filter: blur(9px); }
-  .credential-dialog { width: min(100%, 430px); max-height: min(620px, calc(100dvh - 32px)); overflow-y: auto; padding: 20px; border: 1px solid var(--settings-line); border-radius: 22px; color: var(--settings-ink); background: var(--settings-bg); box-shadow: 0 26px 80px rgba(20,19,16,.24); }
-  .credential-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-  .credential-title { margin: 0; font-size: 18px; font-weight: 660; letter-spacing: -.025em; }
-  .credential-copy { margin: 6px 0 0; color: var(--settings-muted); font-size: 11px; line-height: 1.55; }
-  .credential-close { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border: 0; border-radius: 50%; color: var(--settings-muted); background: var(--settings-soft); cursor: pointer; }
-  .credential-close svg { width: 15px; height: 15px; }
-  .credential-list { margin-top: 18px; overflow: hidden; border: 1px solid var(--settings-line); border-radius: 15px; background: var(--settings-card); }
-  .credential-item { display: flex; align-items: center; gap: 11px; min-height: 52px; padding: 10px 12px; }
-  .credential-item + .credential-item { border-top: 1px solid var(--settings-line); }
-  .credential-mark { width: 29px; height: 29px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; color: var(--settings-muted); background: var(--settings-soft); }
-  .credential-mark svg { width: 14px; height: 14px; }
-  .credential-name { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
-  .credential-empty { padding: 24px 14px; color: var(--settings-muted); font-size: 11px; text-align: center; }
-  .credential-upload { margin-top: 14px; padding: 14px; border: 1px dashed color-mix(in oklab, var(--settings-ink) 17%, transparent); border-radius: 15px; background: var(--settings-soft); }
-  .credential-upload-title { font-size: 12px; font-weight: 630; }
-  .credential-upload-copy { margin: 4px 0 10px; color: var(--settings-muted); font-size: 10px; line-height: 1.5; }
-  .credential-file { width: 100%; color: var(--settings-muted); font-size: 10px; }
-  .credential-upload-actions { display: flex; justify-content: flex-end; margin-top: 11px; }
-  .pairing-mask[hidden] { display: none; }
-  .pairing-mask { position: fixed; inset: 0; z-index: 276; display: grid; place-items: center; padding: 16px; background: rgba(18,18,16,.44); backdrop-filter: blur(9px); }
-  .pairing-dialog { width: min(100%, 460px); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--settings-line); border-radius: 22px; color: var(--settings-ink); background: var(--settings-bg); box-shadow: 0 26px 80px rgba(20,19,16,.24); }
-  .pairing-field { display: grid; gap: 7px; margin-top: 18px; }
-  .pairing-label { color: var(--settings-muted); font-size: 10px; font-weight: 650; }
-  .pairing-input, .pairing-link { width: 100%; border: 1px solid var(--settings-line); border-radius: 11px; padding: 11px 12px; color: var(--settings-ink); background: var(--settings-card); font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .pairing-link { min-height: 92px; resize: none; word-break: break-all; }
-  .pairing-warning { min-height: 18px; margin: 6px 0 0; color: #a2654d; font-size: 10px; line-height: 1.45; }
-  .pairing-result[hidden] { display: none; }
-  .pairing-qr { display: block; width: min(220px, 70vw); height: auto; margin: 16px auto 4px; border: 10px solid #fff; border-radius: 16px; background: #fff; }
-  .pairing-expiry { margin: 8px 0 0; color: var(--settings-muted); font-size: 10px; }
-  .pairing-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-  .pairing-open { display: inline-grid; place-items: center; text-decoration: none; }
-  .pairing-open[aria-disabled="true"] { pointer-events: none; opacity: .5; }
-  .toast-wrap { position: fixed; right: 14px; bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 280; width: min(330px, calc(100vw - 28px)); }
-  .settings-toast { display: flex; align-items: center; gap: 9px; padding: 11px 13px; border: 1px solid var(--settings-line); border-radius: 13px; color: var(--settings-ink); background: color-mix(in oklab, var(--settings-bg) 92%, transparent); box-shadow: 0 12px 32px rgba(20, 19, 16, 0.14); font-size: 12px; backdrop-filter: blur(16px); animation: toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
-  .settings-toast svg { width: 16px; height: 16px; color: #668b7d; }
-  .settings-toast.error svg { color: #bd6259; }
-  .settings-toast.error { border-color: rgba(180, 67, 59, 0.28); }
-  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
-  @media (min-width: 640px) { .settings-page { padding: 34px 18px 14px; } }
-  @media (prefers-reduced-motion: reduce) {
-    .theme-option, .settings-action, .settings-toast { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-  }
-</style>
-{% endblock %}
-
 {% block content %}
-<main class="settings-page tool-page">
-  <header class="settings-header tool-page-header">
-    <p class="tool-page-overline"><i data-feather="sliders"></i><span>Local Preferences</span></p>
-    <h1 class="settings-title">Settings</h1>
-    <p class="tool-page-intro">Manage appearance, the media index, and local services.</p>
+<main class="mx-auto w-full max-w-[660px] px-3.5 pt-7 pb-3 sm:px-5 sm:pt-9">
+  <header class="px-1 pb-6">
+    <p class="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] opacity-50">
+      <i data-feather="sliders" class="size-3.5"></i><span>Local Preferences</span>
+    </p>
+    <h1 class="text-[29px] font-bold leading-tight tracking-tight sm:text-4xl">Settings</h1>
+    <p class="mt-2 max-w-[440px] text-xs leading-relaxed opacity-60">Manage appearance, the media index, and local services.</p>
   </header>
 
-  <div class="settings-stack">
+  <div class="grid gap-7">
     <section aria-labelledby="appearance-title">
-      <h2 id="appearance-title" class="settings-section-title">Appearance</h2>
-      <div class="settings-card appearance-card">
-        <div class="appearance-heading">
-          <div class="settings-row-title">Display Mode</div>
-          <div class="settings-row-copy">Your selection applies to every page immediately.</div>
-        </div>
-        <div class="theme-options" role="group" aria-label="Display mode">
-          <button class="theme-option" type="button" data-theme-preference="system" aria-pressed="false">
-            <span class="theme-preview theme-preview-system"><span class="theme-check"><i data-feather="check"></i></span></span><span>System</span>
-          </button>
-          <button class="theme-option" type="button" data-theme-preference="light" aria-pressed="false">
-            <span class="theme-preview theme-preview-light"><span class="theme-check"><i data-feather="check"></i></span></span><span>Light</span>
-          </button>
-          <button class="theme-option" type="button" data-theme-preference="dark" aria-pressed="false">
-            <span class="theme-preview theme-preview-dark"><span class="theme-check"><i data-feather="check"></i></span></span><span>Dark</span>
-          </button>
+      <h2 id="appearance-title" class="mb-2 ml-1 text-xs font-semibold opacity-55">Appearance</h2>
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-3 p-4">
+          <div>
+            <div class="text-sm font-semibold">Display Mode</div>
+            <div class="mt-0.5 text-xs opacity-60">Your selection applies to every page immediately.</div>
+          </div>
+          <div class="grid grid-cols-3 gap-2" role="group" aria-label="Display mode">
+            {% for value, label, preview in [
+              ('system', 'System', 'bg-[linear-gradient(90deg,#f4f2ec_0_50%,#1b1b18_50%)]'),
+              ('light', 'Light', 'bg-[#f4f2ec]'),
+              ('dark', 'Dark', 'bg-[#1b1b18]'),
+            ] %}
+            <button
+              class="theme-option btn btn-ghost h-auto flex-col gap-2 py-3 font-medium"
+              type="button" data-theme-preference="{{ value }}" aria-pressed="false"
+            >
+              <span class="relative block h-12 w-full max-w-[92px] overflow-hidden rounded-lg border border-base-content/10 {{ preview }}">
+                <span class="theme-check badge badge-xs badge-success absolute right-1 top-1 opacity-0 transition-opacity">
+                  <i data-feather="check" class="size-2.5"></i>
+                </span>
+              </span>
+              <span class="text-xs">{{ label }}</span>
+            </button>
+            {% endfor %}
+          </div>
         </div>
       </div>
     </section>
 
     <section aria-labelledby="radio-devices-title">
-      <h2 id="radio-devices-title" class="settings-section-title">Radio Clients</h2>
-      <div class="settings-card">
-        <div class="settings-row">
-          <span class="setting-icon"><i data-feather="link"></i></span>
-          <div class="settings-row-main">
-            <div class="settings-row-title">Pair a New Phone</div>
-            <div class="settings-row-copy">Generate a secure, single-use pairing link that expires in two minutes.</div>
-          </div>
-          <button id="open-radio-pairing" class="settings-action is-primary" type="button">Generate</button>
-        </div>
+      <h2 id="radio-devices-title" class="mb-2 ml-1 text-xs font-semibold opacity-55">Radio Clients</h2>
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <ul class="list">
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="link" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Pair a New Phone</div>
+              <div class="mt-0.5 text-xs opacity-60">Generate a secure, single-use pairing link that expires in two minutes.</div>
+            </div>
+            <button id="open-radio-pairing" class="btn btn-primary btn-sm self-center" type="button">Generate</button>
+          </li>
+        </ul>
       </div>
-      <div id="radio-device-list" class="settings-card radio-device-list">
-        <div class="settings-row">
-          <span class="setting-icon"><i data-feather="radio"></i></span>
-          <div class="settings-row-main">
-            <div class="settings-row-title">Paired Devices</div>
-            <div class="settings-row-copy">Loading device tokens…</div>
-          </div>
-        </div>
+      <div class="card mt-2 border border-base-300 bg-base-100 shadow-sm">
+        <ul id="radio-device-list" class="list">
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="radio" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Paired Devices</div>
+              <div class="mt-0.5 text-xs opacity-60">Loading device tokens…</div>
+            </div>
+          </li>
+        </ul>
       </div>
     </section>
 
     <section aria-labelledby="library-title">
-      <h2 id="library-title" class="settings-section-title">Media Library</h2>
-      <div class="settings-card">
-        <div class="library-summary">
-          <div class="library-total"><span id="media-total">{{ videos + images }}</span><span class="library-total-unit">local media items</span></div>
-          <div class="library-types"><span id="videos-count">{{ videos }}</span> videos · <span id="images-count">{{ images }}</span> images</div>
-          <div id="index-sync-state" class="library-sync-state"><span class="library-sync-dot"></span><span id="index-sync-copy">Loading index status…</span></div>
-        </div>
-        <div class="settings-row">
-          <span class="setting-icon"><i data-feather="refresh-cw"></i></span>
-          <div class="settings-row-main">
-            <div class="settings-row-title">Rescan Media Library</div>
-            <div class="settings-row-copy">Use after files are added, moved, or deleted outside TikLocal while it is running.</div>
+      <h2 id="library-title" class="mb-2 ml-1 text-xs font-semibold opacity-55">Media Library</h2>
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="px-4 pt-4">
+          <div class="text-3xl font-bold leading-none tracking-tight">
+            <span id="media-total">{{ videos + images }}</span><span class="ml-1.5 text-xs font-medium tracking-normal opacity-60">local media items</span>
           </div>
-          <button id="refresh-library" class="settings-action" type="button">Scan</button>
-        </div>
-        <div class="settings-row">
-          <span class="setting-icon"><i data-feather="image"></i></span>
-          <div class="settings-row-main">
-            <div class="settings-row-title">Thumbnail Cache</div>
-            <div class="settings-row-copy"><span id="cache-size">{{ cache_size_mb }} MB</span>; thumbnails regenerate as needed while browsing.</div>
+          <div class="mt-2 text-xs opacity-60"><span id="videos-count">{{ videos }}</span> videos · <span id="images-count">{{ images }}</span> images</div>
+          <div id="index-sync-state" class="mt-1.5 flex items-center gap-1.5 text-xs opacity-60">
+            <span class="status status-success size-1.5"></span><span id="index-sync-copy">Loading index status…</span>
           </div>
-          <button id="clear-cache" class="settings-action" type="button">Clear</button>
         </div>
+        <ul class="list">
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="refresh-cw" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Rescan Media Library</div>
+              <div class="mt-0.5 text-xs opacity-60">Use after files are added, moved, or deleted outside TikLocal while it is running.</div>
+            </div>
+            <button id="refresh-library" class="btn btn-sm self-center" type="button">Scan</button>
+          </li>
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="image" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Thumbnail Cache</div>
+              <div class="mt-0.5 text-xs opacity-60"><span id="cache-size">{{ cache_size_mb }} MB</span>; thumbnails regenerate as needed while browsing.</div>
+            </div>
+            <button id="clear-cache" class="btn btn-sm self-center" type="button">Clear</button>
+          </li>
+        </ul>
       </div>
     </section>
 
     <section aria-labelledby="privacy-title">
-      <h2 id="privacy-title" class="settings-section-title">Privacy and Recommendations</h2>
-      <div class="settings-card settings-row">
-        <span class="setting-icon"><i data-feather="clock"></i></span>
-        <div class="settings-row-main">
-          <div class="settings-row-title">Local Browsing History</div>
-          <div class="settings-row-copy">Reset views, skips, and completions without changing favorites or collections.</div>
-        </div>
-        <button id="reset-recommendations" class="settings-action is-danger" type="button">Reset</button>
+      <h2 id="privacy-title" class="mb-2 ml-1 text-xs font-semibold opacity-55">Privacy and Recommendations</h2>
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <ul class="list">
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="clock" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Local Browsing History</div>
+              <div class="mt-0.5 text-xs opacity-60">Reset views, skips, and completions without changing favorites or collections.</div>
+            </div>
+            <button id="reset-recommendations" class="btn btn-error btn-soft btn-sm self-center" type="button">Reset</button>
+          </li>
+        </ul>
       </div>
     </section>
 
     {% if auth_enabled %}
     <section id="security" aria-labelledby="security-title">
-      <h2 id="security-title" class="settings-section-title">Security</h2>
-      <div class="settings-card">
-        <form id="password-form" class="flex flex-col gap-3 p-4">
+      <h2 id="security-title" class="mb-2 ml-1 text-xs font-semibold opacity-55">Security</h2>
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <form id="password-form" class="card-body gap-3 p-4">
           <div>
-            <div class="settings-row-title">Access Password</div>
-            <div class="settings-row-copy">Changing it signs out every browser and paired Radio client, including this one's other tabs.</div>
+            <div class="text-sm font-semibold">Access Password</div>
+            <div class="mt-0.5 text-xs opacity-60">Changing it signs out every browser and paired Radio client, including this one's other tabs.</div>
           </div>
 
           <fieldset class="fieldset p-0">
@@ -400,108 +153,148 @@
     {% endif %}
 
     <section id="download" aria-labelledby="download-title">
-      <h2 id="download-title" class="settings-section-title">Downloads</h2>
-      <div class="settings-card">
-        <div class="settings-row">
-          <span class="setting-icon"><i data-feather="activity"></i></span>
-          <div class="settings-row-main">
-            <div class="settings-row-title">Download Components</div>
-            <div id="download-dependency-copy" class="settings-row-copy">Checking status…</div>
-          </div>
-        </div>
-        <div class="settings-row">
-          <span class="setting-icon"><i data-feather="layers"></i></span>
-          <div class="settings-row-main">
-            <div class="settings-row-title">Concurrent Downloads</div>
-            <div class="settings-row-copy">Control parallel jobs. Two works well for most devices.</div>
-          </div>
-          <div id="download-levels" class="download-levels" role="group" aria-label="Concurrent download jobs">
-            <button class="download-level" type="button" data-concurrency="1">1</button>
-            <button class="download-level" type="button" data-concurrency="2">2</button>
-            <button class="download-level" type="button" data-concurrency="4">4</button>
-          </div>
-        </div>
-        <div class="settings-row">
-          <span class="setting-icon"><i data-feather="shield"></i></span>
-          <div class="settings-row-main">
-            <div class="settings-row-title">Website Credentials</div>
-            <div id="credential-summary" class="settings-row-copy">Loading…</div>
-          </div>
-          <button id="manage-credentials" class="settings-action" type="button">Manage</button>
-        </div>
+      <h2 id="download-title" class="mb-2 ml-1 text-xs font-semibold opacity-55">Downloads</h2>
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <ul class="list">
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="activity" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Download Components</div>
+              <div id="download-dependency-copy" class="mt-0.5 text-xs opacity-60">Checking status…</div>
+            </div>
+          </li>
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="layers" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Concurrent Downloads</div>
+              <div class="mt-0.5 text-xs opacity-60">Control parallel jobs. Two works well for most devices.</div>
+            </div>
+            <div id="download-levels" class="join self-center" role="group" aria-label="Concurrent download jobs">
+              <button class="btn btn-sm join-item" type="button" data-concurrency="1">1</button>
+              <button class="btn btn-sm join-item" type="button" data-concurrency="2">2</button>
+              <button class="btn btn-sm join-item" type="button" data-concurrency="4">4</button>
+            </div>
+          </li>
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="shield" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Website Credentials</div>
+              <div id="credential-summary" class="mt-0.5 text-xs opacity-60">Loading…</div>
+            </div>
+            <button id="manage-credentials" class="btn btn-sm self-center" type="button">Manage</button>
+          </li>
+          <li class="list-row">
+            <span class="grid size-8 place-items-center rounded-lg bg-base-200 opacity-70"><i data-feather="download" class="size-4"></i></span>
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Download Queue</div>
+              <div class="mt-0.5 text-xs opacity-60">Add media from a URL and watch jobs progress.</div>
+            </div>
+            <a href="/download" class="btn btn-sm self-center">Open</a>
+          </li>
+        </ul>
       </div>
     </section>
 
     {% if similarity_enabled %}
     <section aria-label="Experiments">
-      <h2 class="settings-section-title">Experiments</h2>
-      <a href="{{ url_for('similarity_view') }}" class="settings-card settings-row">
-        <div class="settings-row-main">
-          <div class="settings-row-title">Similar Images</div>
-          <div class="settings-row-copy">View local vector status and similarity groups.</div>
-        </div>
-        <span aria-hidden="true">→</span>
-      </a>
+      <h2 class="mb-2 ml-1 text-xs font-semibold opacity-55">Experiments</h2>
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <ul class="list">
+          <li class="list-row">
+            <div class="list-col-grow">
+              <div class="text-sm font-semibold">Similar Images</div>
+              <div class="mt-0.5 text-xs opacity-60">View local vector status and similarity groups.</div>
+            </div>
+            <a href="{{ url_for('similarity_view') }}" class="btn btn-sm self-center">Open</a>
+          </li>
+        </ul>
+      </div>
     </section>
     {% endif %}
 
-    <section aria-label="About">
-      <footer class="about-footer about-card">
-        <div class="about-line">
-          <span class="about-name">TikLocal</span><span class="about-separator" aria-hidden="true">·</span><span class="about-version">v{{ version }}</span><span class="about-separator" aria-hidden="true">·</span>
-          <a class="about-link" href="https://github.com/ChanMo/TikLocal" target="_blank" rel="noopener noreferrer">GitHub</a>
-          <span class="about-separator" aria-hidden="true">·</span>
-          <a class="about-link" href="mailto:chan.mo@outlook.com">Contact the Author</a>
-        </div>
-      </footer>
-    </section>
+    <footer class="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 pb-2 text-center opacity-60">
+      <span class="text-xs font-semibold">TikLocal</span>
+      <span class="text-[9px]" aria-hidden="true">·</span>
+      <span class="text-[10px]">v{{ version }}</span>
+      <span class="text-[9px]" aria-hidden="true">·</span>
+      <a class="link link-hover text-[10px]" href="https://github.com/ChanMo/TikLocal" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <span class="text-[9px]" aria-hidden="true">·</span>
+      <a class="link link-hover text-[10px]" href="mailto:chan.mo@outlook.com">Contact the Author</a>
+    </footer>
   </div>
 </main>
-<div id="credential-mask" class="credential-mask" hidden>
-  <section class="credential-dialog" role="dialog" aria-modal="true" aria-labelledby="credential-title">
-    <div class="credential-head">
-      <div><h2 id="credential-title" class="credential-title">Website Credentials</h2><p class="credential-copy">Use them for sign-in-only content. Files remain on this device.</p></div>
-      <button id="close-credentials" class="credential-close" type="button" aria-label="Close"><i data-feather="x"></i></button>
+
+<dialog id="credential-dialog" class="modal" aria-labelledby="credential-title">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-ghost btn-sm btn-circle absolute right-3 top-3" aria-label="Close"><i data-feather="x" class="size-4"></i></button>
+    </form>
+    <h2 id="credential-title" class="text-lg font-bold">Website Credentials</h2>
+    <p class="mt-1 text-xs leading-relaxed opacity-60">Use them for sign-in-only content. Files remain on this device.</p>
+
+    <div class="card mt-4 border border-base-300 bg-base-200">
+      <ul id="credential-list" class="list">
+        <li class="list-row justify-center text-xs opacity-60">Loading credentials…</li>
+      </ul>
     </div>
-    <div id="credential-list" class="credential-list"><div class="credential-empty">Loading credentials…</div></div>
-    <div class="credential-upload">
-      <div class="credential-upload-title">Add or Update</div>
-      <p class="credential-upload-copy">Supports .txt and .cookies files. Uploading the same filename replaces it.</p>
-      <input id="credential-file" class="credential-file" type="file" accept=".txt,.cookies,text/plain">
-      <div class="credential-upload-actions"><button id="upload-credential" class="settings-action is-primary" type="button">Upload</button></div>
-    </div>
-  </section>
-</div>
-<div id="pairing-mask" class="pairing-mask" hidden>
-  <section class="pairing-dialog" role="dialog" aria-modal="true" aria-labelledby="pairing-title">
-    <div class="credential-head">
-      <div>
-        <h2 id="pairing-title" class="credential-title">Pair TikLocal Radio</h2>
-        <p class="credential-copy">The link contains no access password or long-lived device token and expires after two minutes.</p>
+
+    <div class="mt-4 rounded-box border border-dashed border-base-content/20 bg-base-200 p-4">
+      <div class="text-xs font-semibold">Add or Update</div>
+      <p class="mb-2.5 mt-1 text-[10px] leading-relaxed opacity-60">Supports .txt and .cookies files. Uploading the same filename replaces it.</p>
+      <input id="credential-file" class="file-input file-input-sm w-full" type="file" accept=".txt,.cookies,text/plain">
+      <div class="mt-3 flex justify-end">
+        <button id="upload-credential" class="btn btn-primary btn-sm" type="button">Upload</button>
       </div>
-      <button id="close-radio-pairing" class="credential-close" type="button" aria-label="Close"><i data-feather="x"></i></button>
     </div>
-    <label class="pairing-field">
-      <span class="pairing-label">Server address reachable from your phone</span>
-      <input id="pairing-server-url" class="pairing-input" type="url" inputmode="url" autocomplete="url">
-    </label>
-    <p id="pairing-warning" class="pairing-warning"></p>
-    <div id="pairing-result" class="pairing-result" hidden>
-      <img id="pairing-qr" class="pairing-qr" alt="Single-use TikLocal Radio pairing QR code">
-      <label class="pairing-field">
-        <span class="pairing-label">Paste into TikLocal Radio</span>
-        <textarea id="pairing-link" class="pairing-link" readonly></textarea>
-      </label>
-      <p id="pairing-expiry" class="pairing-expiry" aria-live="polite"></p>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close">close</button></form>
+</dialog>
+
+<dialog id="pairing-dialog" class="modal" aria-labelledby="pairing-title">
+  <div class="modal-box">
+    <form method="dialog">
+      <button class="btn btn-ghost btn-sm btn-circle absolute right-3 top-3" aria-label="Close"><i data-feather="x" class="size-4"></i></button>
+    </form>
+    <h2 id="pairing-title" class="text-lg font-bold">Pair TikLocal Radio</h2>
+    <p class="mt-1 text-xs leading-relaxed opacity-60">The link contains no access password or long-lived device token and expires after two minutes.</p>
+
+    <fieldset class="fieldset mt-4 p-0">
+      <legend class="fieldset-legend">Server address reachable from your phone</legend>
+      <input id="pairing-server-url" class="input w-full font-mono text-xs" type="url" inputmode="url" autocomplete="url">
+    </fieldset>
+    <p id="pairing-warning" class="min-h-[18px] text-[10px] leading-relaxed text-warning"></p>
+
+    <div id="pairing-result" hidden>
+      <img id="pairing-qr" class="mx-auto mt-4 block h-auto w-[min(220px,70vw)] rounded-box border-8 border-white bg-white" alt="Single-use TikLocal Radio pairing QR code">
+      <fieldset class="fieldset mt-2 p-0">
+        <legend class="fieldset-legend">Paste into TikLocal Radio</legend>
+        <textarea id="pairing-link" class="textarea min-h-[92px] w-full break-all font-mono text-xs" readonly></textarea>
+      </fieldset>
+      <p id="pairing-expiry" class="mt-2 text-[10px] opacity-60" aria-live="polite"></p>
     </div>
-    <div class="pairing-actions">
-      <button id="generate-radio-pairing" class="settings-action is-primary" type="button">Generate Pairing Link</button>
-      <button id="copy-radio-pairing" class="settings-action" type="button" hidden>Copy Link</button>
-      <a id="open-radio-link" class="settings-action pairing-open" href="#" aria-disabled="true" hidden>Open on This Device</a>
+
+    <div class="modal-action flex-wrap">
+      <button id="generate-radio-pairing" class="btn btn-primary btn-sm" type="button">Generate Pairing Link</button>
+      <button id="copy-radio-pairing" class="btn btn-sm" type="button" hidden>Copy Link</button>
+      <a id="open-radio-link" class="btn btn-sm" href="#" aria-disabled="true" hidden>Open on This Device</a>
     </div>
-  </section>
-</div>
-<div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close">close</button></form>
+</dialog>
+
+<dialog id="confirm-dialog" class="modal" aria-labelledby="confirm-title">
+  <div class="modal-box">
+    <h2 id="confirm-title" class="text-lg font-bold"></h2>
+    <p id="confirm-copy" class="mt-2 text-sm leading-relaxed opacity-70"></p>
+    <div class="modal-action">
+      <button class="btn btn-sm" type="button" data-confirm-cancel>Cancel</button>
+      <button class="btn btn-sm" type="button" data-confirm-accept></button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Cancel">close</button></form>
+</dialog>
+
+<div id="toast-wrap" class="toast toast-end z-[280] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-4" aria-live="polite"></div>
 {% endblock %}
 
 {% block extra_body %}
@@ -511,8 +304,9 @@
     const refreshButton = document.getElementById('refresh-library');
     const clearCacheButton = document.getElementById('clear-cache');
     const resetButton = document.getElementById('reset-recommendations');
-    const credentialMask = document.getElementById('credential-mask');
-    const pairingMask = document.getElementById('pairing-mask');
+    const credentialDialog = document.getElementById('credential-dialog');
+    const pairingDialog = document.getElementById('pairing-dialog');
+    const confirmDialog = document.getElementById('confirm-dialog');
     const pairingServerUrl = document.getElementById('pairing-server-url');
     const pairingResult = document.getElementById('pairing-result');
     const pairingQr = document.getElementById('pairing-qr');
@@ -524,6 +318,8 @@
     const toastWrap = document.getElementById('toast-wrap');
     let pairingTimer = 0;
 
+    const ROW_ICON = 'grid size-8 place-items-center rounded-lg bg-base-200 opacity-70';
+
     function currentThemePreference() {
       const saved = localStorage.getItem('theme');
       return ['light', 'dark', 'system'].includes(saved) ? saved : 'system';
@@ -532,7 +328,8 @@
     function syncThemeButtons(preference = currentThemePreference()) {
       themeButtons.forEach((button) => {
         const active = button.dataset.themePreference === preference;
-        button.classList.toggle('is-active', active);
+        button.classList.toggle('btn-active', active);
+        button.querySelector('.theme-check')?.classList.toggle('opacity-0', !active);
         button.setAttribute('aria-pressed', String(active));
       });
     }
@@ -545,6 +342,7 @@
         const resolved = preference === 'system'
           ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
           : preference;
+        document.documentElement.setAttribute('data-theme', resolved);
         document.body.setAttribute('data-theme', resolved);
       }
       syncThemeButtons(preference);
@@ -552,9 +350,10 @@
 
     function showToast(message, type = 'info') {
       const toast = document.createElement('div');
-      toast.className = `settings-toast ${type}`;
+      toast.className = `alert ${type === 'error' ? 'alert-error' : 'alert-success'} alert-soft text-xs`;
       const icon = document.createElement('i');
       icon.setAttribute('data-feather', type === 'error' ? 'alert-circle' : 'check-circle');
+      icon.className = 'size-4';
       const copy = document.createElement('span');
       copy.textContent = message;
       toast.append(icon, copy);
@@ -581,13 +380,13 @@
     }
 
     function formatSyncTime(value) {
-      if (!value) return 'No scan completed yet';
+      if (!value) return 'Not scanned yet';
       const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return 'A scan completed recently';
-      return `Last scanned: ${date.toLocaleString('en')}`;
+      return Number.isNaN(date.getTime()) ? 'Not scanned yet' : `Last scanned: ${date.toLocaleString('en')}`;
     }
 
     async function loadStats() {
+      const dot = document.getElementById('index-sync-state').querySelector('.status');
       try {
         const payload = await requestJson('/api/library/stats');
         const videos = Number(payload.videos || 0);
@@ -597,10 +396,12 @@
         document.getElementById('images-count').textContent = images;
         document.getElementById('cache-size').textContent = `${Number(payload.cache_mb || 0)} MB`;
         document.getElementById('index-sync-copy').textContent = formatSyncTime(payload.last_synced_at);
-        document.getElementById('index-sync-state').classList.remove('is-error');
+        dot.classList.remove('status-error');
+        dot.classList.add('status-success');
       } catch (error) {
         document.getElementById('index-sync-copy').textContent = 'Index status is unavailable';
-        document.getElementById('index-sync-state').classList.add('is-error');
+        dot.classList.remove('status-success');
+        dot.classList.add('status-error');
       }
     }
 
@@ -609,33 +410,43 @@
       return Number.isNaN(date.getTime()) ? 'Pairing time unknown' : `Paired ${date.toLocaleString('en')}`;
     }
 
+    function makeRow(iconName) {
+      const row = document.createElement('li');
+      row.className = 'list-row';
+      const icon = document.createElement('span');
+      icon.className = ROW_ICON;
+      icon.innerHTML = `<i data-feather="${iconName}" class="size-4"></i>`;
+      const main = document.createElement('div');
+      main.className = 'list-col-grow';
+      row.append(icon, main);
+      return { row, main };
+    }
+
     function renderRadioDevices(devices = []) {
       radioDeviceList.replaceChildren();
       if (!devices.length) {
-        const row = document.createElement('div');
-        row.className = 'settings-row';
-        row.innerHTML = '<span class="setting-icon"><i data-feather="radio"></i></span><div class="settings-row-main"><div class="settings-row-title">No Radio clients yet</div><div class="settings-row-copy">Enter this server address and access password in TikLocal Radio to pair.</div></div>';
+        const { row, main } = makeRow('radio');
+        main.innerHTML = '<div class="text-sm font-semibold">No Radio clients yet</div><div class="mt-0.5 text-xs opacity-60">Enter this server address and access password in TikLocal Radio to pair.</div>';
         radioDeviceList.appendChild(row);
         feather.replace();
         return;
       }
 
       devices.forEach((device) => {
-        const row = document.createElement('div');
-        row.className = 'settings-row';
-        const icon = document.createElement('span');
-        icon.className = 'setting-icon';
-        icon.innerHTML = '<i data-feather="smartphone"></i>';
-        const main = document.createElement('div');
-        main.className = 'settings-row-main';
+        const { row, main } = makeRow('smartphone');
         const title = document.createElement('div');
-        title.className = 'settings-row-title';
+        title.className = 'text-sm font-semibold';
         title.textContent = device.name || 'TikLocal Radio';
         const copy = document.createElement('div');
-        copy.className = `settings-row-copy radio-device-state${device.active ? '' : ' is-expired'}`;
-        copy.textContent = `${device.active ? 'Token active' : 'Invalidated by password change'} · ${formatDeviceTime(device.created_at)}`;
+        copy.className = 'mt-0.5 flex items-center gap-1.5 text-xs opacity-60';
+        const dot = document.createElement('span');
+        dot.className = `status size-1.5 ${device.active ? 'status-success' : 'status-warning'}`;
+        const copyText = document.createElement('span');
+        copyText.textContent = `${device.active ? 'Token active' : 'Invalidated by password change'} · ${formatDeviceTime(device.created_at)}`;
+        copy.append(dot, copyText);
+
         const revoke = document.createElement('button');
-        revoke.className = 'settings-action is-danger';
+        revoke.className = 'btn btn-error btn-soft btn-sm self-center';
         revoke.type = 'button';
         revoke.textContent = 'Revoke';
         revoke.addEventListener('click', () => {
@@ -643,7 +454,7 @@
             'Revoke this Radio client?',
             `${device.name || 'This device'} will lose media access and must pair again with the access password.`,
             'Revoke Client',
-            'danger',
+            'btn-error',
             () => {
               runButton(revoke, 'Revoking…', async () => {
                 await requestJson(`/api/radio/devices/${encodeURIComponent(device.id)}`, { method: 'DELETE' });
@@ -654,7 +465,7 @@
           );
         });
         main.append(title, copy);
-        row.append(icon, main, revoke);
+        row.append(revoke);
         radioDeviceList.appendChild(row);
       });
       feather.replace();
@@ -665,35 +476,36 @@
         const payload = await requestJson('/api/radio/devices');
         renderRadioDevices(payload.data?.devices || []);
       } catch (_) {
-        radioDeviceList.querySelector('.settings-row-copy').textContent = 'Paired devices are unavailable.';
+        const { row, main } = makeRow('radio');
+        main.innerHTML = '<div class="text-sm font-semibold">Paired Devices</div><div class="mt-0.5 text-xs opacity-60">Paired devices are unavailable.</div>';
+        radioDeviceList.replaceChildren(row);
+        feather.replace();
       }
     }
 
-    function confirmAction(title, copy, actionLabel, tone, onConfirm) {
-      const mask = document.createElement('div');
-      mask.className = 'confirm-mask';
-      mask.innerHTML = `
-        <section class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-          <h2 id="confirm-title" class="confirm-title"></h2>
-          <p class="confirm-copy"></p>
-          <div class="confirm-actions">
-            <button class="settings-action" type="button" data-confirm-cancel>Cancel</button>
-            <button class="settings-action" type="button" data-confirm-accept></button>
-          </div>
-        </section>`;
-      mask.querySelector('.confirm-title').textContent = title;
-      mask.querySelector('.confirm-copy').textContent = copy;
-      const acceptButton = mask.querySelector('[data-confirm-accept]');
-      acceptButton.textContent = actionLabel;
-      acceptButton.classList.add(`is-${tone}`);
-      const close = () => mask.remove();
-      mask.querySelector('[data-confirm-cancel]').addEventListener('click', close);
-      acceptButton.addEventListener('click', () => { close(); onConfirm(); });
-      mask.addEventListener('click', (event) => { if (event.target === mask) close(); });
-      mask.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
-      document.body.appendChild(mask);
-      mask.querySelector('[data-confirm-cancel]').focus();
+    // One <dialog> serves every confirmation: the browser supplies the backdrop,
+    // focus trapping and Escape handling, so none of that is reimplemented here.
+    let confirmHandler = null;
+    const confirmAccept = confirmDialog.querySelector('[data-confirm-accept]');
+    const confirmCancel = confirmDialog.querySelector('[data-confirm-cancel]');
+
+    function confirmAction(title, copy, actionLabel, toneClass, onConfirm) {
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-copy').textContent = copy;
+      confirmAccept.textContent = actionLabel;
+      confirmAccept.className = `btn btn-sm ${toneClass}`;
+      confirmHandler = onConfirm;
+      confirmDialog.showModal();
+      confirmCancel.focus();
     }
+
+    confirmCancel.addEventListener('click', () => confirmDialog.close());
+    confirmAccept.addEventListener('click', () => {
+      const handler = confirmHandler;
+      confirmDialog.close();
+      handler?.();
+    });
+    confirmDialog.addEventListener('close', () => { confirmHandler = null; });
 
     async function runButton(button, busyLabel, task) {
       const original = button.textContent;
@@ -704,13 +516,22 @@
 
     function renderCredentials(files = []) {
       const list = document.getElementById('credential-list');
-      document.getElementById('credential-summary').textContent = files.length ? `${files.length} credential files saved and matched to websites automatically.` : 'None added. Public content can still be downloaded.';
+      document.getElementById('credential-summary').textContent = files.length
+        ? `${files.length} credential files saved and matched to websites automatically.`
+        : 'None added. Public content can still be downloaded.';
+      list.replaceChildren();
       if (!files.length) {
-        list.innerHTML = '<div class="credential-empty">No credentials saved</div>';
+        const empty = document.createElement('li');
+        empty.className = 'list-row justify-center text-xs opacity-60';
+        empty.textContent = 'No credentials saved';
+        list.appendChild(empty);
       } else {
-        list.innerHTML = files.map((name) => `
-          <div class="credential-item"><span class="credential-mark"><i data-feather="key"></i></span><span class="credential-name"></span></div>`).join('');
-        list.querySelectorAll('.credential-name').forEach((element, index) => { element.textContent = files[index]; });
+        files.forEach((name) => {
+          const { row, main } = makeRow('key');
+          main.className = 'list-col-grow self-center truncate text-xs font-semibold';
+          main.textContent = name;
+          list.appendChild(row);
+        });
       }
       feather.replace();
     }
@@ -727,24 +548,12 @@
         document.getElementById('download-dependency-copy').textContent = missing.length ? `${missing.join(', ')} components are not ready.` : 'Image and video downloads are ready.';
         const configured = Number(configPayload.data?.effective?.max_concurrent ?? 2);
         const shown = [1, 2, 4].includes(configured) ? configured : 2;
-        document.querySelectorAll('[data-concurrency]').forEach((button) => button.classList.toggle('is-active', Number(button.dataset.concurrency) === shown));
+        document.querySelectorAll('[data-concurrency]').forEach((button) => button.classList.toggle('btn-active', Number(button.dataset.concurrency) === shown));
         renderCredentials(cookiePayload.data?.files || []);
       } catch (_) {
         document.getElementById('download-dependency-copy').textContent = 'Download status is unavailable.';
         document.getElementById('credential-summary').textContent = 'Credentials are unavailable.';
       }
-    }
-
-    function openCredentials() {
-      credentialMask.hidden = false;
-      document.body.style.overflow = 'hidden';
-      document.getElementById('close-credentials').focus();
-    }
-
-    function closeCredentials() {
-      credentialMask.hidden = true;
-      document.body.style.overflow = '';
-      document.getElementById('manage-credentials').focus();
     }
 
     function updatePairingWarning() {
@@ -776,31 +585,11 @@
           : 'This link has expired. Generate a new one.';
         copyPairingButton.disabled = !seconds;
         openRadioLink.setAttribute('aria-disabled', String(!seconds));
+        openRadioLink.classList.toggle('btn-disabled', !seconds);
         if (!seconds) stopPairingTimer();
       };
       render();
       pairingTimer = window.setInterval(render, 1000);
-    }
-
-    function openRadioPairing() {
-      pairingServerUrl.value = window.location.origin;
-      pairingResult.hidden = true;
-      copyPairingButton.hidden = true;
-      openRadioLink.hidden = true;
-      pairingLink.value = '';
-      pairingQr.removeAttribute('src');
-      stopPairingTimer();
-      updatePairingWarning();
-      pairingMask.hidden = false;
-      document.body.style.overflow = 'hidden';
-      pairingServerUrl.focus();
-    }
-
-    function closeRadioPairing() {
-      stopPairingTimer();
-      pairingMask.hidden = true;
-      document.body.style.overflow = '';
-      document.getElementById('open-radio-pairing').focus();
     }
 
     async function copyPairingLink() {
@@ -819,7 +608,7 @@
     syncThemeButtons();
 
     refreshButton.addEventListener('click', () => {
-      confirmAction('Rescan the media library?', 'The scan will reconcile files added, moved, or deleted while TikLocal was running.', 'Start Scan', 'primary', () => {
+      confirmAction('Rescan the media library?', 'The scan will reconcile files added, moved, or deleted while TikLocal was running.', 'Start Scan', 'btn-primary', () => {
         runButton(refreshButton, 'Scanning…', async () => {
           const payload = await requestJson('/api/library/sync', { method: 'POST' });
           await loadStats();
@@ -829,7 +618,7 @@
     });
 
     clearCacheButton.addEventListener('click', () => {
-      confirmAction('Clear the thumbnail cache?', 'Original media will be kept. Thumbnails regenerate as needed while browsing.', 'Clear Cache', 'warning', () => {
+      confirmAction('Clear the thumbnail cache?', 'Original media will be kept. Thumbnails regenerate as needed while browsing.', 'Clear Cache', 'btn-warning', () => {
         runButton(clearCacheButton, 'Clearing…', async () => {
           const payload = await requestJson('/api/cache/clear', { method: 'POST' });
           await loadStats();
@@ -839,7 +628,7 @@
     });
 
     resetButton.addEventListener('click', () => {
-      confirmAction('Reset recommendation history?', 'Views, skips, and completions will be cleared. Favorites and collections remain unchanged.', 'Reset History', 'danger', () => {
+      confirmAction('Reset recommendation history?', 'Views, skips, and completions will be cleared. Favorites and collections remain unchanged.', 'Reset History', 'btn-error', () => {
         runButton(resetButton, 'Resetting…', async () => {
           await requestJson('/api/activity', { method: 'DELETE' });
           showToast('Recommendation history reset');
@@ -880,21 +669,34 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ max_concurrent: maxConcurrent }),
         });
-        document.querySelectorAll('[data-concurrency]').forEach((item) => item.classList.toggle('is-active', item === button));
+        document.querySelectorAll('[data-concurrency]').forEach((item) => item.classList.toggle('btn-active', item === button));
         showToast(`Concurrent downloads set to ${maxConcurrent}`);
       } catch (_) { showToast('Failed to save download settings', 'error'); }
     });
 
-    document.getElementById('manage-credentials').addEventListener('click', openCredentials);
-    document.getElementById('close-credentials').addEventListener('click', closeCredentials);
-    credentialMask.addEventListener('click', (event) => { if (event.target === credentialMask) closeCredentials(); });
-    credentialMask.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCredentials(); });
-    document.getElementById('open-radio-pairing').addEventListener('click', openRadioPairing);
-    document.getElementById('close-radio-pairing').addEventListener('click', closeRadioPairing);
-    pairingMask.addEventListener('click', (event) => { if (event.target === pairingMask) closeRadioPairing(); });
-    pairingMask.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeRadioPairing(); });
+    document.getElementById('manage-credentials').addEventListener('click', () => credentialDialog.showModal());
+    credentialDialog.addEventListener('close', () => document.getElementById('manage-credentials').focus());
+
+    document.getElementById('open-radio-pairing').addEventListener('click', () => {
+      pairingServerUrl.value = window.location.origin;
+      pairingResult.hidden = true;
+      copyPairingButton.hidden = true;
+      openRadioLink.hidden = true;
+      pairingLink.value = '';
+      pairingQr.removeAttribute('src');
+      stopPairingTimer();
+      updatePairingWarning();
+      pairingDialog.showModal();
+      pairingServerUrl.focus();
+    });
+    pairingDialog.addEventListener('close', () => {
+      stopPairingTimer();
+      document.getElementById('open-radio-pairing').focus();
+    });
+
     pairingServerUrl.addEventListener('input', updatePairingWarning);
     copyPairingButton.addEventListener('click', () => void copyPairingLink());
+
     document.getElementById('generate-radio-pairing').addEventListener('click', (event) => {
       runButton(event.currentTarget, 'Generating…', async () => {
         const payload = await requestJson('/api/radio/pairing-grants', {
@@ -910,9 +712,11 @@
         openRadioLink.hidden = false;
         openRadioLink.href = pairingLink.value;
         openRadioLink.setAttribute('aria-disabled', 'false');
+        openRadioLink.classList.remove('btn-disabled');
         startPairingTimer(data.expires_in);
       }).catch((error) => showToast(error.message || 'Failed to generate pairing link', 'error'));
     });
+
     document.getElementById('upload-credential').addEventListener('click', (event) => {
       const input = document.getElementById('credential-file');
       const file = input.files?.[0];
