@@ -86,6 +86,7 @@ def test_authentication_protects_pages_apis_and_media(authenticated_app):
     api = client.get('/api/library/stats')
     media = client.get('/media/clip.mp4')
     static_asset = client.get('/static/csrf_fetch.js')
+    favicon = client.get('/favicon.ico')
 
     assert page.status_code == 302
     assert page.headers['Location'].endswith('/login?next=/')
@@ -93,6 +94,8 @@ def test_authentication_protects_pages_apis_and_media(authenticated_app):
     assert api.get_json()['error'] == 'Authentication required'
     assert media.status_code == 401
     assert static_asset.status_code == 200
+    assert favicon.status_code == 200
+    assert favicon.mimetype == 'image/vnd.microsoft.icon'
 
 
 def test_login_creates_a_secure_session(authenticated_app):

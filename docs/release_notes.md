@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.8.39 (2026-09-23)
+
+- Added the TikLocal mark: a lowercase `t` whose hook ends in an orange dot, drawn on the same 24-unit, 2px round-stroke grid as the Feather icons in the web UI.
+- Replaced the `TL` text badges in the desktop rail, the page header, and the login screen with the mark, and set the wordmark as tik**Local**.
+- Added favicons for every page: an SVG icon that follows the browser's light or dark scheme, a 16/32/48px `favicon.ico`, an Apple touch icon, and a public `/favicon.ico` route that works with authentication enabled.
+- Added `brand/` with light, dark, and monochrome marks, outlined wordmark lockups, a 512px avatar, and usage guidelines. `scripts/build_brand.py` regenerates every asset from one geometry definition.
+
 ## v0.8.38 (2026-09-21)
 
 - Consolidated Web Radio, media details, transfers, settings, Flow, and Library behavior into their route and service modules. Shared thumbnail, media payload, statistics, source, favorite, and recommendation logic now has one implementation.
