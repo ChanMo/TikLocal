@@ -1,4 +1,9 @@
-# TikLocal
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ChanMo/TikLocal/main/brand/tiklocal-lockup-dark.svg">
+    <img src="https://raw.githubusercontent.com/ChanMo/TikLocal/main/brand/tiklocal-lockup.svg" alt="TikLocal" width="260">
+  </picture>
+</h1>
 
 **TikLocal** is a **mobile and tablet** **web application** built on **Flask**. It allows you to browse and manage your local videos and images in a way similar to TikTok and Pinterest.
 

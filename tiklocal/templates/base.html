@@ -5,6 +5,9 @@
     <title>TikLocal · {{ instance_name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#171815" />
+    <link rel="icon" href="{{ static_asset('brand/favicon.ico') }}" sizes="32x32">
+    <link rel="icon" href="{{ static_asset('brand/favicon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ static_asset('brand/apple-touch-icon.png') }}">
     {% if auth_enabled %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endif %}
     <link rel="stylesheet" type="text/css" href="{{ static_asset('output.css') }}">
     <script src="{{ static_asset('feather.min.js') }}"></script>
@@ -320,8 +323,8 @@
       </nav>
       {% else %}
       <a class="app-wordmark" href="/" aria-label="Return home">
-        <span class="app-wordmark-mark" aria-hidden="true">TL</span>
-        <span>TikLocal</span>
+        <span class="app-wordmark-mark">{% include 'brand_mark.html' %}</span>
+        <span><span class="app-wordmark-tik">tik</span>Local</span>
       </a>
       {% endif %}
       <button id="app-nav-menu-trigger" class="mobile-nav-trigger" type="button" aria-label="Open media and tools" aria-expanded="false" aria-controls="app-nav-menu">
@@ -330,7 +333,7 @@
     </header>
 
     <nav class="floating-dock" aria-label="Main navigation">
-      <a class="rail-brand" href="/" aria-label="TikLocal home">TL</a>
+      <a class="rail-brand" href="/" aria-label="TikLocal home">{% include 'brand_mark.html' %}</a>
       <a href="/" class="dock-item {% if menu == 'home' %}active{% endif %}" data-label="Home" aria-label="Home" {% if menu == 'home' %}aria-current="page"{% endif %}>
         <i data-feather="home"></i><span class="rail-tooltip">Home</span>
       </a>

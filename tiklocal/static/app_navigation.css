@@ -145,6 +145,15 @@ body.app-nav-menu-open {
   text-decoration: none;
 }
 
+.app-wordmark-mark .brand-mark {
+  width: 18px;
+  height: 18px;
+}
+
+.app-wordmark-tik {
+  font-weight: 400;
+}
+
 .app-wordmark-mark {
   width: 27px;
   height: 27px;
@@ -154,9 +163,6 @@ body.app-nav-menu-open {
   border-radius: 9px;
   background: var(--app-nav-surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 11px;
-  letter-spacing: -0.08em;
   backdrop-filter: blur(18px) saturate(120%);
   -webkit-backdrop-filter: blur(18px) saturate(120%);
 }
@@ -428,11 +434,12 @@ body[data-nav-context="radio"] .radio-page {
     border-radius: 14px;
     color: var(--app-nav-ink-strong);
     background: var(--app-nav-active);
-    font-family: ui-serif, "Iowan Old Style", "Palatino Linotype", serif;
-    font-size: 16px;
-    font-weight: 720;
-    letter-spacing: -0.06em;
     text-decoration: none;
+  }
+
+  .rail-brand .brand-mark {
+    width: 26px;
+    height: 26px;
   }
 
   .rail-spacer {

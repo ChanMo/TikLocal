@@ -274,6 +274,14 @@ def create_app(test_config=None):
             num_bytes /= 1024.0
         return f"{num_bytes:.1f} PB"
 
+    @app.get('/favicon.ico')
+    def favicon():
+        return send_file(
+            Path(app.static_folder) / 'brand' / 'favicon.ico',
+            mimetype='image/vnd.microsoft.icon',
+            max_age=86400,
+        )
+
     @app.get('/service-worker.js')
     def retired_service_worker():
         return send_file(

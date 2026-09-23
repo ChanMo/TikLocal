@@ -122,6 +122,7 @@ def configure_auth(app, auth_store, *, enabled: bool, device_auth_store=None) ->
     def enforce_authentication():
         if request.endpoint in {
             'static',
+            'favicon',
             'retired_service_worker',
         }:
             return None
