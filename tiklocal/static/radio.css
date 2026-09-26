@@ -128,6 +128,33 @@ body:has([data-radio-root]) {
   --console-scrim-mid: 26%;
 }
 
+/* Live shader room: the canvas carries the scene, so the washes only protect legibility. */
+.radio-atmosphere-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.6s var(--radio-ease);
+}
+
+.radio-page.is-scene-live .radio-atmosphere-canvas { opacity: 1; }
+.radio-page.is-scene-live .radio-atmosphere-video { opacity: 0 !important; }
+.radio-page.is-scene-live .radio-glow { opacity: .08; }
+.radio-page.is-scene-live .radio-grain { opacity: .025; }
+
+.radio-page.is-scene-live,
+[data-theme="dark"] .radio-page.is-scene-live {
+  --room-wash-left: 0%;
+  --room-wash-right: 14%;
+  --room-wash-top: 0%;
+  --room-wash-bottom: 8%;
+  --console-scrim-core: 40%;
+  --console-scrim-mid: 20%;
+}
+
 .radio-glow {
   position: absolute;
   z-index: 2;
@@ -771,8 +798,21 @@ body:has([data-radio-root]) {
   .now-playing { min-height: 3.75rem; }
 }
 
+@media (max-width: 840px) {
+  .radio-page.is-scene-live,
+  [data-theme="dark"] .radio-page.is-scene-live {
+    --mobile-wash-center: 22%;
+    --mobile-wash-edge: 4%;
+    --mobile-wash-top: 4%;
+    --mobile-wash-bottom: 12%;
+    --console-scrim-core: 46%;
+    --console-scrim-mid: 24%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .radio-atmosphere-video { transition: none; }
+  .radio-atmosphere-video,
+  .radio-atmosphere-canvas { transition: none; }
   .radio-page.is-playing .record-surface,
   .radio-page.is-playing .signal-core,
   .radio-page.is-playing .station-pulse i,

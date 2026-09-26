@@ -561,6 +561,11 @@
       disablepictureinpicture
       tabindex="-1"
     ></video>
+    <canvas
+      id="radio-atmosphere-canvas"
+      class="radio-atmosphere-canvas"
+      data-shader-src="{{ static_asset('radio/rain-glass.frag') }}"
+    ></canvas>
     <span class="radio-atmosphere-wash"></span>
     <span class="radio-glow radio-glow-a"></span>
     <span class="radio-glow radio-glow-b"></span>
@@ -612,6 +617,10 @@
             <span id="room-label">ROOM · RAIN</span>
           </button>
           <div id="room-menu" class="room-menu" role="listbox" aria-label="Choose ambience" hidden>
+            <button class="room-option" type="button" role="option" data-room="glass" aria-selected="false">
+              <span class="room-option-key">GLASS</span>
+              <span class="room-option-name">Rain on Glass</span>
+            </button>
             <button class="room-option" type="button" role="option" data-room="rain" aria-selected="true">
               <span class="room-option-key">RAIN</span>
               <span class="room-option-name">Rainy Window</span>
@@ -671,5 +680,6 @@
 {% endblock %}
 
 {% block extra_body %}
+<script src="{{ static_asset('radio_scene.js') }}"></script>
 <script src="{{ static_asset('radio_controller.js') }}"></script>
 {% endblock %}

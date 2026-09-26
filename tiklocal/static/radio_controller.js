@@ -8,6 +8,12 @@
   var SLEEP_OPTIONS = [null, 30, 60, 120];
   var MAX_ENCORE_COUNT = 3;
   var ROOMS = {
+    glass: {
+      label: 'ROOM · GLASS',
+      ariaLabel: 'Ambience: rain on glass. Click to select.',
+      sourceKey: 'Rain',
+      scene: true,
+    },
     rain: {
       label: 'ROOM · RAIN',
       ariaLabel: 'Ambience: rainy night. Click to select.',
@@ -48,6 +54,10 @@
   var metadataLoadToken = 0;
   var roomId = normalizeRoom(localStorage.getItem(ROOM_KEY));
   var atmosphereMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var scene = null;
+  var sceneFailed = false;
+  var scenePalette = null;
+  var sceneCover = null;
 
   var els = {};
 
@@ -76,7 +86,7 @@
       'btn-fav', 'btn-encore', 'encore-count', 'btn-sleep', 'sleep-label',
       'btn-room', 'room-label', 'room-menu',
       'station-options', 'upcoming-preview', 'upcoming-list', 'cover-wave', 'cover-art',
-      'radio-atmosphere-video'
+      'radio-atmosphere-video', 'radio-atmosphere-canvas'
     ].forEach(function (id) {
       els[toCamel(id)] = document.getElementById(id);
     });
@@ -129,6 +139,9 @@
       updateMediaPosition();
     });
     document.addEventListener('visibilitychange', syncAtmosphere);
+    window.addEventListener('tiklocal:theme-changed', function () {
+      if (scene) scene.setDark(isDarkTheme());
+    });
 
     els.btnPlay.addEventListener('click', togglePlay);
     els.btnNext.addEventListener('click', function () { playNext(true, { manual: true }); });
@@ -527,8 +540,10 @@
       && !document.hidden
       && !atmosphereMotionQuery.matches
       && !saveData;
+    var sceneActive = usesScene();
 
-    if (!shouldMove) {
+    if (scene) scene.setRunning(sceneActive && shouldMove);
+    if (sceneActive || !shouldMove) {
       els.radioAtmosphereVideo.pause();
       els.radioPage.classList.remove('is-atmosphere-moving');
       return;
@@ -559,6 +574,8 @@
     Object.keys(ROOMS).forEach(function (id) {
       els.radioPage.classList.toggle('is-room-' + id, id === roomId);
     });
+    if (usesScene()) ensureScene();
+    els.radioPage.classList.toggle('is-scene-live', usesScene() && Boolean(scene) && scene.ready);
     els.roomLabel.textContent = room.label;
     els.btnRoom.setAttribute('aria-label', room.ariaLabel);
     els.roomOptions.forEach(function (option) {
@@ -566,6 +583,44 @@
     });
     if (room.sourceKey) applyAtmosphereSource(room.sourceKey);
     syncAtmosphere();
+  }
+
+  function usesScene() {
+    return Boolean(ROOMS[roomId].scene) && !sceneFailed;
+  }
+
+  // The shader room is created on first use; any failure falls back to the room's video.
+  function ensureScene() {
+    if (scene || sceneFailed) return;
+    var canvas = els.radioAtmosphereCanvas;
+    var created = canvas && window.RadioScene && window.RadioScene.create(canvas, {
+      shaderUrl: canvas.dataset.shaderSrc,
+      stats: /[?&]scene_stats=1\b/.test(window.location.search),
+      onReady: function () {
+        if (!scene) return;
+        scene.ready = true;
+        applyRoom();
+      },
+      onFail: function () {
+        sceneFailed = true;
+        if (scene) scene.destroy();
+        scene = null;
+        applyRoom();
+      },
+    });
+    if (!created) {
+      sceneFailed = true;
+      return;
+    }
+    scene = created;
+    scene.ready = false;
+    scene.setDark(isDarkTheme());
+    if (scenePalette) scene.setPalette(scenePalette);
+    if (sceneCover) scene.setCover(sceneCover);
+  }
+
+  function isDarkTheme() {
+    return document.body.getAttribute('data-theme') === 'dark';
   }
 
   function applyAtmosphereSource(sourceKey) {
@@ -751,6 +806,8 @@
     els.radioPage.style.setProperty('--radio-art-a', colors[0]);
     els.radioPage.style.setProperty('--radio-art-b', colors[1]);
     els.radioPage.style.setProperty('--radio-art-c', colors[2]);
+    scenePalette = colors;
+    if (scene) scene.setPalette(colors);
 
     artLoadToken += 1;
     var token = artLoadToken;
@@ -771,6 +828,8 @@
       }
       els.btnPlay.classList.remove('no-cover');
       els.btnPlay.classList.add('has-cover');
+      sceneCover = els.coverArt;
+      if (scene) scene.setCover(els.coverArt);
     };
     els.coverArt.onerror = function () {
       if (token !== artLoadToken) return;
@@ -786,6 +845,8 @@
     els.coverArt.removeAttribute('src');
     els.btnPlay.classList.remove('has-cover');
     els.btnPlay.classList.add('no-cover');
+    sceneCover = null;
+    if (scene) scene.setCover(null);
   }
 
   function paletteFor(seed) {
