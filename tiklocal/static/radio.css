@@ -465,6 +465,57 @@ body:has([data-radio-root]) {
 .room-picker {
   position: relative;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: .15rem;
+}
+
+.room-sound {
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  display: none;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: color-mix(in oklab, var(--radio-ink) 44%, transparent);
+  background: transparent;
+  cursor: pointer;
+  transition: color .25s ease, background .25s ease;
+}
+
+.radio-page.has-room-sound .room-sound { display: inline-grid; }
+
+.room-sound svg {
+  width: .95rem;
+  height: .95rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.room-sound[aria-pressed="true"] { color: var(--radio-accent); }
+
+.room-sound[aria-pressed="false"]::after {
+  content: "";
+  position: absolute;
+  width: 1.2rem;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: rotate(-45deg);
+}
+
+.room-sound:hover {
+  color: var(--radio-ink);
+  background: color-mix(in oklab, var(--radio-paper) 66%, transparent);
+}
+
+.room-sound:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--radio-accent) 48%, transparent);
+  outline-offset: .12rem;
 }
 
 .room-trigger {

@@ -10,6 +10,9 @@
  *   scene.setCover(imgOrNull);     // null falls back to the palette
  *   scene.setPalette(['#466b61', '#a88756', '#d7d2c4']);
  *   scene.setDark(true);
+ *   scene.rainLevel();             // current rain amount 0..1, to drive the rain sound
+ *
+ * options.onLightning fires when a lightning flash starts.
  *
  * create() returns null when WebGL is unavailable; onFail fires for later failures
  * (shader fetch or compile errors, lost context) so the caller can fall back.
@@ -285,6 +288,7 @@
         if (timestamp < nextFlashAt) return 0;
         flashStart = timestamp;
         nextFlashAt = 0;
+        if (options.onLightning) options.onLightning();
       }
       var t = (timestamp - flashStart) / 1000;
       if (t > 1.2) {
@@ -308,6 +312,7 @@
       setCover: setCover,
       setPalette: setPalette,
       setDark: setDark,
+      rainLevel: function () { return rainAmount(sceneTime); },
       destroy: destroy,
     };
   }

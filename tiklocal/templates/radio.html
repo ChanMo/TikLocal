@@ -604,6 +604,9 @@
           <span id="station-name">Default Station</span>
         </div>
         <div class="room-picker">
+          <button id="btn-room-sound" class="room-sound" type="button" aria-pressed="true" aria-label="Rain sound: on" title="Rain sound: on">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
+          </button>
           <button
             id="btn-room"
             class="room-trigger"
@@ -681,5 +684,6 @@
 
 {% block extra_body %}
 <script src="{{ static_asset('radio_scene.js') }}"></script>
+<script src="{{ static_asset('radio_rain_sound.js') }}"></script>
 <script src="{{ static_asset('radio_controller.js') }}"></script>
 {% endblock %}

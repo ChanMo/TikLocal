@@ -5,6 +5,8 @@
   var RECENT_KEY = 'radio_recent_tracks';
   var POSITION_KEY = 'radio_position';
   var ROOM_KEY = 'radio_room';
+  var ROOM_SOUND_KEY = 'radio_room_sound';
+  var SLEEP_RAIN_TAIL = 25;
   var SLEEP_OPTIONS = [null, 30, 60, 120];
   var MAX_ENCORE_COUNT = 3;
   var ROOMS = {
@@ -13,11 +15,13 @@
       ariaLabel: 'Ambience: rain on glass. Click to select.',
       sourceKey: 'Rain',
       scene: true,
+      sound: true,
     },
     rain: {
       label: 'ROOM · RAIN',
       ariaLabel: 'Ambience: rainy night. Click to select.',
       sourceKey: 'Rain',
+      sound: true,
     },
     breeze: {
       label: 'ROOM · BREEZE',
@@ -58,6 +62,9 @@
   var sceneFailed = false;
   var scenePalette = null;
   var sceneCover = null;
+  var roomSoundOn = localStorage.getItem(ROOM_SOUND_KEY) !== 'off';
+  var rainSound = window.RadioRainSound ? window.RadioRainSound.create() : null;
+  var sleepFading = false;
 
   var els = {};
 
@@ -72,6 +79,7 @@
     cacheEls();
     bindEvents();
     initAtmosphere();
+    initRainSound();
     updateSignalArt(null);
     replaceFeather();
     loadStations()
@@ -84,7 +92,7 @@
       'radio-page', 'station-name', 'track-title', 'track-meta',
       'progress-bar', 'time-current', 'time-total', 'btn-play', 'btn-next',
       'btn-fav', 'btn-encore', 'encore-count', 'btn-sleep', 'sleep-label',
-      'btn-room', 'room-label', 'room-menu',
+      'btn-room', 'btn-room-sound', 'room-label', 'room-menu',
       'station-options', 'upcoming-preview', 'upcoming-list', 'cover-wave', 'cover-art',
       'radio-atmosphere-video', 'radio-atmosphere-canvas'
     ].forEach(function (id) {
@@ -139,6 +147,10 @@
       updateMediaPosition();
     });
     document.addEventListener('visibilitychange', syncAtmosphere);
+    // Safari only starts Web Audio from a gesture, so unlock on any tap or key press.
+    document.addEventListener('pointerdown', unlockRainSound, true);
+    document.addEventListener('keydown', unlockRainSound, true);
+    els.btnRoomSound.addEventListener('click', toggleRoomSound);
     window.addEventListener('tiklocal:theme-changed', function () {
       if (scene) scene.setDark(isDarkTheme());
     });
@@ -435,6 +447,7 @@
       clearInterval(sleepTickId);
       sleepEnd = null;
       sleepIndex = 0;
+      sleepFading = true;
       audio.pause();
     }
     updateSleep();
@@ -533,6 +546,7 @@
   }
 
   function syncAtmosphere() {
+    syncRainSound();
     if (!els.radioAtmosphereVideo) return;
     var saveData = Boolean(navigator.connection && navigator.connection.saveData);
     var shouldMove = roomId !== 'off'
@@ -576,6 +590,7 @@
     });
     if (usesScene()) ensureScene();
     els.radioPage.classList.toggle('is-scene-live', usesScene() && Boolean(scene) && scene.ready);
+    updateRoomSound();
     els.roomLabel.textContent = room.label;
     els.btnRoom.setAttribute('aria-label', room.ariaLabel);
     els.roomOptions.forEach(function (option) {
@@ -596,6 +611,9 @@
     var created = canvas && window.RadioScene && window.RadioScene.create(canvas, {
       shaderUrl: canvas.dataset.shaderSrc,
       stats: /[?&]scene_stats=1\b/.test(window.location.search),
+      onLightning: function () {
+        if (rainSound) rainSound.thunder();
+      },
       onReady: function () {
         if (!scene) return;
         scene.ready = true;
@@ -617,6 +635,46 @@
     scene.setDark(isDarkTheme());
     if (scenePalette) scene.setPalette(scenePalette);
     if (sceneCover) scene.setCover(sceneCover);
+  }
+
+  function initRainSound() {
+    if (!rainSound) return;
+    rainSound.setIntensitySource(function () {
+      return scene && scene.ready && usesScene() ? scene.rainLevel() : null;
+    });
+  }
+
+  function roomHasSound() {
+    return Boolean(rainSound && ROOMS[roomId].sound);
+  }
+
+  function unlockRainSound() {
+    if (roomSoundOn && roomHasSound()) rainSound.unlock();
+  }
+
+  // Rain follows the music; after the sleep timer it keeps falling a little longer.
+  function syncRainSound() {
+    if (!rainSound) return;
+    var wanted = roomSoundOn && roomHasSound() && isPlaying;
+    rainSound.setActive(wanted, !wanted && sleepFading ? { tail: SLEEP_RAIN_TAIL } : null);
+    if (wanted || !isPlaying) sleepFading = false;
+  }
+
+  function toggleRoomSound() {
+    roomSoundOn = !roomSoundOn;
+    localStorage.setItem(ROOM_SOUND_KEY, roomSoundOn ? 'on' : 'off');
+    if (roomSoundOn) unlockRainSound();
+    updateRoomSound();
+    syncRainSound();
+  }
+
+  function updateRoomSound() {
+    if (!els.btnRoomSound) return;
+    els.radioPage.classList.toggle('has-room-sound', roomHasSound());
+    var label = roomSoundOn ? 'Rain sound: on' : 'Rain sound: off';
+    els.btnRoomSound.setAttribute('aria-pressed', roomSoundOn ? 'true' : 'false');
+    els.btnRoomSound.setAttribute('aria-label', label);
+    els.btnRoomSound.setAttribute('title', label);
   }
 
   function isDarkTheme() {
