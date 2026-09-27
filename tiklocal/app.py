@@ -26,6 +26,7 @@ from tiklocal.services.downloader import (
 )
 from tiklocal.services.collections import CollectionStore
 from tiklocal.services.radio import RadioProfileStore, RadioService
+from tiklocal.services.radio_energy import RadioEnergyService
 from tiklocal.services.auth import AuthStore
 from tiklocal.services.device_auth import DeviceAuthStore
 from tiklocal.services.pairing_grants import PairingGrantStore
@@ -253,7 +254,7 @@ def create_app(test_config=None):
         activity_store=activity_store,
     )
 
-    register_radio_routes(app, library_service, radio_service, thumbnail_service)
+    register_radio_routes(app, library_service, radio_service, thumbnail_service, RadioEnergyService(library_service))
     register_media_routes(app, library_service, media_index, thumbnail_service, download_manager)
     register_settings_routes(app, media_index, favorite_service, thumbnail_service, app_version)
 

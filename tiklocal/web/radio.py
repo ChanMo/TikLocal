@@ -10,7 +10,7 @@ from tiklocal.web import read_int_arg
 from tiklocal.web.media_payloads import media_urls
 
 
-def register_radio_routes(app, library_service, radio_service, thumbnail_service):
+def register_radio_routes(app, library_service, radio_service, thumbnail_service, energy_service):
     def _positive_ratio(value) -> float | None:
         try:
             ratio = float(value)
@@ -33,6 +33,7 @@ def register_radio_routes(app, library_service, radio_service, thumbnail_service
             'name': item.name,
             **media_urls(item.name),
             'artwork_url': f'/api/radio/artwork?uri={quote(item.name, safe="")}',
+            'energy_url': f'/api/radio/energy?uri={quote(item.name, safe="")}',
             'title': item.title,
             'artist': item.artist,
             'album': item.album,
@@ -50,6 +51,14 @@ def register_radio_routes(app, library_service, radio_service, thumbnail_service
         uri = library_service.find_existing_uri(unquote(request.args.get('uri') or ''))
         path, mimetype = thumbnail_service.get_radio_artwork(uri)
         return send_file(io.BytesIO(path) if isinstance(path, bytes) else path, mimetype=mimetype)
+
+    @app.route('/api/radio/energy')
+    def api_radio_energy():
+        uri = library_service.find_existing_uri(unquote(request.args.get('uri') or ''))
+        envelope = energy_service.get_envelope(uri) if uri else None
+        if envelope is None:
+            return {'success': False, 'error': 'Energy unavailable'}, 404
+        return {'success': True, 'data': {'hop': envelope['hop'], 'values': envelope['values']}}
 
     @app.route('/api/radio/items')
     def api_radio_items():
