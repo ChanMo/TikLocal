@@ -2,6 +2,7 @@
 
 import datetime
 import io
+from pathlib import Path
 from urllib.parse import quote, unquote
 
 from flask import redirect, render_template, request, send_file
@@ -11,7 +12,7 @@ from tiklocal.services.library import IMAGE_EXTENSIONS
 from tiklocal.web.media_payloads import media_urls
 
 
-def register_media_routes(app, library_service, media_index, thumbnail_service, download_manager):
+def register_media_routes(app, library_service, media_index, thumbnail_service, download_manager, trash_service, library_indexer):
     def neighbors(media_type, name):
         """Previous and next items in library order (newest first)."""
         names = [str(record['name']) for record in media_index.records(media_type=media_type)]
@@ -78,25 +79,72 @@ def register_media_routes(app, library_service, media_index, thumbnail_service, 
             source_meta=source_meta,
         )
 
+    def detail_url(uri):
+        if Path(uri).suffix.lower() in IMAGE_EXTENSIONS:
+            return f"/image?uri={quote(uri, safe='')}"
+        return f"/detail/{quote(uri, safe='/')}"
+
+    def purge(entry_id):
+        uri = trash_service.purge(entry_id)
+        for candidate in library_service.legacy_candidates(uri):
+            download_manager.delete_source_for_file(candidate)
+        thumbnail_service.delete_thumbnail(uri)
+
+    def purge_expired():
+        for entry_id in trash_service.expired():
+            try:
+                purge(entry_id)
+            except (KeyError, OSError):
+                continue
+
+    purge_expired()
+
     @app.route("/delete/<path:name>", methods=['POST', 'GET'])
     def delete_view(name):
         name = library_service.find_existing_uri(name)
-        target = library_service.resolve_path(name)
-        if request.method == 'POST':
-            if target and target.exists():
-                try:
-                    target.unlink()
-                    download_manager.delete_source_for_file(name)
-                    media_index.delete(name)
-                    thumbnail_service.delete_thumbnail(name)
-                except Exception as e:
-                    return f"Error deleting file: {e}", 500
-            else:
-                media_index.delete(name)
-                thumbnail_service.delete_thumbnail(name)
-            return redirect('/library')
+        if request.method == 'GET':
+            return render_template('delete_confirm.html', file=name)
+        wants_json = request.accept_mimetypes.best == 'application/json'
+        try:
+            entry = trash_service.move(name)
+        except FileNotFoundError:
+            media_index.delete(library_service.canonicalize_uri(name))
+            return ({'error': 'File not found'}, 404) if wants_json else redirect('/library')
+        except OSError as e:
+            return ({'error': str(e)}, 500) if wants_json else (f"Error deleting file: {e}", 500)
+        media_index.delete(entry['uri'])
+        return {'id': entry['id'], 'name': entry['name']} if wants_json else redirect('/library')
 
-        return render_template('delete_confirm.html', file=name)
+    @app.route('/api/trash')
+    def api_trash():
+        purge_expired()
+        return {'items': trash_service.entries(), 'retention_days': trash_service.retention.days}
+
+    @app.route('/api/trash/<entry_id>/restore', methods=['POST'])
+    def api_trash_restore(entry_id):
+        try:
+            uri = trash_service.restore(entry_id)
+        except KeyError:
+            return {'error': 'Not in trash'}, 404
+        except FileExistsError:
+            return {'error': 'A file already exists at the original location'}, 409
+        library_indexer.register_uris([uri])
+        return {'uri': uri, 'url': detail_url(uri)}
+
+    @app.route('/api/trash/<entry_id>', methods=['DELETE'])
+    def api_trash_purge(entry_id):
+        try:
+            purge(entry_id)
+        except KeyError:
+            return {'error': 'Not in trash'}, 404
+        return {'ok': True}
+
+    @app.route('/api/trash', methods=['DELETE'])
+    def api_trash_empty():
+        items = trash_service.entries()
+        for item in items:
+            purge(item['id'])
+        return {'purged': len(items)}
 
     @app.route("/delete", methods=['POST', 'GET'])
     def delete_confirm_legacy():

@@ -18,6 +18,7 @@ from tiklocal.web.downloads import register_download_routes
 from tiklocal.web.library import register_library_routes
 from tiklocal.services.database import AppDatabase, MediaActivityStore
 from tiklocal.services.library_index import LibraryIndexer, MediaIndexStore
+from tiklocal.services.trash import TrashService
 from tiklocal.services.downloader import (
     DownloadConfigStore,
     DownloadHistoryStore,
@@ -255,7 +256,10 @@ def create_app(test_config=None):
     )
 
     register_radio_routes(app, library_service, radio_service, thumbnail_service, RadioEnergyService(library_service))
-    register_media_routes(app, library_service, media_index, thumbnail_service, download_manager)
+    register_media_routes(
+        app, library_service, media_index, thumbnail_service, download_manager,
+        TrashService(library_service), library_indexer,
+    )
     register_settings_routes(app, media_index, favorite_service, thumbnail_service, app_version)
 
     # --- Template Filters ---

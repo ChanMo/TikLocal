@@ -281,7 +281,7 @@ def test_source_batch_api(client):
     assert data["data"]["items"]["missing.mp4"] is None
 
 
-def test_delete_file_also_deletes_source_map(client):
+def test_purging_trashed_file_deletes_source_map(client):
     media_root = client.application.config["MEDIA_ROOT"]
     media_file = media_root / "mock-output.mp4"
     media_file.write_bytes(b"00")
@@ -292,6 +292,9 @@ def test_delete_file_also_deletes_source_map(client):
 
     delete_res = client.post("/delete/mock-output.mp4", follow_redirects=False)
     assert delete_res.status_code in {301, 302, 303, 307, 308}
+    # The trash keeps the source so a restore is lossless; purging drops it.
+    assert client.get("/api/source", query_string={"file": "mock-output.mp4"}).get_json()["data"]["source"]
+    assert client.delete("/api/trash").get_json() == {"purged": 1}
 
     source_res = client.get("/api/source", query_string={"file": "mock-output.mp4"})
     source_data = source_res.get_json()

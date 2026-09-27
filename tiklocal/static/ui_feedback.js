@@ -1,4 +1,5 @@
-// Site-wide feedback: TikLocalUI.toast(message, type) and await TikLocalUI.confirm({...}).
+// Site-wide feedback: TikLocalUI.toast(message, type, action), await TikLocalUI.confirm({...}),
+// and TikLocalUI.trash(deleteUrl, nextUrl), which offers Undo on the page it lands on.
 (function () {
   function icon(name) {
     var el = document.createElement('i');
@@ -6,7 +7,10 @@
     return el;
   }
 
-  function toast(message, type) {
+  var UNDO_KEY = 'tiklocal:undo';
+
+  // action: optional { label, run } rendered as a button; such toasts stay a little longer.
+  function toast(message, type, action) {
     type = type || 'success';
     var wrap = document.querySelector('.ui-toast-wrap');
     if (!wrap) {
@@ -20,12 +24,60 @@
     var copy = document.createElement('span');
     copy.textContent = message;
     el.append(icon(type === 'error' ? 'alert-circle' : type === 'info' ? 'info' : 'check-circle'), copy);
-    wrap.replaceChildren(el);
-    if (window.feather) feather.replace();
-    setTimeout(function () {
+    function leave() {
       el.classList.add('is-leaving');
       setTimeout(function () { el.remove(); }, 180);
-    }, 3000);
+    }
+    if (action) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ui-toast-action';
+      button.textContent = action.label;
+      button.addEventListener('click', function () {
+        leave();
+        action.run();
+      });
+      el.append(button);
+    }
+    wrap.replaceChildren(el);
+    if (window.feather) feather.replace();
+    setTimeout(leave, action ? 6000 : 3000);
+  }
+
+  function readJson(response) {
+    return response.json().catch(function () { return {}; }).then(function (data) {
+      if (!response.ok) throw new Error(data.error || '');
+      return data;
+    });
+  }
+
+  // Moves a file to the trash, then continues to nextUrl where the Undo toast appears.
+  function trash(deleteUrl, nextUrl) {
+    return fetch(deleteUrl, { method: 'POST', headers: { Accept: 'application/json' } })
+      .then(readJson)
+      .then(function (entry) {
+        try { sessionStorage.setItem(UNDO_KEY, JSON.stringify({ id: entry.id, at: Date.now() })); } catch (_) {}
+        location.replace(nextUrl || '/library');
+      })
+      .catch(function (error) { toast(error.message || 'Delete failed. Please try again.', 'error'); });
+  }
+
+  function offerUndo() {
+    var entry = null;
+    try {
+      entry = JSON.parse(sessionStorage.getItem(UNDO_KEY));
+      sessionStorage.removeItem(UNDO_KEY);
+    } catch (_) {}
+    if (!entry || Date.now() - entry.at > 10000) return;
+    toast('Moved to trash', 'info', {
+      label: 'Undo',
+      run: function () {
+        fetch('/api/trash/' + encodeURIComponent(entry.id) + '/restore', { method: 'POST' })
+          .then(readJson)
+          .then(function (data) { location.href = data.url; })
+          .catch(function (error) { toast(error.message || 'Restore failed. Please try again.', 'error'); });
+      },
+    });
   }
 
   // Resolves true when confirmed; Escape, Cancel and the backdrop resolve false.
@@ -79,5 +131,7 @@
     });
   }
 
-  window.TikLocalUI = { toast: toast, confirm: confirm };
+  window.TikLocalUI = { toast: toast, confirm: confirm, trash: trash };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', offerUndo);
+  else offerUndo();
 })();

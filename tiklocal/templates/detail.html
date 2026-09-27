@@ -402,25 +402,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Delete confirmation.
-async function confirmDelete() {
-  const confirmed = await TikLocalUI.confirm({
-    title: 'Delete this video?',
-    message: 'This action cannot be undone. The video will be permanently deleted.',
-    confirmLabel: 'Delete',
-    tone: 'danger',
-  });
-  if (!confirmed) return;
-  try {
-    const response = await fetch('/delete/{{ file_path_encoded }}', { method: 'POST' });
-    if (response.ok || response.redirected) {
-      window.location.href = '/library';
-      return;
-    }
-    TikLocalUI.toast('Delete failed. Please try again.', 'error');
-  } catch (error) {
-    TikLocalUI.toast('Delete failed. Please try again.', 'error');
-  }
+// Delete moves the file to the trash and continues to a neighbour, where Undo is offered.
+function confirmDelete() {
+  TikLocalUI.trash('/delete/{{ file_path_encoded }}', {% if next_item %}'/detail/{{ next_item_path_encoded }}'{% elif previous_item %}'/detail/{{ previous_item_path_encoded }}'{% else %}null{% endif %});
 }
 </script>
 {% endblock %}

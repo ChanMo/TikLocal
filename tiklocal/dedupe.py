@@ -2,6 +2,7 @@ import hashlib
 import sys
 from pathlib import Path
 from tiklocal.services.library import VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
+from tiklocal.services.trash import TRASH_DIR
 
 
 def compute_file_hash(path: Path, algorithm='sha256', chunk_size=8192) -> str | None:
@@ -33,7 +34,7 @@ def _scan_files(root: Path, extensions: set[str]) -> list[Path]:
     for ext in extensions:
         files.extend(root.glob(f'**/*{ext}'))
         files.extend(root.glob(f'**/*{ext.upper()}'))
-    return files
+    return [f for f in files if TRASH_DIR not in f.parts]
 
 
 def _print_progress(current: int, total: int, prefix: str = '') -> None:

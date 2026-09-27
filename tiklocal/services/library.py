@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from tiklocal.services.trash import TRASH_DIR
+
 VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.mkv', '.avi', '.m4v'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
 AUDIO_EXTENSIONS = {'.mp3', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wav'}
@@ -92,6 +94,8 @@ class LibraryService:
         for directory, folders, files in os.walk(source.path, onerror=fail):
             if not recursive:
                 folders.clear()
+            elif TRASH_DIR in folders:
+                folders.remove(TRASH_DIR)
             paths.extend(
                 Path(directory) / name for name in files
                 if Path(name).suffix.lower() in extensions

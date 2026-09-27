@@ -78,6 +78,8 @@
   }
   .radio-device-state.is-expired::before { background: #a58a67; }
   .radio-device-list { margin-top: 8px; }
+  .settings-action[hidden] { display: none; }
+  .trash-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .appearance-card { padding: 15px; }
   .appearance-heading { margin-bottom: 13px; }
   .theme-options {
@@ -328,6 +330,20 @@
             <div class="settings-row-copy"><span id="cache-size">{{ cache_size_mb }} MB</span>; thumbnails regenerate as needed while browsing.</div>
           </div>
           <button id="clear-cache" class="settings-action" type="button">Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="trash-title">
+      <h2 id="trash-title" class="settings-section-title">Recently Deleted</h2>
+      <div id="trash-list" class="settings-card">
+        <div class="settings-row">
+          <span class="setting-icon"><i data-feather="trash-2"></i></span>
+          <div class="settings-row-main">
+            <div class="settings-row-title">Trash</div>
+            <div id="trash-summary" class="settings-row-copy">Loading…</div>
+          </div>
+          <button id="empty-trash" class="settings-action is-danger" type="button" hidden>Empty</button>
         </div>
       </div>
     </section>
@@ -814,8 +830,78 @@
       }).catch(() => TikLocalUI.toast('Failed to upload credentials', 'error'));
     });
 
+    function formatBytes(bytes) {
+      const mb = Number(bytes || 0) / 1048576;
+      return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(1)} MB`;
+    }
+
+    function renderTrash(items, retentionDays) {
+      const list = document.getElementById('trash-list');
+      const total = items.reduce((sum, item) => sum + Number(item.size || 0), 0);
+      document.getElementById('trash-summary').textContent = items.length
+        ? `${items.length} ${items.length === 1 ? 'item' : 'items'} · ${formatBytes(total)}. Kept for ${retentionDays} days, then removed.`
+        : `Deleted media stays here for ${retentionDays} days.`;
+      document.getElementById('empty-trash').hidden = !items.length;
+      list.querySelectorAll('.trash-item').forEach((row) => row.remove());
+      items.forEach((item) => {
+        const days = Math.max(0, retentionDays - Math.floor((Date.now() - new Date(item.deleted_at)) / 86400000));
+        const row = document.createElement('div');
+        row.className = 'settings-row trash-item';
+        row.innerHTML = `<span class="setting-icon"><i data-feather="${/\.(jpe?g|png|gif|webp|bmp)$/i.test(item.name) ? 'image' : 'film'}"></i></span><div class="settings-row-main"><div class="settings-row-title trash-name"></div><div class="settings-row-copy"></div></div>`;
+        row.querySelector('.trash-name').textContent = item.name;
+        row.querySelector('.settings-row-copy').textContent = `${formatBytes(item.size)} · ${days} days left`;
+        const restore = document.createElement('button');
+        restore.className = 'settings-action';
+        restore.type = 'button';
+        restore.textContent = 'Restore';
+        restore.addEventListener('click', () => {
+          runButton(restore, 'Restoring…', async () => {
+            const data = await requestJson(`/api/trash/${encodeURIComponent(item.id)}/restore`, { method: 'POST' });
+            await Promise.all([loadTrash(), loadStats()]);
+            TikLocalUI.toast(`Restored ${item.name}`, 'success', { label: 'Open', run: () => { location.href = data.url; } });
+          }).catch((error) => TikLocalUI.toast(error.message || 'Restore failed. Please try again.', 'error'));
+        });
+        const purge = document.createElement('button');
+        purge.className = 'settings-action is-danger';
+        purge.type = 'button';
+        purge.textContent = 'Delete';
+        purge.addEventListener('click', () => {
+          confirmAction(`Delete ${item.name} permanently?`, 'The file is removed from disk and cannot be restored.', 'Delete', 'danger', () => {
+            runButton(purge, 'Deleting…', async () => {
+              await requestJson(`/api/trash/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+              await loadTrash();
+            }).catch(() => TikLocalUI.toast('Delete failed. Please try again.', 'error'));
+          });
+        });
+        row.querySelector('.settings-row-main').after(restore, purge);
+        list.appendChild(row);
+      });
+      feather.replace();
+    }
+
+    async function loadTrash() {
+      try {
+        const data = await requestJson('/api/trash');
+        renderTrash(data.items || [], data.retention_days || 30);
+      } catch (_) {
+        document.getElementById('trash-summary').textContent = 'Trash is unavailable.';
+      }
+    }
+
+    document.getElementById('empty-trash').addEventListener('click', (event) => {
+      const button = event.currentTarget;
+      confirmAction('Empty the trash?', 'Every file in the trash is removed from disk and cannot be restored.', 'Empty Trash', 'danger', () => {
+        runButton(button, 'Emptying…', async () => {
+          const data = await requestJson('/api/trash', { method: 'DELETE' });
+          await loadTrash();
+          TikLocalUI.toast(`Deleted ${data.purged} items permanently`);
+        }).catch(() => TikLocalUI.toast('Failed to empty the trash. Please try again.', 'error'));
+      });
+    });
+
     loadStats();
     loadRadioDevices();
+    loadTrash();
     loadDownloadSettings();
   })();
 </script>

@@ -52,6 +52,30 @@
   color: var(--ui-ok);
 }
 
+.ui-toast > span {
+  flex: 1;
+}
+
+.ui-toast.info svg {
+  color: var(--ui-muted);
+}
+
+.ui-toast-action {
+  margin: -4px -4px -4px 4px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ui-ink);
+  background: var(--ui-soft);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ui-toast-action:hover {
+  background: color-mix(in srgb, var(--ui-ink) 11%, transparent);
+}
+
 .ui-toast.error {
   border-color: rgba(180, 67, 59, 0.28);
 }

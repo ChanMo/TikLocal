@@ -354,6 +354,9 @@ def test_library_images_use_bounded_cached_thumbnails(tmp_path, monkeypatch):
 
     delete_res = local_client.post("/delete/%40default/large%20image.png")
     assert delete_res.status_code in {301, 302, 308}
+    # The thumbnail stays with the trashed file and goes when the trash is emptied.
+    assert thumb_path.exists()
+    local_client.delete("/api/trash")
     assert not thumb_path.exists()
 
 
