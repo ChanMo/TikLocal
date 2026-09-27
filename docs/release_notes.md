@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## v0.8.40 (2026-09-27)
+
+- Added live ambience rooms to Web Radio, each drawn by a full-screen WebGL shader with a daytime look for the light theme and a night look for the dark theme: **Rain on Glass** (drops that refract the street, slide and leave trails through the fog), **Snowy Night** (snow falling through a street lamp's light, chimney smoke, frost and flakes melting on the pane), **By the Fire** (a log fire with glowing coals and rising sparks), and **Summer Night** (a meadow with fireflies, stars and swaying grass, or pollen in golden-hour light). The existing video rooms remain.
+- Scenes take their colours from the current cover art, crossfade when switching rooms, and fall back to the rain video or a still background when WebGL is unavailable. They render at reduced resolution capped at 30 fps, pause while the page is hidden or music is paused, and show a still frame under Reduce Motion or Save-Data.
+- Added procedural ambient sound for each room: rain on glass, wind at a snowy window, a crackling fire, and crickets on a summer night. It runs beside the music without touching the music's audio path, follows play and pause, can be switched off from the room bar, and lingers 25 seconds after the sleep timer stops the music.
+- Added rare scene events with matching sounds: lightning followed by thunder, a car passing along the snowy street, a log settling in the fire, and a shooting star. `?scene_stats=1` shows frame rate and energy, and tapping it triggers the current room's event.
+- Added `/api/radio/energy`, a per-track loudness envelope decoded with ffmpeg (plain WAV files work without it) and cached on disk. Radio tracks now include `energy_url`, and scenes brighten and move slightly faster in louder passages.
+- The room menu now opens upward on phones so every room stays reachable.
+
 ## v0.8.39 (2026-09-23)
 
 - Added the TikLocal mark: a lowercase `t` whose hook ends in an orange dot, drawn on the same 24-unit, 2px round-stroke grid as the Feather icons in the web UI.

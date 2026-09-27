@@ -8,7 +8,7 @@
 //   room     warm lamp reflection, lightning flash, vignette and grain
 //
 // Uniforms are driven by radio_scene.js. uDark blends between an overcast day (0)
-// and a rainy night (1); uRain (0..1) sets how many drops are on the glass; uEnergy is
+// and a rainy night (1); uIntensity (0..1) sets how many drops are on the glass; uEnergy is
 // the smoothed loudness of the music (0.5 when unknown), which makes the lights breathe.
 
 #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -20,7 +20,7 @@ precision mediump float;
 uniform vec2 uRes;
 uniform float uTime;
 uniform float uDark;
-uniform float uRain;
+uniform float uIntensity;
 uniform float uFlash;
 uniform float uEnergy;
 uniform sampler2D uSharp;
@@ -113,25 +113,37 @@ vec3 outside(vec2 uv, float soft) {
   return col;
 }
 
-// Resting droplets. xy = lens offset (screen-height units), z = lens mask, w = clear mask.
-vec4 restingDrops(vec2 p, float scale, float seed) {
+// Drops write into `surface`: xy = where this pixel sits inside the drop (a unit disc,
+// used as its normal) and z = coverage. The strongest drop at a pixel wins.
+void keep(inout vec3 surface, vec2 inside, float coverage) {
+  if (coverage > surface.z) surface = vec3(inside, coverage);
+}
+
+// Coverage of a round drop; zero for a drop too small to see (smoothstep with equal
+// edges is undefined in GLSL and shows up as square blocks).
+float disc(vec2 d, float radius, float softness) {
+  return radius > 0.002 ? smoothstep(radius, radius * softness, length(d)) : 0.0;
+}
+
+// Resting droplets that bead up, sit a while, and evaporate.
+void restingDrops(vec2 p, float scale, float seed, inout vec3 surface) {
   vec2 q = p * scale;
   vec2 id = floor(q);
   vec2 f = fract(q) - 0.5;
   vec2 r = hash22(id + seed);
 
-  float present = step(1.0 - uRain * 0.55, hash21(id * 1.31 + seed * 3.3));
+  float present = step(1.0 - uIntensity * 0.55, hash21(id * 1.31 + seed * 3.3));
   float life = fract(uTime * 0.03 + hash21(id * 1.7 + seed));
   float grow = smoothstep(0.0, 0.03, life) * smoothstep(1.0, 0.8, life);
   float radius = mix(0.08, 0.26, r.y) * grow;
 
   vec2 d = f - (r - 0.5) * 0.4;
-  float m = smoothstep(radius, radius * 0.72, length(d)) * present;
-  return vec4(d / scale * m, m, m);
+  keep(surface, d / max(radius, 1e-4), disc(d, radius, 0.72) * present);
 }
 
-// Drops sliding down in columns, creeping then running, leaving a trail of beads.
-vec4 slidingDrops(vec2 p, float scale, float seed, float t) {
+// Drops sliding down in columns, creeping then running, leaving a trail of beads. The
+// trail wipes the fog only partly: it stays a faint streak rather than clear glass.
+void slidingDrops(vec2 p, float scale, float seed, float t, inout vec3 surface, inout float wiped) {
   vec2 cell = vec2(1.0, 3.0);
   vec2 q = p * scale;
   q.y += t * 0.32;
@@ -141,7 +153,7 @@ vec4 slidingDrops(vec2 p, float scale, float seed, float t) {
   vec2 st = (fract(g) - 0.5) * cell;
 
   float h = hash21(id + seed);
-  float active = step(1.0 - (0.25 + uRain * 0.45), h);
+  if (h < 1.0 - (0.25 + uIntensity * 0.45)) return;
   float h2 = hash21(id * 2.3 + seed);
   float h3 = hash21(id * 3.7 + seed);
 
@@ -162,32 +174,18 @@ vec4 slidingDrops(vec2 p, float scale, float seed, float t) {
   float running = smoothstep(run, run + 0.02, phase) * (1.0 - smoothstep(0.97, 1.0, phase));
   vec2 d = st - vec2(dropX, y);
   d.y *= mix(1.0, 0.72, running);
-  float drop = smoothstep(radius, radius * 0.75, length(d));
+  keep(surface, d / radius, disc(d, radius, 0.75));
 
   float above = st.y - y;
   float trailWidth = radius * 0.5;
   float trail = smoothstep(trailWidth, trailWidth * 0.35, abs(st.x - pathX))
     * smoothstep(0.0, radius, above)
     * smoothstep(travel * 1.3, 0.0, above);
+  wiped = max(wiped, trail * 0.55);
 
   vec2 bead = vec2(st.x - pathX, (fract(st.y * 5.0) - 0.5) / 5.0);
   float beadRadius = radius * 0.32 * smoothstep(radius * 1.5, radius * 2.5, above);
-  float beads = smoothstep(beadRadius, beadRadius * 0.6, length(bead)) * trail;
-
-  vec2 offset = (d * drop + bead * beads) / scale;
-  float lens = max(drop, beads);
-  return vec4(offset, lens, max(trail, lens)) * active;
-}
-
-vec4 glass(vec2 p) {
-  vec4 a = restingDrops(p, 22.0, 1.3);
-  vec4 b = restingDrops(p + 3.7, 41.0, 2.1);
-  vec4 c = slidingDrops(p, 3.4, 4.2, uTime);
-  vec4 d = slidingDrops(p + vec2(0.37, 0.0), 5.6, 7.9, uTime * 1.08);
-  vec4 sum = vec4(a.xy + b.xy + c.xy + d.xy, 0.0, 0.0);
-  sum.z = max(max(a.z, b.z), max(c.z, d.z));
-  sum.w = max(max(a.w, b.w), max(c.w, d.w));
-  return sum;
+  keep(surface, bead / max(beadRadius, 1e-4), disc(bead, beadRadius, 0.6) * trail);
 }
 
 void main() {
@@ -195,9 +193,14 @@ void main() {
   float a = aspect();
   vec2 p = uv * vec2(a, 1.0);
 
-  vec4 g = glass(p);
-  float lens = clamp(g.z, 0.0, 1.0);
-  float clear = clamp(g.w, 0.0, 1.0);
+  vec3 surface = vec3(0.0);
+  float wiped = 0.0;
+  restingDrops(p, 22.0, 1.3, surface);
+  restingDrops(p + 3.7, 41.0, 2.1, surface);
+  slidingDrops(p, 3.4, 4.2, uTime, surface, wiped);
+  slidingDrops(p + vec2(0.37, 0.0), 5.6, 7.9, uTime * 1.08, surface, wiped);
+  float lens = clamp(surface.z, 0.0, 1.0);
+  float clear = max(lens, wiped);
 
   float condensation = valueNoise(p * 2.2 + vec2(uTime * 0.01, 0.0)) * 0.6
     + valueNoise(p * 5.3 - uTime * 0.012) * 0.4;
@@ -209,13 +212,17 @@ void main() {
   vec3 col = fogView;
 
   if (clear > 0.001) {
-    vec2 refracted = uv - g.xy * vec2(1.0 / a, 1.0) * 3.2;
-    vec3 clearView = outside(refracted, 0.3) * (1.0 + lens * mix(0.02, 0.35, uDark)) + lens * 0.025 * uDark;
-    float rimShade = lens * (1.0 - lens) * 4.0;
-    clearView *= 1.0 - rimShade * mix(0.3, 0.18, uDark);
-    vec2 dir = g.xy / (length(g.xy) + 1e-5);
-    float glint = pow(max(dot(dir, vec2(-0.6, 0.8)), 0.0), 6.0) * rimShade;
-    clearView += glint * mix(0.14, 0.55, uDark);
+    // A drop is a tiny wide-angle lens: it shows a flipped, shrunken view of a wide
+    // patch behind it, dark toward its rim, with a highlight on top and a caustic below.
+    vec2 inside = surface.xy * lens;
+    float edge = length(surface.xy);
+    vec3 clearView = outside(uv - inside * vec2(1.0 / a, 1.0) * 0.09, 0.25);
+    float fresnel = smoothstep(0.45, 1.0, edge) * lens;
+    clearView *= 1.0 - fresnel * mix(0.4, 0.6, uDark);
+    float highlight = smoothstep(0.32, 0.05, length(surface.xy - vec2(-0.28, 0.42))) * lens;
+    float caustic = smoothstep(0.5, 0.95, edge) * smoothstep(-0.2, -0.8, surface.y) * lens;
+    vec3 sheen = mix(vec3(1.0), vec3(1.0, 0.9, 0.8), uDark);
+    clearView += sheen * (highlight * mix(0.35, 0.65, uDark) + caustic * mix(0.08, 0.2, uDark));
     col = mix(fogView, clearView, clear);
   }
 

@@ -6,22 +6,51 @@
   var POSITION_KEY = 'radio_position';
   var ROOM_KEY = 'radio_room';
   var ROOM_SOUND_KEY = 'radio_room_sound';
-  var SLEEP_RAIN_TAIL = 25;
+  var SLEEP_AMBIENCE_TAIL = 25;
   var SLEEP_OPTIONS = [null, 30, 60, 120];
   var MAX_ENCORE_COUNT = 3;
+  // scene: a live shader room (its .frag URL is on the canvas as data-shader-<room>);
+  // sourceKey: the video shown by video rooms, and the fallback when WebGL fails;
+  // sound: the ambience profile mixed beside the music;
+  // event: the scene's rare moment (see radio_scene.js), paired with a sound when it has one.
   var ROOMS = {
     glass: {
       label: 'ROOM · GLASS',
       ariaLabel: 'Ambience: rain on glass. Click to select.',
       sourceKey: 'Rain',
       scene: true,
-      sound: true,
+      sound: 'rain',
+      event: 'lightning',
+    },
+    snow: {
+      label: 'ROOM · SNOW',
+      ariaLabel: 'Ambience: snowy night. Click to select.',
+      sourceKey: '',
+      scene: true,
+      sound: 'snow',
+      event: 'car',
+    },
+    hearth: {
+      label: 'ROOM · HEARTH',
+      ariaLabel: 'Ambience: by the fire. Click to select.',
+      sourceKey: '',
+      scene: true,
+      sound: 'fire',
+      event: 'burst',
+    },
+    firefly: {
+      label: 'ROOM · FIREFLY',
+      ariaLabel: 'Ambience: summer night with fireflies. Click to select.',
+      sourceKey: '',
+      scene: true,
+      sound: 'night',
+      event: 'meteor',
     },
     rain: {
       label: 'ROOM · RAIN',
       ariaLabel: 'Ambience: rainy night. Click to select.',
       sourceKey: 'Rain',
-      sound: true,
+      sound: 'rain',
     },
     breeze: {
       label: 'ROOM · BREEZE',
@@ -63,7 +92,7 @@
   var scenePalette = null;
   var sceneCover = null;
   var roomSoundOn = localStorage.getItem(ROOM_SOUND_KEY) !== 'off';
-  var rainSound = window.RadioRainSound ? window.RadioRainSound.create() : null;
+  var ambience = window.RadioAmbience ? window.RadioAmbience.create() : null;
   var sleepFading = false;
   var trackEnergy = null;
   var energyTrackName = '';
@@ -81,7 +110,7 @@
     cacheEls();
     bindEvents();
     initAtmosphere();
-    initRainSound();
+    initAmbience();
     updateSignalArt(null);
     replaceFeather();
     loadStations()
@@ -150,8 +179,8 @@
     });
     document.addEventListener('visibilitychange', syncAtmosphere);
     // Safari only starts Web Audio from a gesture, so unlock on any tap or key press.
-    document.addEventListener('pointerdown', unlockRainSound, true);
-    document.addEventListener('keydown', unlockRainSound, true);
+    document.addEventListener('pointerdown', unlockAmbience, true);
+    document.addEventListener('keydown', unlockAmbience, true);
     els.btnRoomSound.addEventListener('click', toggleRoomSound);
     window.addEventListener('tiklocal:theme-changed', function () {
       if (scene) scene.setDark(isDarkTheme());
@@ -550,7 +579,7 @@
   }
 
   function syncAtmosphere() {
-    syncRainSound();
+    syncAmbience();
     if (!els.radioAtmosphereVideo) return;
     var saveData = Boolean(navigator.connection && navigator.connection.saveData);
     var shouldMove = roomId !== 'off'
@@ -594,9 +623,17 @@
     });
     if (usesScene()) {
       ensureScene();
+      if (scene) {
+        // A hidden canvas switches at once; a visible one crossfades between rooms.
+        scene.setShader(shaderUrl(roomId), {
+          event: room.event || null,
+          immediate: !els.radioPage.classList.contains('is-scene-live'),
+        });
+      }
       loadEnergy();
     }
     els.radioPage.classList.toggle('is-scene-live', usesScene() && Boolean(scene) && scene.ready);
+    els.radioPage.classList.toggle('is-video-hidden', !room.sourceKey);
     updateRoomSound();
     els.roomLabel.textContent = room.label;
     els.btnRoom.setAttribute('aria-label', room.ariaLabel);
@@ -611,16 +648,20 @@
     return Boolean(ROOMS[roomId].scene) && !sceneFailed;
   }
 
-  // The shader room is created on first use; any failure falls back to the room's video.
+  function shaderUrl(id) {
+    return els.radioAtmosphereCanvas.dataset['shader' + id.charAt(0).toUpperCase() + id.slice(1)];
+  }
+
+  // Shader rooms share one scene, created on first use; any failure falls back to the
+  // room's video (or a still background when the room has none).
   function ensureScene() {
     if (scene || sceneFailed) return;
     var canvas = els.radioAtmosphereCanvas;
     var created = canvas && window.RadioScene && window.RadioScene.create(canvas, {
-      shaderUrl: canvas.dataset.shaderSrc,
       stats: /[?&]scene_stats=1\b/.test(window.location.search),
       energySource: currentEnergy,
-      onLightning: function () {
-        if (rainSound) rainSound.thunder();
+      onEvent: function (type, seed) {
+        if (ambience) ambience.event(type, seed);
       },
       onReady: function () {
         if (!scene) return;
@@ -672,41 +713,44 @@
     return (values[index] + (next - values[index]) * (position - index)) / 255;
   }
 
-  function initRainSound() {
-    if (!rainSound) return;
-    rainSound.setIntensitySource(function () {
-      return scene && scene.ready && usesScene() ? scene.rainLevel() : null;
+  function initAmbience() {
+    if (!ambience) return;
+    ambience.setIntensitySource(function () {
+      return scene && scene.ready && usesScene() ? scene.intensity() : null;
     });
   }
 
   function roomHasSound() {
-    return Boolean(rainSound && ROOMS[roomId].sound);
+    return Boolean(ambience && ROOMS[roomId].sound);
   }
 
-  function unlockRainSound() {
-    if (roomSoundOn && roomHasSound()) rainSound.unlock();
+  function unlockAmbience() {
+    if (!roomSoundOn || !roomHasSound()) return;
+    ambience.setProfile(ROOMS[roomId].sound);
+    ambience.unlock();
   }
 
-  // Rain follows the music; after the sleep timer it keeps falling a little longer.
-  function syncRainSound() {
-    if (!rainSound) return;
+  // Ambience follows the music; after the sleep timer it lingers a little longer.
+  function syncAmbience() {
+    if (!ambience) return;
     var wanted = roomSoundOn && roomHasSound() && isPlaying;
-    rainSound.setActive(wanted, !wanted && sleepFading ? { tail: SLEEP_RAIN_TAIL } : null);
+    if (roomHasSound()) ambience.setProfile(ROOMS[roomId].sound);
+    ambience.setActive(wanted, !wanted && sleepFading ? { tail: SLEEP_AMBIENCE_TAIL } : null);
     if (wanted || !isPlaying) sleepFading = false;
   }
 
   function toggleRoomSound() {
     roomSoundOn = !roomSoundOn;
     localStorage.setItem(ROOM_SOUND_KEY, roomSoundOn ? 'on' : 'off');
-    if (roomSoundOn) unlockRainSound();
+    if (roomSoundOn) unlockAmbience();
     updateRoomSound();
-    syncRainSound();
+    syncAmbience();
   }
 
   function updateRoomSound() {
     if (!els.btnRoomSound) return;
     els.radioPage.classList.toggle('has-room-sound', roomHasSound());
-    var label = roomSoundOn ? 'Rain sound: on' : 'Rain sound: off';
+    var label = roomSoundOn ? 'Ambient sound: on' : 'Ambient sound: off';
     els.btnRoomSound.setAttribute('aria-pressed', roomSoundOn ? 'true' : 'false');
     els.btnRoomSound.setAttribute('aria-label', label);
     els.btnRoomSound.setAttribute('title', label);
