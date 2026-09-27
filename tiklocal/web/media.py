@@ -2,6 +2,7 @@
 
 import datetime
 import io
+import math
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -12,7 +13,8 @@ from tiklocal.services.library import IMAGE_EXTENSIONS
 from tiklocal.web.media_payloads import media_urls
 
 
-def register_media_routes(app, library_service, media_index, thumbnail_service, download_manager, trash_service, library_indexer):
+def register_media_routes(app, library_service, media_index, thumbnail_service, download_manager, trash_service, library_indexer,
+                          activity_store):
     def neighbors(media_type, name):
         """Previous and next items in library order (newest first)."""
         names = [str(record['name']) for record in media_index.records(media_type=media_type)]
@@ -40,10 +42,12 @@ def register_media_routes(app, library_service, media_index, thumbnail_service, 
         prev_item_path_encoded = quote(prev_item, safe='/') if prev_item else None
         next_item_path_encoded = quote(next_item, safe='/') if next_item else None
 
+        canonical = library_service.canonicalize_uri(name)
         stat = target.stat()
         return render_template(
             'detail.html',
             file=name,
+            resume=activity_store.positions_for([canonical]).get(canonical),
             file_path_encoded=file_path_encoded,
             file_query_encoded=file_query_encoded,
             mtime=datetime.datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M'),
@@ -54,6 +58,20 @@ def register_media_routes(app, library_service, media_index, thumbnail_service, 
             next_item_path_encoded=next_item_path_encoded,
             source_meta=source_meta,
         )
+
+    @app.route('/api/playback', methods=['POST'])
+    def api_playback():
+        payload = request.get_json(silent=True, force=True) or {}
+        uri = library_service.canonicalize_uri(str(payload.get('uri') or ''))
+        try:
+            position, duration = float(payload.get('position')), float(payload.get('duration'))
+        except (TypeError, ValueError):
+            return {'error': 'position and duration must be numbers'}, 400
+        if not (math.isfinite(position) and math.isfinite(duration)):
+            return {'error': 'position and duration must be finite'}, 400
+        if not uri or not library_service.resolve_path(uri):
+            return {'error': 'Unknown media'}, 404
+        return {'saved': activity_store.save_position(uri, position, duration)}
 
     @app.route('/image')
     def image_view():

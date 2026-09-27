@@ -14,7 +14,7 @@ from tiklocal.web import read_int_arg
 
 def register_library_routes(
     app, *, library_service, media_index, library_indexer, favorite_service,
-    collection_store, metadata_store, similarity_active: bool,
+    collection_store, metadata_store, activity_store, similarity_active: bool,
 ):
     def _read_page_options(scope: str = 'all') -> dict:
         mode = str(request.args.get('mode', 'all')).strip()
@@ -133,9 +133,15 @@ def register_library_routes(
         )
         records = page.pop('records')
         enrich_media_dimensions(records, metadata_store, library_service)
+        items = [serialize_library_item(record) for record in records]
+        positions = activity_store.positions_for([item['name'] for item in items if item['type'] == 'video'])
+        for item in items:
+            if spot := positions.get(item['name']):
+                item['resume'] = spot['position']
+                item['progress'] = round(spot['position'] / spot['duration'], 3)
         return {
             **page,
-            'items': [serialize_library_item(record) for record in records],
+            'items': items,
             'seed': seed,
         }
 

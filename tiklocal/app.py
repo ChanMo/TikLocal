@@ -245,7 +245,7 @@ def create_app(test_config=None):
     register_library_routes(
         app, library_service=library_service, media_index=media_index,
         library_indexer=library_indexer, favorite_service=favorite_service,
-        collection_store=collection_store, metadata_store=metadata_store,
+        collection_store=collection_store, metadata_store=metadata_store, activity_store=activity_store,
         similarity_active=similarity_active,
     )
 
@@ -258,7 +258,7 @@ def create_app(test_config=None):
     register_radio_routes(app, library_service, radio_service, thumbnail_service, RadioEnergyService(library_service))
     register_media_routes(
         app, library_service, media_index, thumbnail_service, download_manager,
-        TrashService(library_service), library_indexer,
+        TrashService(library_service), library_indexer, activity_store,
     )
     register_settings_routes(app, media_index, favorite_service, thumbnail_service, app_version)
 

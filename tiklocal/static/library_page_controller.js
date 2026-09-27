@@ -326,6 +326,13 @@
       badge.className = 'tile-video-badge';
       badge.innerHTML = feather.icons.play.toSvg({ width: 12, height: 12 });
       tile.appendChild(badge);
+
+      if (item.progress) {
+        const progress = document.createElement('span');
+        progress.className = 'tile-progress';
+        progress.style.setProperty('--progress', `${item.progress * 100}%`);
+        tile.appendChild(progress);
+      }
     } else {
       const img = document.createElement('img');
       img.src = item.thumb_url || item.media_url;
@@ -1129,6 +1136,7 @@
       if (quickVideo.getAttribute('src') !== nextSrc) {
         quickVideo.src = nextSrc;
         quickVideo.load();
+        TikLocalResume.track(quickVideo, item.name, item.resume || 0);
       }
       quickVideo.poster = item.thumb_url || '';
       quickVideo.classList.add('active');

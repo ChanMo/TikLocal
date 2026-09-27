@@ -267,6 +267,19 @@ def _migrate_008_add_time_metadata_version(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_009_create_playback_positions(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS playback_positions (
+          uri TEXT PRIMARY KEY,
+          position REAL NOT NULL,
+          duration REAL NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+
 MIGRATIONS = [
     Migration(1, "create_image_vectors", _migrate_001_create_image_vectors),
     Migration(2, "create_media_similarity_groups", _migrate_002_create_media_similarity_groups),
@@ -276,6 +289,7 @@ MIGRATIONS = [
     Migration(6, "add_media_capture_time", _migrate_006_add_media_capture_time),
     Migration(7, "add_capture_calendar_buckets", _migrate_007_add_capture_calendar_buckets),
     Migration(8, "add_time_metadata_version", _migrate_008_add_time_metadata_version),
+    Migration(9, "create_playback_positions", _migrate_009_create_playback_positions),
 ]
 
 
@@ -421,8 +435,48 @@ class MediaActivityStore:
             for row in rows
         }
 
+    # Only long videos resume; short clips, the first seconds and the ending start over.
+    RESUME_MIN_DURATION = 60.0
+    RESUME_MIN_POSITION = 10.0
+    RESUME_END_MARGIN = 15.0
+
+    def save_position(self, uri: str, position: float, duration: float) -> bool:
+        """Remember where playback stopped; returns False when the position was cleared instead."""
+        keep = (
+            duration >= self.RESUME_MIN_DURATION
+            and self.RESUME_MIN_POSITION <= position <= duration - self.RESUME_END_MARGIN
+        )
+        with self.database.connect() as conn:
+            if not keep:
+                conn.execute("DELETE FROM playback_positions WHERE uri = ?", (uri,))
+                return False
+            conn.execute(
+                """
+                INSERT INTO playback_positions(uri, position, duration, updated_at) VALUES (?, ?, ?, ?)
+                ON CONFLICT(uri) DO UPDATE SET
+                  position = excluded.position, duration = excluded.duration, updated_at = excluded.updated_at
+                """,
+                (uri, position, duration, datetime.datetime.now(datetime.timezone.utc).isoformat()),
+            )
+        return True
+
+    def positions_for(self, uris: list[str]) -> dict[str, dict]:
+        unique = list(dict.fromkeys(str(uri) for uri in uris if uri))
+        results: dict[str, dict] = {}
+        with self.database.connect() as conn:
+            for start in range(0, len(unique), 500):
+                chunk = unique[start:start + 500]
+                placeholders = ",".join("?" for _ in chunk)
+                rows = conn.execute(
+                    f"SELECT uri, position, duration FROM playback_positions WHERE uri IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+                results.update({str(row["uri"]): {"position": row["position"], "duration": row["duration"]} for row in rows})
+        return results
+
     def clear(self) -> None:
         with self.database.connect() as conn:
+            conn.execute("DELETE FROM playback_positions")
             conn.execute("DELETE FROM media_events")
             conn.execute("DELETE FROM media_affinity")
             conn.execute("DELETE FROM preference_dimensions")

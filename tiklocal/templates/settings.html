@@ -354,7 +354,7 @@
         <span class="setting-icon"><i data-feather="clock"></i></span>
         <div class="settings-row-main">
           <div class="settings-row-title">Local Browsing History</div>
-          <div class="settings-row-copy">Reset views, skips, and completions without changing favorites or collections.</div>
+          <div class="settings-row-copy">Reset views, skips, completions, and resume points without changing favorites or collections.</div>
         </div>
         <button id="reset-recommendations" class="settings-action is-danger" type="button">Reset</button>
       </div>
@@ -764,7 +764,7 @@
     });
 
     resetButton.addEventListener('click', () => {
-      confirmAction('Reset recommendation history?', 'Views, skips, and completions will be cleared. Favorites and collections remain unchanged.', 'Reset History', 'danger', () => {
+      confirmAction('Reset recommendation history?', 'Views, skips, completions, and resume points will be cleared. Favorites and collections remain unchanged.', 'Reset History', 'danger', () => {
         runButton(resetButton, 'Resetting…', async () => {
           await requestJson('/api/activity', { method: 'DELETE' });
           TikLocalUI.toast('Recommendation history reset');

@@ -305,6 +305,23 @@
     object-fit: cover;
     background: #000;
   }
+  .tile-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.28);
+  }
+
+  .tile-progress::after {
+    content: '';
+    display: block;
+    width: var(--progress);
+    height: 100%;
+    background: #e18462;
+  }
+
   .tile-video-badge {
     position: absolute;
     right: 8px;

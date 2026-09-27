@@ -374,6 +374,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  TikLocalResume.track(mainVideo, fileName, {{ (resume.position if resume else 0)|tojson }});
+
   // Initialize.
   initFavoriteStatus();
 
