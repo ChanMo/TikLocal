@@ -643,7 +643,7 @@
         closeCreateModal();
         await loadCollections();
       } catch (error) {
-        alert(error.message || 'Failed to create collection');
+        TikLocalUI.toast(error.message || 'Failed to create collection', 'error');
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create';
@@ -665,7 +665,7 @@
         closeRenameModal();
         await loadCollections();
       } catch (error) {
-        alert(error.message || 'Failed to rename collection');
+        TikLocalUI.toast(error.message || 'Failed to rename collection', 'error');
       } finally {
         renameSubmitBtn.disabled = false;
         renameSubmitBtn.textContent = 'Save';
@@ -675,13 +675,18 @@
     async function deleteCollection(collectionId) {
       const item = collectionsById.get(collectionId);
       if (!item) return;
-      const ok = window.confirm(`Delete the collection "${String(item.name || 'Untitled collection')}"?`);
+      const ok = await TikLocalUI.confirm({
+        title: `Delete "${String(item.name || 'Untitled collection')}"?`,
+        message: 'The collection is removed. The media inside it stays in your library.',
+        confirmLabel: 'Delete',
+        tone: 'danger',
+      });
       if (!ok) return;
       try {
         await api(`/api/collections/${encodeURIComponent(collectionId)}`, { method: 'DELETE' });
         await loadCollections();
       } catch (error) {
-        alert(error.message || 'Failed to delete collection');
+        TikLocalUI.toast(error.message || 'Failed to delete collection', 'error');
       }
     }
 

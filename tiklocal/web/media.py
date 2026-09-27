@@ -12,6 +12,16 @@ from tiklocal.web.media_payloads import media_urls
 
 
 def register_media_routes(app, library_service, media_index, thumbnail_service, download_manager):
+    def neighbors(media_type, name):
+        """Previous and next items in library order (newest first)."""
+        names = [str(record['name']) for record in media_index.records(media_type=media_type)]
+        try:
+            index = names.index(name)
+        except ValueError:
+            return None, None
+        return (names[index - 1] if index > 0 else None,
+                names[index + 1] if index < len(names) - 1 else None)
+
     @app.route('/detail/<path:name>')
     def detail_view(name):
         name = library_service.find_existing_uri(name)
@@ -25,17 +35,7 @@ def register_media_routes(app, library_service, media_index, thumbnail_service, 
         file_path_encoded = quote(name, safe='/')
         file_query_encoded = quote(name, safe='')
 
-        video_names = [
-            str(record['name'])
-            for record in media_index.records(media_type='video')
-        ]
-
-        try:
-            index = video_names.index(name)
-            prev_item = video_names[index-1] if index > 0 else None
-            next_item = video_names[index+1] if index < len(video_names)-1 else None
-        except ValueError:
-            prev_item = next_item = None
+        prev_item, next_item = neighbors('video', name)
         prev_item_path_encoded = quote(prev_item, safe='/') if prev_item else None
         next_item_path_encoded = quote(next_item, safe='/') if next_item else None
 
@@ -65,8 +65,11 @@ def register_media_routes(app, library_service, media_index, thumbnail_service, 
         source_meta = download_manager.resolve_source_for_file(uri)
         uri_path_encoded = quote(uri, safe='/')
         uri_query_encoded = quote(uri, safe='')
+        prev_item, next_item = neighbors('image', uri)
         return render_template(
             'image_detail.html',
+            previous_url=f"/image?uri={quote(prev_item, safe='')}" if prev_item else None,
+            next_url=f"/image?uri={quote(next_item, safe='')}" if next_item else None,
             image=target,
             uri=uri,
             uri_path_encoded=uri_path_encoded,

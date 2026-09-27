@@ -1,3 +1,33 @@
+/* Cross-document transitions: chrome stays put, media morphs, the page itself crossfades. */
+@view-transition {
+  navigation: auto;
+}
+
+.floating-dock { view-transition-name: app-dock; }
+.mobile-app-header { view-transition-name: app-header; }
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+}
+
+::view-transition-group(media-hero) {
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(media-hero),
+::view-transition-new(media-hero) {
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}
+
 :root {
   --app-nav-width: 72px;
   --app-nav-safe-top: max(12px, env(safe-area-inset-top));

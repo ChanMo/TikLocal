@@ -11,6 +11,9 @@
     {% if auth_enabled %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endif %}
     <link rel="stylesheet" type="text/css" href="{{ static_asset('output.css') }}">
     <script src="{{ static_asset('feather.min.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ static_asset('ui_feedback.css') }}">
+    <script src="{{ static_asset('ui_feedback.js') }}"></script>
+    <script src="{{ static_asset('page_transitions.js') }}"></script>
     <script src="{{ url_for('static', filename='retire_pwa.js') }}"></script>
     {% if auth_enabled %}<script src="{{ static_asset('csrf_fetch.js') }}"></script>{% endif %}
     <style>

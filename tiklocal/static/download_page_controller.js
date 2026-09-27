@@ -15,16 +15,6 @@
       .replace(/'/g, '&#39;');
   }
 
-  function notify(message, type = 'info') {
-    const wrap = document.getElementById('toast-wrap');
-    if (!wrap) return;
-    const toast = document.createElement('div');
-    toast.className = `download-toast ${type}`;
-    toast.textContent = message;
-    wrap.appendChild(toast);
-    window.setTimeout(() => toast.remove(), 2800);
-  }
-
   async function api(path, options = {}) {
     const response = await fetch(path, {
       headers: { 'Content-Type': 'application/json' },
@@ -189,7 +179,7 @@
       const jobs = data.jobs || [];
       renderJobs(jobs, { force });
     } catch (error) {
-      notify(error.message, 'error');
+      TikLocalUI.toast(error.message, 'error');
       schedulePolling(false);
     }
   }
@@ -297,13 +287,13 @@
       if (action === 'cancel') await api(`/api/download/jobs/${jobId}/cancel`, { method: 'POST' });
       if (action === 'retry') {
         await api(`/api/download/jobs/${jobId}/retry`, { method: 'POST' });
-        notify('Retry submitted');
+        TikLocalUI.toast('Retry submitted');
       }
       if (action === 'delete') await api(`/api/download/jobs/${jobId}`, { method: 'DELETE' });
       lastJobsSignature = '';
       await refreshJobs({ force: true });
     } catch (error) {
-      notify(error.message, 'error');
+      TikLocalUI.toast(error.message, 'error');
       button.disabled = false;
     }
   }
@@ -326,7 +316,7 @@
       if (!url) return;
       if (!updateDetectedSite(urlInput)) return;
       if (selectedEngine === 'gallery-dl' && !dependencyMeta.gallery_dl_available) {
-        notify('The image download component is not installed.', 'error');
+        TikLocalUI.toast('The image download component is not installed.', 'error');
         return;
       }
       submitButton.disabled = true;
@@ -336,11 +326,11 @@
         await api('/api/download/jobs', { method: 'POST', body: JSON.stringify(payload) });
         urlInput.value = '';
         updateDetectedSite(urlInput);
-        notify('Added to the download queue');
+        TikLocalUI.toast('Added to the download queue');
         lastJobsSignature = '';
         await refreshJobs({ force: true });
       } catch (error) {
-        notify(error.message, 'error');
+        TikLocalUI.toast(error.message, 'error');
       } finally {
         submitButton.disabled = false;
         submitButton.textContent = 'Start Download';
@@ -360,11 +350,11 @@
       if (!await confirmClear({ title: 'Clear all download history?', copy: 'Active jobs and local media files will be kept.' })) return;
       try {
         const data = await api('/api/download/jobs/clear', { method: 'POST' });
-        notify(`Cleared ${data.deleted || 0} records`);
+        TikLocalUI.toast(`Cleared ${data.deleted || 0} records`);
         lastJobsSignature = '';
         await refreshJobs({ force: true });
       } catch (error) {
-        notify(error.message, 'error');
+        TikLocalUI.toast(error.message, 'error');
       }
     });
 

@@ -1,99 +1,20 @@
 {% extends "base.html" %}
 
 {% block extra_head %}
+<link rel="stylesheet" type="text/css" href="{{ static_asset('media_detail.css') }}">
 <style>
-  .video-player {
-    max-height: calc(100vh - 156px);
-    object-fit: contain;
-  }
-
   .video-stage {
     min-height: min(calc(100vh - 136px), 820px);
-    overflow: hidden;
   }
 
-  .material-icon-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: rgb(55 65 81);
-    transition: background-color 0.16s ease, color 0.16s ease;
-  }
-
-  .material-icon-btn:hover {
-    background: rgba(229, 231, 235, 0.86);
-    color: rgb(17 24 39);
-  }
-
-  [data-theme="dark"] .material-icon-btn {
-    color: rgb(209 213 219);
-  }
-
-  [data-theme="dark"] .material-icon-btn:hover {
-    background: rgba(55, 65, 81, 0.78);
-    color: white;
-  }
-
-  .favorite-btn.active {
-    background: rgb(254 226 226);
-    color: rgb(220 38 38);
-  }
-
-  [data-theme="dark"] .favorite-btn.active {
-    background: rgba(127, 29, 29, 0.72);
-    color: rgb(252 165 165);
-  }
-
-  .video-detail-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
-    gap: 24px;
-    align-items: start;
-  }
-
-  .speed-btn {
-    height: 32px;
-    border-radius: 999px;
-    padding: 0 12px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgb(75 85 99);
-    transition: background-color 0.16s ease, color 0.16s ease;
-  }
-
-  .speed-btn:hover {
-    background: rgb(243 244 246);
-    color: rgb(17 24 39);
-  }
-
-  .speed-btn.is-active {
-    background: rgb(17 24 39);
-    color: white;
-  }
-
-  [data-theme="dark"] .speed-btn {
-    color: rgb(209 213 219);
-  }
-
-  [data-theme="dark"] .speed-btn:hover {
-    background: rgb(55 65 81);
-    color: white;
-  }
-
-  [data-theme="dark"] .speed-btn.is-active {
-    background: rgb(229 231 235);
-    color: rgb(17 24 39);
+  .video-player {
+    width: 100%;
+    max-height: calc(100vh - 156px);
+    object-fit: contain;
+    border-radius: 3px;
   }
 
   @media (max-width: 1023px) {
-    .video-detail-grid {
-      grid-template-columns: 1fr;
-      gap: 18px;
-    }
-
     .video-stage {
       min-height: auto;
     }
@@ -106,14 +27,14 @@
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-neutral-50 py-3 dark:bg-neutral-950">
-  <div class="container mx-auto max-w-7xl px-3">
-    <header class="mb-3 flex h-12 items-center justify-between gap-3">
-      <button onclick="history.back()" class="material-icon-btn shrink-0" aria-label="Back" type="button">
+<div class="detail-shell">
+  <div class="detail-container">
+    <header class="detail-header">
+      <button onclick="history.back()" class="material-icon-btn" aria-label="Back" type="button">
         <i data-feather="arrow-left" class="w-5 h-5"></i>
       </button>
 
-      <div class="relative flex min-w-0 items-center gap-1">
+      <div class="detail-header-actions">
         {% if previous_item %}
         <a href="/detail/{{ previous_item_path_encoded }}" class="material-icon-btn" aria-label="Previous video">
           <i data-feather="chevron-left" class="w-5 h-5"></i>
@@ -172,13 +93,13 @@
       </div>
     </header>
 
-    <div class="video-detail-grid">
+    <div class="detail-grid">
       <main>
-        <div class="video-stage relative flex items-center justify-center rounded-xl bg-neutral-100 p-2 dark:bg-black" id="video-container">
+        <div class="detail-stage video-stage" id="video-container">
           <video
             controls
             preload="metadata"
-            class="video-player w-full rounded-lg"
+            class="video-player detail-hero"
             id="main-video"
             src="/media/{{ file_path_encoded }}"
             poster="/thumb?uri={{ file_query_encoded }}"
@@ -188,22 +109,18 @@
         </div>
       </main>
 
-      <aside class="min-w-0 space-y-6 lg:border-l lg:border-gray-200 lg:pl-6 dark:lg:border-gray-800">
+      <aside class="detail-aside">
         <section>
-          <h1 class="detail-wrap-anywhere text-xl font-semibold leading-snug text-gray-950 dark:text-white">
+          <p class="detail-label">Video</p>
+          <h1 class="detail-title detail-wrap-anywhere">
             {{ file.rsplit('/', 1)[-1].rsplit('.', 1)[0] }}
           </h1>
         </section>
 
         {% if source_meta and source_meta.url %}
         <section>
-          <div class="mb-1 text-xs text-gray-500 dark:text-gray-400">Source</div>
-          <a
-            href="{{ source_meta.url }}"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="detail-source-link inline-flex items-center gap-2 text-sm font-medium text-gray-800 hover:text-gray-950 dark:text-gray-200 dark:hover:text-white"
-          >
+          <p class="detail-label">Source</p>
+          <a href="{{ source_meta.url }}" target="_blank" rel="noopener noreferrer" class="detail-source-link">
             <i data-feather="external-link" class="w-4 h-4"></i>
             <span>{{ source_meta.source_domain or 'View Source' }}</span>
           </a>
@@ -211,17 +128,17 @@
         {% endif %}
 
         <section>
-          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">File</div>
-          <div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-            <div class="break-all font-medium text-gray-900 dark:text-white">{{ file }}</div>
+          <p class="detail-label">File</p>
+          <div class="detail-meta">
+            <div class="detail-meta-path">{{ file }}</div>
             <div>{{ size | filesizeformat }}</div>
             <div>{{ mtime }}</div>
           </div>
         </section>
 
         <section>
-          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">Speed</div>
-          <div class="flex flex-wrap gap-1 rounded-full bg-white p-1 dark:bg-gray-900">
+          <p class="detail-label">Speed</p>
+          <div class="detail-segment">
             <button class="speed-btn" data-speed="0.5" type="button">0.5x</button>
             <button class="speed-btn is-active" data-speed="1" type="button">1x</button>
             <button class="speed-btn" data-speed="1.5" type="button">1.5x</button>
@@ -230,26 +147,20 @@
         </section>
 
         {% if previous_item or next_item %}
-        <section class="grid grid-cols-2 gap-2">
+        <nav class="detail-pager" aria-label="Video navigation">
           {% if previous_item %}
-          <a
-            href="/detail/{{ previous_item_path_encoded }}"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
+          <a href="/detail/{{ previous_item_path_encoded }}" class="detail-pill">
             <i data-feather="chevron-left" class="w-4 h-4"></i>
             Previous
           </a>
           {% endif %}
           {% if next_item %}
-          <a
-            href="/detail/{{ next_item_path_encoded }}"
-            class="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 {% if not previous_item %}col-start-2{% endif %}"
-          >
+          <a href="/detail/{{ next_item_path_encoded }}" class="detail-pill is-next">
             Next
             <i data-feather="chevron-right" class="w-4 h-4"></i>
           </a>
           {% endif %}
-        </section>
+        </nav>
         {% endif %}
       </aside>
     </div>
@@ -347,10 +258,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok || typeof data.favorite !== 'boolean') throw new Error('Failed to save favorite');
       isFavorited = data.favorite;
       updateFavoriteUI();
-      showNotification(isFavorited ? 'Added to favorites' : 'Removed from favorites', 'success');
+      TikLocalUI.toast(isFavorited ? 'Added to favorites' : 'Removed from favorites', 'success');
     } catch (error) {
       console.error('Failed to update favorite:', error);
-      showNotification('The action failed. Please try again.', 'error');
+      TikLocalUI.toast('The action failed. Please try again.', 'error');
     } finally {
       favoriteBtn.disabled = false;
     }
@@ -387,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await mainVideo.requestPictureInPicture();
       }
     } catch (error) {
-      showNotification('Picture in picture is not supported', 'error');
+      TikLocalUI.toast('Picture in picture is not supported', 'error');
     }
   });
 
@@ -398,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const speed = parseFloat(btn.dataset.speed);
       mainVideo.playbackRate = speed;
       speedBtns.forEach(b => b.classList.toggle('is-active', b === btn));
-      showNotification(`Playback speed set to ${speed}x`, 'info');
+      TikLocalUI.toast(`Playback speed set to ${speed}x`, 'info');
     });
   });
 
@@ -408,9 +319,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const url = window.location.origin + '/media?uri=' + encodeURIComponent(fileName);
       await navigator.clipboard.writeText(url);
-      showNotification('Link copied to clipboard', 'success');
+      TikLocalUI.toast('Link copied to clipboard', 'success');
     } catch (err) {
-      showNotification('Copy failed. Please copy the link manually.', 'error');
+      TikLocalUI.toast('Copy failed. Please copy the link manually.', 'error');
     }
   });
 
@@ -481,124 +392,34 @@ document.addEventListener('DOMContentLoaded', () => {
       if (resp.ok && data.success) {
         // Force a poster cache refresh.
         mainVideo.setAttribute('poster', `/thumb?uri=${encodeURIComponent(fileName)}&v=${Date.now()}`);
-        showNotification('Thumbnail updated', 'success');
+        TikLocalUI.toast('Thumbnail updated', 'success');
       } else {
-        showNotification(data.error || 'Failed to generate thumbnail', 'error');
+        TikLocalUI.toast(data.error || 'Failed to generate thumbnail', 'error');
       }
     } catch (e) {
-      showNotification('An error occurred. Please try again later.', 'error');
+      TikLocalUI.toast('An error occurred. Please try again later.', 'error');
     }
   });
 });
 
 // Delete confirmation.
-function confirmDelete() {
-  showModal(
-    'Delete this video?',
-    'This action cannot be undone. The video will be permanently deleted.',
-    async () => {
-      try {
-        const response = await fetch('/delete/{{ file_path_encoded }}', { method: 'POST' });
-        if (response.ok || response.redirected) {
-          window.location.href = '/library';
-          return;
-        }
-        showNotification('Delete failed. Please try again.', 'error');
-      } catch (error) {
-        showNotification('Delete failed. Please try again.', 'error');
-      }
+async function confirmDelete() {
+  const confirmed = await TikLocalUI.confirm({
+    title: 'Delete this video?',
+    message: 'This action cannot be undone. The video will be permanently deleted.',
+    confirmLabel: 'Delete',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
+  try {
+    const response = await fetch('/delete/{{ file_path_encoded }}', { method: 'POST' });
+    if (response.ok || response.redirected) {
+      window.location.href = '/library';
+      return;
     }
-  );
-}
-
-// Notification helper.
-function showNotification(message, type = 'info') {
-  const iconMap = {
-    success: 'check-circle',
-    info: 'info',
-    error: 'alert-circle'
-  };
-  const colorMap = {
-    success: 'bg-green-500',
-    info: 'bg-blue-500',
-    error: 'bg-red-500'
-  };
-
-  const notification = document.createElement('div');
-  notification.className = `fixed bottom-20 right-5 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white ${colorMap[type]} transform translate-y-20 opacity-0 transition-all duration-300 ease-out z-50`;
-  notification.innerHTML = `
-    <i data-feather="${iconMap[type]}" class="w-6 h-6"></i>
-    <span class="font-medium">${message}</span>
-  `;
-  
-  document.body.appendChild(notification);
-  feather.replace();
-  
-  setTimeout(() => {
-    notification.classList.remove('translate-y-20', 'opacity-0');
-  }, 10);
-
-  setTimeout(() => {
-    notification.classList.add('opacity-0');
-    setTimeout(() => {
-      notification.remove();
-    }, 300);
-  }, 3000);
-}
-
-// Modal helper.
-function showModal(title, text, onConfirm) {
-  const existingModal = document.getElementById('confirmation-modal');
-  if (existingModal) existingModal.remove();
-
-  const modalHTML = `
-    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md m-4 transform transition-all" role="document">
-        <div class="p-6">
-          <div class="flex items-start gap-4">
-            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 sm:mx-0 sm:h-10 sm:w-10">
-              <i data-feather="alert-triangle" class="h-6 w-6 text-red-600 dark:text-red-400"></i>
-            </div>
-            <div class="mt-0 text-center sm:text-left">
-              <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">${title}</h3>
-              <div class="mt-2">
-                <p class="text-sm text-gray-500 dark:text-gray-400">${text}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-2xl">
-          <button type="button" id="confirm-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
-            Delete
-          </button>
-          <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', modalHTML);
-  feather.replace();
-
-  const modal = document.getElementById('confirmation-modal');
-  const confirmBtn = document.getElementById('confirm-btn');
-  const cancelBtn = document.getElementById('cancel-btn');
-
-  function closeModal() {
-    modal.remove();
-  }
-
-  confirmBtn.onclick = () => {
-    onConfirm();
-    closeModal();
-  };
-  cancelBtn.onclick = closeModal;
-  modal.onclick = (e) => {
-    if (e.target === modal) {
-      closeModal();
-    }
+    TikLocalUI.toast('Delete failed. Please try again.', 'error');
+  } catch (error) {
+    TikLocalUI.toast('Delete failed. Please try again.', 'error');
   }
 }
 </script>

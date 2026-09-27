@@ -211,21 +211,6 @@
   .about-link { color: var(--settings-muted); font-size: 10px; font-weight: 560; text-decoration: none; }
   .about-link:hover { color: var(--settings-ink); }
   .about-link:focus-visible { outline: 2px solid var(--settings-ink); outline-offset: 3px; border-radius: 3px; }
-  .confirm-mask {
-    position: fixed;
-    inset: 0;
-    z-index: 270;
-    display: grid;
-    place-items: center;
-    padding: 16px;
-    background: rgba(18, 18, 16, 0.42);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-  }
-  .confirm-card { width: min(100%, 390px); padding: 19px; border: 1px solid var(--settings-line); border-radius: 20px; color: var(--settings-ink); background: var(--settings-bg); box-shadow: 0 24px 70px rgba(20, 19, 16, 0.22); }
-  .confirm-title { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
-  .confirm-copy { margin: 7px 0 0; color: var(--settings-muted); font-size: 12px; line-height: 1.55; }
-  .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
   .credential-mask[hidden] { display: none; }
   .credential-mask { position: fixed; inset: 0; z-index: 275; display: grid; place-items: center; padding: 16px; background: rgba(18,18,16,.44); backdrop-filter: blur(9px); }
   .credential-dialog { width: min(100%, 430px); max-height: min(620px, calc(100dvh - 32px)); overflow-y: auto; padding: 20px; border: 1px solid var(--settings-line); border-radius: 22px; color: var(--settings-ink); background: var(--settings-bg); box-shadow: 0 26px 80px rgba(20,19,16,.24); }
@@ -260,15 +245,9 @@
   .pairing-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .pairing-open { display: inline-grid; place-items: center; text-decoration: none; }
   .pairing-open[aria-disabled="true"] { pointer-events: none; opacity: .5; }
-  .toast-wrap { position: fixed; right: 14px; bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 280; width: min(330px, calc(100vw - 28px)); }
-  .settings-toast { display: flex; align-items: center; gap: 9px; padding: 11px 13px; border: 1px solid var(--settings-line); border-radius: 13px; color: var(--settings-ink); background: color-mix(in oklab, var(--settings-bg) 92%, transparent); box-shadow: 0 12px 32px rgba(20, 19, 16, 0.14); font-size: 12px; backdrop-filter: blur(16px); animation: toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
-  .settings-toast svg { width: 16px; height: 16px; color: #668b7d; }
-  .settings-toast.error svg { color: #bd6259; }
-  .settings-toast.error { border-color: rgba(180, 67, 59, 0.28); }
-  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
   @media (min-width: 640px) { .settings-page { padding: 34px 18px 14px; } }
   @media (prefers-reduced-motion: reduce) {
-    .theme-option, .settings-action, .settings-toast { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    .theme-option, .settings-action { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   }
 </style>
 {% endblock %}
@@ -467,7 +446,6 @@
     </div>
   </section>
 </div>
-<div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
 {% endblock %}
 
 {% block extra_body %}
@@ -487,7 +465,6 @@
     const copyPairingButton = document.getElementById('copy-radio-pairing');
     const openRadioLink = document.getElementById('open-radio-link');
     const radioDeviceList = document.getElementById('radio-device-list');
-    const toastWrap = document.getElementById('toast-wrap');
     let pairingTimer = 0;
 
     function currentThemePreference() {
@@ -516,18 +493,6 @@
       syncThemeButtons(preference);
     }
 
-    function showToast(message, type = 'info') {
-      const toast = document.createElement('div');
-      toast.className = `settings-toast ${type}`;
-      const icon = document.createElement('i');
-      icon.setAttribute('data-feather', type === 'error' ? 'alert-circle' : 'check-circle');
-      const copy = document.createElement('span');
-      copy.textContent = message;
-      toast.append(icon, copy);
-      toastWrap.replaceChildren(toast);
-      feather.replace();
-      window.setTimeout(() => toast.remove(), 3200);
-    }
 
     async function requestJson(url, options = {}) {
       const response = await fetch(url, options);
@@ -614,8 +579,8 @@
               runButton(revoke, 'Revoking…', async () => {
                 await requestJson(`/api/radio/devices/${encodeURIComponent(device.id)}`, { method: 'DELETE' });
                 await loadRadioDevices();
-                showToast('Radio client revoked');
-              }).catch(() => showToast('Failed to revoke the client. Please try again later.', 'error'));
+                TikLocalUI.toast('Radio client revoked');
+              }).catch(() => TikLocalUI.toast('Failed to revoke the client. Please try again later.', 'error'));
             },
           );
         });
@@ -635,30 +600,8 @@
       }
     }
 
-    function confirmAction(title, copy, actionLabel, tone, onConfirm) {
-      const mask = document.createElement('div');
-      mask.className = 'confirm-mask';
-      mask.innerHTML = `
-        <section class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-          <h2 id="confirm-title" class="confirm-title"></h2>
-          <p class="confirm-copy"></p>
-          <div class="confirm-actions">
-            <button class="settings-action" type="button" data-confirm-cancel>Cancel</button>
-            <button class="settings-action" type="button" data-confirm-accept></button>
-          </div>
-        </section>`;
-      mask.querySelector('.confirm-title').textContent = title;
-      mask.querySelector('.confirm-copy').textContent = copy;
-      const acceptButton = mask.querySelector('[data-confirm-accept]');
-      acceptButton.textContent = actionLabel;
-      acceptButton.classList.add(`is-${tone}`);
-      const close = () => mask.remove();
-      mask.querySelector('[data-confirm-cancel]').addEventListener('click', close);
-      acceptButton.addEventListener('click', () => { close(); onConfirm(); });
-      mask.addEventListener('click', (event) => { if (event.target === mask) close(); });
-      mask.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
-      document.body.appendChild(mask);
-      mask.querySelector('[data-confirm-cancel]').focus();
+    async function confirmAction(title, copy, actionLabel, tone, onConfirm) {
+      if (await TikLocalUI.confirm({ title, message: copy, confirmLabel: actionLabel, tone })) onConfirm();
     }
 
     async function runButton(button, busyLabel, task) {
@@ -777,7 +720,7 @@
         pairingLink.select();
         document.execCommand('copy');
       }
-      showToast('Pairing link copied');
+      TikLocalUI.toast('Pairing link copied');
     }
 
     themeButtons.forEach((button) => button.addEventListener('click', () => setThemePreference(button.dataset.themePreference)));
@@ -789,8 +732,8 @@
         runButton(refreshButton, 'Scanning…', async () => {
           const payload = await requestJson('/api/library/sync', { method: 'POST' });
           await loadStats();
-          showToast(`Scan complete. Indexed ${Number(payload.data?.indexed || 0)} media items.`);
-        }).catch(() => showToast('Scan failed. Please try again later.', 'error'));
+          TikLocalUI.toast(`Scan complete. Indexed ${Number(payload.data?.indexed || 0)} media items.`);
+        }).catch(() => TikLocalUI.toast('Scan failed. Please try again later.', 'error'));
       });
     });
 
@@ -799,8 +742,8 @@
         runButton(clearCacheButton, 'Clearing…', async () => {
           const payload = await requestJson('/api/cache/clear', { method: 'POST' });
           await loadStats();
-          showToast(`Freed ${Number(payload.freed_mb || 0)} MB`);
-        }).catch(() => showToast('Cleanup failed. Please try again later.', 'error'));
+          TikLocalUI.toast(`Freed ${Number(payload.freed_mb || 0)} MB`);
+        }).catch(() => TikLocalUI.toast('Cleanup failed. Please try again later.', 'error'));
       });
     });
 
@@ -808,8 +751,8 @@
       confirmAction('Reset recommendation history?', 'Views, skips, and completions will be cleared. Favorites and collections remain unchanged.', 'Reset History', 'danger', () => {
         runButton(resetButton, 'Resetting…', async () => {
           await requestJson('/api/activity', { method: 'DELETE' });
-          showToast('Recommendation history reset');
-        }).catch(() => showToast('Reset failed. Please try again later.', 'error'));
+          TikLocalUI.toast('Recommendation history reset');
+        }).catch(() => TikLocalUI.toast('Reset failed. Please try again later.', 'error'));
       });
     });
 
@@ -824,8 +767,8 @@
           body: JSON.stringify({ max_concurrent: maxConcurrent }),
         });
         document.querySelectorAll('[data-concurrency]').forEach((item) => item.classList.toggle('is-active', item === button));
-        showToast(`Concurrent downloads set to ${maxConcurrent}`);
-      } catch (_) { showToast('Failed to save download settings', 'error'); }
+        TikLocalUI.toast(`Concurrent downloads set to ${maxConcurrent}`);
+      } catch (_) { TikLocalUI.toast('Failed to save download settings', 'error'); }
     });
 
     document.getElementById('manage-credentials').addEventListener('click', openCredentials);
@@ -854,12 +797,12 @@
         openRadioLink.href = pairingLink.value;
         openRadioLink.setAttribute('aria-disabled', 'false');
         startPairingTimer(data.expires_in);
-      }).catch((error) => showToast(error.message || 'Failed to generate pairing link', 'error'));
+      }).catch((error) => TikLocalUI.toast(error.message || 'Failed to generate pairing link', 'error'));
     });
     document.getElementById('upload-credential').addEventListener('click', (event) => {
       const input = document.getElementById('credential-file');
       const file = input.files?.[0];
-      if (!file) { showToast('Select a credential file first', 'error'); return; }
+      if (!file) { TikLocalUI.toast('Select a credential file first', 'error'); return; }
       runButton(event.currentTarget, 'Uploading…', async () => {
         const formData = new FormData();
         formData.append('file', file);
@@ -867,8 +810,8 @@
         input.value = '';
         const payload = await requestJson('/api/download/cookies');
         renderCredentials(payload.data?.files || []);
-        showToast('Credentials updated');
-      }).catch(() => showToast('Failed to upload credentials', 'error'));
+        TikLocalUI.toast('Credentials updated');
+      }).catch(() => TikLocalUI.toast('Failed to upload credentials', 'error'));
     });
 
     loadStats();

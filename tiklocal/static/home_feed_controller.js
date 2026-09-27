@@ -136,10 +136,6 @@
     let isImmersive = false;
     let isDragging = false;
     let wasPlayingBeforeDrag = false;
-    let clickTimer = null;
-    let lastClickTime = 0;
-    let touchStartX = 0;
-    let touchStartY = 0;
 
     let isMagnifying = false;
     let magX = 0;
@@ -161,8 +157,10 @@
         && videoEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
     }
 
-    function showVideoStartCover() {
+    function showVideoStartCover(item) {
       clearTimeout(videoStartCoverTimer);
+      // The thumbnail matches what the page slid in with, so the hand-off does not flash black.
+      videoStartCover.style.backgroundImage = item?.thumb_url ? `url("${item.thumb_url}")` : '';
       videoStartCover.classList.remove('is-waiting');
       videoStartCover.classList.add('is-visible');
       videoStartCover.setAttribute('aria-hidden', 'false');
@@ -310,7 +308,7 @@
           flashCaptionError();
         }
       },
-      confirmCaptionReplace: async () => window.confirm('A title already exists. Replace it?'),
+      confirmCaptionReplace: () => TikLocalUI.confirm({ title: 'Replace the existing title?', message: 'The current title and tags will be regenerated.', confirmLabel: 'Replace' }),
     });
 
 
@@ -531,15 +529,84 @@
       if (getCurrentIndex() >= feedItems.length - 1 && flowSession.hasMore()) {
         await loadFeed();
       }
-      if (getCurrentIndex() < feedItems.length - 1) {
-        await showItem(getCurrentIndex() + 1);
+      slidePage(1);
+    }
+
+    function goPrev() {
+      slidePage(-1);
+    }
+
+    // Paging moves the current item and its neighbour together, so a swipe follows the finger.
+    const pageEase = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let pager = null;
+    let settling = false;
+
+    function setPeek(item, visible) {
+      if (!item) return;
+      item.el.classList.toggle('active', visible);
+      item.el.style.display = visible ? (item.type === 'theme_strip' ? '' : 'block') : 'none';
+      item.el.style.removeProperty('transition');
+      item.el.style.translate = '';
+    }
+
+    function placePage(offset, duration = 0) {
+      const transition = duration ? `translate ${duration}ms ${pageEase}` : 'none';
+      const height = feedContainer.clientHeight;
+      [currentItem()?.el, videoStartCover].forEach((el) => {
+        if (!el) return;
+        // Inline !important: the global stylesheet disables transitions on img/video.
+        el.style.setProperty('transition', transition, 'important');
+        el.style.translate = `0 ${offset}px`;
+      });
+      if (pager?.peer) {
+        pager.peer.el.style.setProperty('transition', transition, 'important');
+        pager.peer.el.style.translate = `0 ${offset + pager.dir * height}px`;
       }
     }
 
-    async function goPrev() {
-      if (getCurrentIndex() > 0) {
-        await showItem(getCurrentIndex() - 1);
-      }
+    function beginPage(dir) {
+      const index = getCurrentIndex() + dir;
+      const peer = feedItems[index] || null;
+      if (pager?.peer && pager.peer !== peer) setPeek(pager.peer, false);
+      pager = { dir, index, peer };
+      if (peer) setPeek(peer, true);
+    }
+
+    function settlePage(commit, offset) {
+      if (!pager) return;
+      const { index, peer, dir } = pager;
+      const height = feedContainer.clientHeight;
+      const moving = commit && !!peer;
+      const target = moving ? -dir * height : 0;
+      const distance = Math.abs(target - offset) / Math.max(height, 1);
+      const duration = reduceMotion.matches ? 0 : Math.round(Math.min(340, Math.max(170, distance * 380)));
+      settling = true;
+      if (duration) placePage(target, duration);
+      window.setTimeout(() => {
+        [currentItem()?.el, videoStartCover].forEach((el) => {
+          if (!el) return;
+          el.style.removeProperty('transition');
+          el.style.translate = '';
+        });
+        if (moving) {
+          peer.el.style.removeProperty('transition');
+          peer.el.style.translate = '';
+        } else {
+          setPeek(peer, false);
+        }
+        pager = null;
+        settling = false;
+        if (moving) showItem(index);
+      }, duration);
+    }
+
+    function slidePage(dir) {
+      if (settling || pager || !feedItems[getCurrentIndex() + dir]) return;
+      beginPage(dir);
+      placePage(0);
+      void feedContainer.offsetHeight;
+      settlePage(true, 0);
     }
 
     function goGroupNext() {
@@ -921,7 +988,7 @@
       flowState.onMediaChanged();
 
       const needsVideoStartCover = item.type === 'video' && !isVideoStartReady(item.el);
-      if (needsVideoStartCover) showVideoStartCover();
+      if (needsVideoStartCover) showVideoStartCover(item);
       else hideVideoStartCover();
 
       item.el.style.display = item.type === 'theme_strip' ? '' : 'block';
@@ -1094,6 +1161,7 @@
         video.playsInline = true;
         video.controls = false;
         video.preload = 'metadata';
+        if (item.thumb_url) video.poster = item.thumb_url;
         video.dataset.src = item.media_url;
         video.dataset.name = item.name;
         video.addEventListener('error', () => {
@@ -1283,62 +1351,131 @@
       }
     }
 
-    const hammer = new Hammer(overlayLayer);
-    hammer.get('swipe').set({ direction: Hammer.DIRECTION_ALL });
-    hammer.on('swipeup', () => {
-      if (isMagnifying) return;
-      goNext();
-    });
-    hammer.on('swipedown', () => {
-      if (isMagnifying) return;
-      goPrev();
-    });
-    hammer.on('swipeleft', () => {
-      if (isMagnifying) return;
-      goGroupNext();
-    });
-    hammer.on('swiperight', () => {
-      if (isMagnifying) return;
-      goGroupPrev();
-    });
+    // One pointer gesture for the stage: drag to page, tap to play or reveal, double-tap to favorite.
+    const tapSlop = 10;
+    const doubleTapMs = 250;
+    const longPressMs = 450;
+    let gesture = null;
+    let lastTap = { time: 0, x: 0, y: 0 };
+    let tapTimer = null;
 
-    overlayLayer.addEventListener('click', () => {
-      const now = Date.now();
-      const delta = now - lastClickTime;
+    function likeAt(x, y) {
+      if (favoriteBtn.hidden || !favoriteBtn.dataset.value) return;
+      const heart = document.createElement('div');
+      heart.className = 'tap-heart';
+      heart.style.left = `${x}px`;
+      heart.style.top = `${y}px`;
+      heart.style.setProperty('--tilt', `${Math.round(Math.random() * 28 - 14)}deg`);
+      heart.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+      heart.addEventListener('animationend', () => heart.remove());
+      document.body.appendChild(heart);
+      if (!favoriteBtn.classList.contains('is-active')) favoriteBtn.click();
+    }
 
-      if (delta < 250 && delta > 0) {
-        if (clickTimer) clearTimeout(clickTimer);
-        clickTimer = null;
-        const item = currentItem();
-        if (item?.type === 'video') {
-          togglePlay();
-        }
-      } else {
-        if (clickTimer) clearTimeout(clickTimer);
-        clickTimer = setTimeout(() => {
-          toggleUI();
-          clickTimer = null;
-        }, 250);
+    function handleTap(x, y) {
+      const now = performance.now();
+      const isDouble = now - lastTap.time < doubleTapMs && Math.hypot(x - lastTap.x, y - lastTap.y) < 40;
+      lastTap = isDouble ? { time: 0, x: 0, y: 0 } : { time: now, x, y };
+      clearTimeout(tapTimer);
+      if (isDouble) {
+        likeAt(x, y);
+        return;
       }
-      lastClickTime = now;
-    });
-    overlayLayer.addEventListener('touchstart', (event) => {
-      const touch = event.changedTouches && event.changedTouches[0];
-      if (!touch) return;
-      touchStartX = touch.clientX;
-      touchStartY = touch.clientY;
-    }, { passive: true });
-    overlayLayer.addEventListener('touchend', (event) => {
+      // A single tap waits out the double-tap window, so a double tap never touches playback.
       const item = currentItem();
-      if (!item || item.type !== 'image_group' || isMagnifying) return;
-      const touch = event.changedTouches && event.changedTouches[0];
-      if (!touch) return;
-      const deltaX = touch.clientX - touchStartX;
-      const deltaY = touch.clientY - touchStartY;
-      if (Math.abs(deltaX) < 36 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
-      if (deltaX < 0) goGroupNext();
-      else goGroupPrev();
-    }, { passive: true });
+      tapTimer = setTimeout(() => {
+        if (currentItem() !== item) return;
+        if (item?.type === 'video') togglePlay();
+        else toggleUI();
+      }, doubleTapMs);
+    }
+
+    function releaseVelocity(samples) {
+      const last = samples[samples.length - 1];
+      const first = samples.find(([time]) => last[0] - time <= 90) || last;
+      return last[0] > first[0] ? (last[1] - first[1]) / (last[0] - first[0]) : 0;
+    }
+
+    overlayLayer.addEventListener('pointerdown', (event) => {
+      if (!event.isPrimary || event.button !== 0 || isMagnifying || settling) return;
+      overlayLayer.setPointerCapture(event.pointerId);
+      gesture = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        mode: 'pending',
+        offset: 0,
+        dx: 0,
+        samples: [[event.timeStamp, event.clientY]],
+        longPressed: false,
+      };
+      gesture.timer = setTimeout(() => {
+        if (gesture?.mode !== 'pending') return;
+        gesture.longPressed = true;
+        clearTimeout(tapTimer);
+        toggleUI();
+      }, longPressMs);
+    });
+
+    overlayLayer.addEventListener('pointermove', (event) => {
+      if (!gesture || event.pointerId !== gesture.id) return;
+      const dx = event.clientX - gesture.x;
+      const dy = event.clientY - gesture.y;
+      if (gesture.mode === 'pending') {
+        if (Math.hypot(dx, dy) < tapSlop) return;
+        clearTimeout(gesture.timer);
+        clearTimeout(tapTimer);
+        gesture.mode = gesture.longPressed ? 'none' : (Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal');
+      }
+      if (gesture.mode === 'horizontal') gesture.dx = dx;
+      if (gesture.mode !== 'vertical') return;
+      const dir = dy < 0 ? 1 : -1;
+      if (!pager || pager.dir !== dir) beginPage(dir);
+      gesture.offset = pager.peer ? dy : dy * 0.25;
+      gesture.samples.push([event.timeStamp, event.clientY]);
+      if (gesture.samples.length > 6) gesture.samples.shift();
+      placePage(gesture.offset);
+    });
+
+    function endGesture(event, cancelled) {
+      if (!gesture || event.pointerId !== gesture.id) return;
+      const current = gesture;
+      gesture = null;
+      clearTimeout(current.timer);
+      if (current.mode === 'vertical' && pager) {
+        const height = feedContainer.clientHeight;
+        const toward = -current.offset * pager.dir;
+        const fling = -releaseVelocity(current.samples) * pager.dir > 0.45;
+        const commit = !cancelled && (toward > height * 0.22 || (fling && toward > 24));
+        if (commit && !pager.peer && pager.dir > 0 && flowSession.hasMore()) loadFeed();
+        settlePage(commit, current.offset);
+        return;
+      }
+      if (cancelled) return;
+      if (current.mode === 'horizontal' && Math.abs(current.dx) > 36) {
+        if (current.dx < 0) goGroupNext();
+        else goGroupPrev();
+        return;
+      }
+      if (current.mode === 'pending' && !current.longPressed) handleTap(event.clientX, event.clientY);
+    }
+
+    overlayLayer.addEventListener('pointerup', (event) => endGesture(event, false));
+    overlayLayer.addEventListener('pointercancel', (event) => endGesture(event, true));
+
+    // Wheel and trackpad page once per gesture; momentum is absorbed until the wheel goes quiet.
+    let wheelLocked = false;
+    let wheelQuietTimer = null;
+    overlayLayer.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      if (isMagnifying) return;
+      clearTimeout(wheelQuietTimer);
+      wheelQuietTimer = setTimeout(() => { wheelLocked = false; }, 200);
+      if (wheelLocked || Math.abs(event.deltaY) < 12) return;
+      wheelLocked = true;
+      if (event.deltaY > 0) goNext();
+      else goPrev();
+    }, { passive: false });
 
     speedBtn.addEventListener('click', () => {
       currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.length;

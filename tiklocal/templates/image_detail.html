@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 
 {% block extra_head %}
+<link rel="stylesheet" type="text/css" href="{{ static_asset('media_detail.css') }}">
 {% if similarity_enabled %}<link rel="stylesheet" href="{{ static_asset('experiments/image-similarity.css') }}">{% endif %}
 <style>
   .image-viewer {
+    max-width: 100%;
     max-height: calc(100vh - 160px);
     object-fit: contain;
     cursor: zoom-in;
@@ -12,10 +14,9 @@
     user-select: none;
     -webkit-user-drag: none;
   }
-  
+
   .image-stage {
     min-height: min(calc(100vh - 140px), 860px);
-    overflow: hidden;
     touch-action: none;
     user-select: none;
   }
@@ -31,162 +32,154 @@
   #fullscreen-stage {
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
-    touch-action: none;
+    padding: 16px;
+    border-radius: 0;
+    background: transparent;
   }
 
   #fullscreen-stage .image-viewer {
     max-height: 92vh;
     max-width: 92vw;
   }
-  
-  .info-card {
-    backdrop-filter: blur(10px);
-  }
-  
-  .stat-item {
-    transition: all 0.2s ease;
-  }
-  
-  .stat-item:hover {
-    transform: translateY(-2px);
-  }
 
-  #caption-primary-btn.is-loading::after {
-    content: '';
-    position: absolute;
-    right: 8px;
-    width: 12px;
-    height: 12px;
-    border-radius: 999px;
-    border: 1.5px solid rgba(251, 191, 36, 0.9);
-    border-top-color: transparent;
-    animation: caption-spin 0.9s linear infinite;
-  }
-  #caption-primary-btn.is-loading {
-    cursor: default;
-  }
   #embedded-prompt {
     max-height: 7.5rem;
     overflow: hidden;
+    color: var(--detail-muted);
+    font-size: 12px;
+    line-height: 1.6;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+
   #embedded-prompt.is-expanded {
     max-height: none;
   }
+
   .detail-disclosure summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 650;
     cursor: pointer;
     list-style: none;
   }
+
   .detail-disclosure summary::-webkit-details-marker {
     display: none;
   }
-  .material-icon-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: rgb(55 65 81);
-    transition: background-color 0.16s ease, color 0.16s ease;
+
+  .detail-disclosure summary svg {
+    color: var(--detail-muted);
+    transition: transform 200ms var(--detail-ease) !important;
   }
-  .material-icon-btn:hover {
-    background: rgba(229, 231, 235, 0.86);
-    color: rgb(17 24 39);
+
+  .detail-disclosure[open] summary svg {
+    transform: rotate(180deg);
   }
-  [data-theme="dark"] .material-icon-btn {
-    color: rgb(209 213 219);
-  }
-  [data-theme="dark"] .material-icon-btn:hover {
-    background: rgba(55, 65, 81, 0.78);
-    color: white;
-  }
-  .detail-grid {
+
+  .detail-disclosure-body {
+    margin-top: 16px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
-    grid-template-areas:
-      "image title"
-      "image info"
-      "similar similar";
-    column-gap: 24px;
-    row-gap: 12px;
-    align-items: start;
+    gap: 16px;
   }
-  .image-area {
-    grid-area: image;
+
+  .detail-disclosure-row {
+    margin-bottom: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
-  .title-area {
-    grid-area: title;
+
+  .detail-disclosure-row .detail-label {
+    margin: 0;
   }
-  .info-area {
-    grid-area: info;
-  }
-  .similar-area {
-    grid-area: similar;
-  }
+
   .title-empty-cta {
     width: 100%;
     min-height: 56px;
-    border: 1px solid rgb(209 213 219);
-    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    color: rgb(75 85 99);
-    font-weight: 600;
-    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    border: 1px dashed color-mix(in srgb, var(--detail-ink) 22%, transparent);
+    border-radius: 14px;
+    color: var(--detail-muted);
+    background: transparent;
+    font-size: 13px;
+    font-weight: 620;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
   }
-  .title-empty-cta.hidden,
-  .title-empty-cta[hidden] {
-    display: none !important;
-  }
+
   .title-empty-cta:hover {
-    background: rgb(249 250 251);
-    border-color: rgb(156 163 175);
-    color: rgb(17 24 39);
+    border-color: color-mix(in srgb, var(--detail-ink) 40%, transparent);
+    color: var(--detail-ink);
+    background: var(--detail-soft);
   }
-  [data-theme="dark"] .title-empty-cta {
-    border-color: rgb(75 85 99);
-    color: rgb(209 213 219);
+
+  .detail-grid {
+    grid-template-areas:
+      "image title"
+      "image info"
+      "similar similar";
+    grid-template-rows: auto 1fr;
   }
-  [data-theme="dark"] .title-empty-cta:hover {
-    background: rgb(17 24 39);
-    border-color: rgb(107 114 128);
-    color: white;
+
+  .image-area { grid-area: image; }
+  .title-area { grid-area: title; }
+  .info-area { grid-area: info; }
+  .similar-area { grid-area: similar; }
+
+  @media (min-width: 1024px) {
+    .detail-grid {
+      row-gap: 0;
+    }
+
+    .similar-area {
+      padding-top: 32px;
+    }
+
+    .title-area {
+      padding: 0 0 24px 24px;
+      border-left: 1px solid var(--detail-line);
+    }
   }
+
   @media (max-width: 1023px) {
     .detail-grid {
-      grid-template-columns: 1fr;
       grid-template-areas:
         "image"
         "title"
         "similar"
         "info";
-      gap: 20px;
+      grid-template-rows: none;
     }
-  }
-  @keyframes caption-spin {
-    to { transform: rotate(360deg); }
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-neutral-50 py-3 dark:bg-neutral-950">
-  <div class="container mx-auto px-3 max-w-7xl">
-    <header class="mb-3 flex h-12 items-center justify-between">
+<div class="detail-shell">
+  <div class="detail-container">
+    <header class="detail-header">
       <button onclick="history.back()" class="material-icon-btn" aria-label="Back" type="button">
         <i data-feather="arrow-left" class="w-5 h-5"></i>
       </button>
-      <div class="relative flex items-center gap-1">
-        <button
-          id="caption-primary-btn"
-          class="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-amber-100 px-4 text-sm font-medium text-amber-700 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30 transition-colors"
-          type="button"
-        >
+      <div class="detail-header-actions">
+        {% if previous_url %}
+        <a href="{{ previous_url }}" class="material-icon-btn" aria-label="Previous image">
+          <i data-feather="chevron-left" class="w-5 h-5"></i>
+        </a>
+        {% endif %}
+        {% if next_url %}
+        <a href="{{ next_url }}" class="material-icon-btn" aria-label="Next image">
+          <i data-feather="chevron-right" class="w-5 h-5"></i>
+        </a>
+        {% endif %}
+        <button id="caption-primary-btn" class="detail-pill is-primary" type="button">
           <i data-feather="zap" class="w-4 h-4"></i>
           <span id="caption-primary-label">Generate Title</span>
         </button>
@@ -221,52 +214,35 @@
     </header>
 
     <div class="detail-grid">
-      <!-- Image display -->
       <div class="image-area">
-        <div>
-          <!-- Image container -->
-          <div class="image-stage relative bg-neutral-100 dark:bg-black flex items-center justify-center rounded-xl p-3 sm:p-4" id="image-container">
-            <img 
-              src="/media?uri={{ uri_query_encoded }}" 
-              alt="{{image.name}}"
-              class="image-viewer max-w-full"
-              id="main-image"
-              loading="lazy"
-            />
-            
-            <!-- Image controls -->
-            <div class="absolute top-4 right-4 flex flex-wrap justify-end gap-2">
-              <button 
-                id="zoom-out-btn" 
-                class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-                aria-label="Zoom out"
-              >
-                <i data-feather="zoom-out" class="w-5 h-5"></i>
-              </button>
-              <button 
-                id="zoom-in-btn" 
-                class="w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-                aria-label="Zoom in"
-              >
-                <i data-feather="zoom-in" class="w-5 h-5"></i>
-              </button>
-              <button
-                id="zoom-reset-btn"
-                class="px-3 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200 text-xs font-semibold"
-                aria-label="Reset zoom"
-              >
-                <span id="zoom-label">100%</span>
-              </button>
-            </div>
+        <div class="detail-stage image-stage" id="image-container">
+          <img
+            src="/thumb?uri={{ uri_query_encoded }}"
+            data-full-src="/media?uri={{ uri_query_encoded }}"
+            alt="{{image.name}}"
+            class="image-viewer detail-hero"
+            id="main-image"
+            fetchpriority="high"
+          />
+          <div class="detail-float-bar">
+            <button id="zoom-out-btn" class="detail-glass-btn" type="button" aria-label="Zoom out">
+              <i data-feather="zoom-out" class="w-5 h-5"></i>
+            </button>
+            <button id="zoom-in-btn" class="detail-glass-btn" type="button" aria-label="Zoom in">
+              <i data-feather="zoom-in" class="w-5 h-5"></i>
+            </button>
+            <button id="zoom-reset-btn" class="detail-glass-btn is-wide" type="button" aria-label="Reset zoom">
+              <span id="zoom-label">100%</span>
+            </button>
           </div>
         </div>
-
       </div>
 
       <section class="title-area" id="caption-card">
+        <p class="detail-label">Image</p>
         <div id="caption-content" class="hidden min-w-0">
-          <h1 id="caption-title" class="detail-wrap-anywhere text-xl font-semibold leading-snug text-gray-950 dark:text-white"></h1>
-          <div id="caption-tags" class="mt-3 flex flex-wrap gap-2"></div>
+          <h1 id="caption-title" class="detail-title detail-wrap-anywhere"></h1>
+          <div id="caption-tags" class="detail-tags"></div>
         </div>
         <button id="caption-empty-cta" class="title-empty-cta hidden" type="button" hidden aria-hidden="true">
           <i data-feather="zap" class="w-5 h-5"></i>
@@ -276,17 +252,11 @@
 
       {% if similarity_enabled %}{% include 'experiments/image-similarity.html' %}{% endif %}
 
-      <!-- Sidebar information -->
-      <aside class="info-area min-w-0 space-y-6 lg:border-l lg:border-gray-200 lg:pl-6 dark:lg:border-gray-800">
+      <aside class="detail-aside info-area">
         {% if source_meta and source_meta.url %}
         <section>
-          <div class="mb-1 text-xs text-gray-500 dark:text-gray-400">Source</div>
-          <a
-            href="{{ source_meta.url }}"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="detail-source-link inline-flex items-center gap-2 text-sm font-medium text-gray-800 hover:text-gray-950 dark:text-gray-200 dark:hover:text-white"
-          >
+          <p class="detail-label">Source</p>
+          <a href="{{ source_meta.url }}" target="_blank" rel="noopener noreferrer" class="detail-source-link">
             <i data-feather="external-link" class="w-4 h-4"></i>
             <span>{{ source_meta.source_domain or 'View Source' }}</span>
           </a>
@@ -294,36 +264,30 @@
         {% endif %}
 
         <section>
-          <div class="mb-2 text-xs text-gray-500 dark:text-gray-400">File</div>
-          <div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-            <div class="break-all font-medium text-gray-900 dark:text-white">{{image.name}}</div>
+          <p class="detail-label">File</p>
+          <div class="detail-meta">
+            <div class="detail-meta-path">{{image.name}}</div>
             <div>{{ stat.st_size | filesizeformat }}</div>
             <div>{{ stat.st_mtime | timestamp_to_date }}</div>
           </div>
         </section>
 
         <details class="detail-disclosure hidden" id="embedded-generation-card">
-          <summary class="flex items-center justify-between gap-3 text-sm font-semibold text-gray-900 dark:text-white">
+          <summary>
             <span>Generation Details</span>
-            <i data-feather="chevron-down" class="w-4 h-4 text-gray-400"></i>
+            <i data-feather="chevron-down" class="w-4 h-4"></i>
           </summary>
-          <div class="mt-4 space-y-4">
+          <div class="detail-disclosure-body">
             <div>
-              <div class="text-xs text-gray-500 dark:text-gray-400">Model</div>
-              <div id="embedded-model" class="mt-1 text-sm font-medium text-gray-900 dark:text-white break-all"></div>
+              <p class="detail-label">Model</p>
+              <div id="embedded-model" class="detail-meta-path"></div>
             </div>
             <div>
-              <div class="mb-2 flex items-center justify-between gap-3">
-                <div class="text-xs text-gray-500 dark:text-gray-400">Prompt</div>
-                <button
-                  id="embedded-prompt-toggle"
-                  class="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
-                  type="button"
-                >
-                  Show All
-                </button>
+              <div class="detail-disclosure-row">
+                <p class="detail-label">Prompt</p>
+                <button id="embedded-prompt-toggle" class="detail-text-btn" type="button">Show All</button>
               </div>
-              <div id="embedded-prompt" class="text-xs leading-relaxed text-gray-700 dark:text-gray-200"></div>
+              <div id="embedded-prompt"></div>
             </div>
           </div>
         </details>
@@ -332,82 +296,66 @@
   </div>
 
   <!-- Fullscreen modal -->
-  <div id="fullscreen-modal" class="fixed inset-0 z-50 bg-black bg-opacity-95 backdrop-blur-sm hidden">
-    <div class="absolute top-4 right-4 z-10 flex flex-wrap justify-end gap-2">
-      <button
-        id="fullscreen-zoom-out"
-        class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-        aria-label="Zoom out"
-      >
+  <div id="fullscreen-modal" class="detail-modal is-media hidden">
+    <div class="detail-float-bar">
+      <button id="fullscreen-zoom-out" class="detail-glass-btn" type="button" aria-label="Zoom out">
         <i data-feather="zoom-out" class="w-5 h-5"></i>
       </button>
-      <button
-        id="fullscreen-zoom-in"
-        class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-        aria-label="Zoom in"
-      >
+      <button id="fullscreen-zoom-in" class="detail-glass-btn" type="button" aria-label="Zoom in">
         <i data-feather="zoom-in" class="w-5 h-5"></i>
       </button>
-      <button
-        id="fullscreen-reset"
-        class="px-3 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200 text-xs font-semibold"
-        aria-label="Reset zoom"
-      >
+      <button id="fullscreen-reset" class="detail-glass-btn is-wide" type="button" aria-label="Reset zoom">
         <span id="fullscreen-zoom-label">100%</span>
       </button>
-      <button 
-        id="close-fullscreen" 
-        class="w-11 h-11 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all duration-200"
-        aria-label="Close fullscreen"
-      >
-        <i data-feather="x" class="w-6 h-6"></i>
+      <button id="close-fullscreen" class="detail-glass-btn" type="button" aria-label="Close fullscreen">
+        <i data-feather="x" class="w-5 h-5"></i>
       </button>
     </div>
-    <div class="image-stage flex items-center justify-center p-4" id="fullscreen-stage">
+    <div class="detail-stage image-stage" id="fullscreen-stage">
       <img
         id="fullscreen-viewer-image"
         src="/media?uri={{ uri_query_encoded }}"
         alt="{{image.name}}"
-        class="image-viewer max-w-full object-contain"
+        class="image-viewer"
       />
     </div>
   </div>
 
   <!-- Prompt override modal -->
-  <div id="caption-prompt-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-    <div class="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
-      <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <h3 class="text-lg font-bold text-gray-900 dark:text-white">Generation Override</h3>
-        <button id="caption-prompt-close" class="w-8 h-8 inline-flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-          <i data-feather="x" class="w-4 h-4 text-gray-500"></i>
+  <div id="caption-prompt-modal" class="detail-modal hidden">
+    <section class="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="caption-prompt-title">
+      <div class="detail-dialog-head">
+        <h2 id="caption-prompt-title" class="detail-dialog-title">Generation Override</h2>
+        <button id="caption-prompt-close" class="material-icon-btn" type="button" aria-label="Close">
+          <i data-feather="x" class="w-4 h-4"></i>
         </button>
       </div>
-      <div class="p-5 space-y-4 max-h-screen overflow-y-auto">
+      <div class="detail-dialog-body">
         <div>
-          <label for="caption-override-system" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">System Prompt</label>
-          <textarea id="caption-override-system" rows="4" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+          <label for="caption-override-system" class="detail-field-label">System Prompt</label>
+          <textarea id="caption-override-system" rows="4" class="detail-input"></textarea>
         </div>
         <div>
-          <label for="caption-override-user" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">User Prompt</label>
-          <textarea id="caption-override-user" rows="6" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Use <code>{tags_limit}</code> or <code>{% raw %}{{tags_limit}}{% endraw %}</code> as a placeholder.</p>
+          <label for="caption-override-user" class="detail-field-label">User Prompt</label>
+          <textarea id="caption-override-user" rows="6" class="detail-input"></textarea>
+          <p class="detail-field-hint">Use <code>{tags_limit}</code> or <code>{% raw %}{{tags_limit}}{% endraw %}</code> as a placeholder.</p>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="detail-field-row">
           <div>
-            <label for="caption-override-temperature" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">temperature (0-2)</label>
-            <input id="caption-override-temperature" type="number" min="0" max="2" step="0.1" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <label for="caption-override-temperature" class="detail-field-label">temperature (0-2)</label>
+            <input id="caption-override-temperature" type="number" min="0" max="2" step="0.1" class="detail-input">
           </div>
           <div>
-            <label for="caption-override-tags" class="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">tags_limit (1-20)</label>
-            <input id="caption-override-tags" type="number" min="1" max="20" step="1" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <label for="caption-override-tags" class="detail-field-label">tags_limit (1-20)</label>
+            <input id="caption-override-tags" type="number" min="1" max="20" step="1" class="detail-input">
           </div>
         </div>
       </div>
-      <div class="px-5 py-4 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl flex flex-wrap justify-end gap-3">
-        <button id="caption-override-cancel" class="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">Cancel</button>
-        <button id="caption-override-generate" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">Generate with Override</button>
+      <div class="detail-dialog-foot">
+        <button id="caption-override-cancel" class="detail-pill" type="button">Cancel</button>
+        <button id="caption-override-generate" class="detail-pill is-primary" type="button">Generate with Override</button>
       </div>
-    </div>
+    </section>
   </div>
 </div>
 {% endblock %}
@@ -459,6 +407,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const imageUri = {{ uri|tojson }};
   const imageUriEncoded = {{ uri_query_encoded|tojson }};
   let promptConfigCache = null;
+  // The cached thumbnail paints first and carries the page transition; full resolution swaps in when ready.
+  const fullImage = new Image();
+  fullImage.onload = () => { mainImage.src = fullImage.src; };
+  fullImage.src = mainImage.dataset.fullSrc;
+
   const mainViewer = window.createImageViewerController({
     stage: imageContainer,
     image: mainImage,
@@ -475,6 +428,76 @@ document.addEventListener('DOMContentLoaded', () => {
     resetButton: fullscreenReset,
     zoomLabel: fullscreenZoomLabel
   });
+
+  // Swipe the unzoomed image: sideways for its neighbour, down to put it back where it came from.
+  const previousUrl = {{ previous_url|tojson }};
+  const nextUrl = {{ next_url|tojson }};
+  const easeOut = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  let swipe = null;
+
+  const dismiss = () => {
+    if (document.referrer.startsWith(location.origin) && history.length > 1) history.back();
+    else window.location.href = '/library';
+  };
+
+  const springBack = () => {
+    const from = { translate: mainImage.style.translate || '0 0', scale: mainImage.style.scale || '1' };
+    mainImage.style.translate = '';
+    mainImage.style.scale = '';
+    imageContainer.style.backgroundColor = '';
+    mainImage.animate([from, { translate: '0 0', scale: '1' }], { duration: 280, easing: easeOut });
+  };
+
+  imageContainer.addEventListener('pointerdown', (event) => {
+    if (!event.isPrimary || event.button !== 0 || imageContainer.classList.contains('is-zoomed')) return;
+    if (event.target.closest('button, a')) return;
+    swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, time: event.timeStamp, axis: '', dx: 0, dy: 0 };
+  });
+
+  imageContainer.addEventListener('pointermove', (event) => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const dx = event.clientX - swipe.x;
+    const dy = event.clientY - swipe.y;
+    if (!swipe.axis) {
+      if (Math.hypot(dx, dy) < 10) return;
+      swipe.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : (dy > 0 ? 'y' : 'none');
+      if (swipe.axis !== 'none') imageContainer.setPointerCapture(event.pointerId);
+    }
+    if (swipe.axis === 'x') {
+      swipe.dx = (dx < 0 ? nextUrl : previousUrl) ? dx : dx * 0.25;
+      mainImage.style.translate = `${swipe.dx}px 0`;
+    } else if (swipe.axis === 'y') {
+      swipe.dy = Math.max(0, dy);
+      const progress = Math.min(swipe.dy / 420, 1);
+      mainImage.style.translate = `${dx * 0.6}px ${swipe.dy}px`;
+      mainImage.style.scale = String(1 - progress * 0.28);
+      imageContainer.style.backgroundColor = `color-mix(in srgb, var(--detail-stage) ${Math.round(100 - progress * 100)}%, transparent)`;
+    }
+  });
+
+  const endSwipe = (event, cancelled) => {
+    if (!swipe || event.pointerId !== swipe.id) return;
+    const current = swipe;
+    swipe = null;
+    if (!current.axis || current.axis === 'none') return;
+    const speed = (current.axis === 'x' ? Math.abs(current.dx) : current.dy) / Math.max(event.timeStamp - current.time, 1);
+    if (!cancelled && current.axis === 'x') {
+      const target = current.dx < 0 ? nextUrl : previousUrl;
+      if (target && (Math.abs(current.dx) > imageContainer.clientWidth * 0.22 || (speed > 0.5 && Math.abs(current.dx) > 30))) {
+        window.location.href = target;
+        return;
+      }
+    }
+    if (!cancelled && current.axis === 'y' && (current.dy > 120 || (speed > 0.5 && current.dy > 40))) {
+      dismiss();
+      return;
+    }
+    springBack();
+  };
+
+  imageContainer.addEventListener('pointerup', (event) => endSwipe(event, false));
+  imageContainer.addEventListener('pointercancel', (event) => endSwipe(event, true));
+  window.addEventListener('pageshow', springBack);
 
   const closeMoreMenu = () => {
     if (!moreMenu || !moreMenuBtn) return;
@@ -505,20 +528,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Fullscreen.
   fullscreenBtn?.addEventListener('click', () => {
     fullscreenModal.classList.remove('hidden');
-    fullscreenModal.classList.add('flex');
     requestAnimationFrame(() => fullscreenViewer.reset());
   });
   
   closeFullscreen?.addEventListener('click', () => {
     fullscreenModal.classList.add('hidden');
-    fullscreenModal.classList.remove('flex');
   });
   
   // Close when the modal backdrop is clicked.
   fullscreenModal?.addEventListener('click', (e) => {
     if (e.target === fullscreenModal) {
       fullscreenModal.classList.add('hidden');
-      fullscreenModal.classList.remove('flex');
     }
   });
   
@@ -536,7 +556,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (!fullscreenModal.classList.contains('hidden')) {
       fullscreenModal.classList.add('hidden');
-      fullscreenModal.classList.remove('flex');
     }
   });
   
@@ -546,9 +565,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const url = window.location.origin + '/media?uri=' + imageUriEncoded;
       await navigator.clipboard.writeText(url);
-      showNotification('Link copied to clipboard', 'success');
+      TikLocalUI.toast('Link copied to clipboard', 'success');
     } catch (err) {
-      showNotification('Copy failed. Please copy the link manually.', 'error');
+      TikLocalUI.toast('Copy failed. Please copy the link manually.', 'error');
     }
   });
 
@@ -579,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
     captionTags.innerHTML = '';
     tags.forEach(tag => {
       const chip = document.createElement('span');
-      chip.className = 'detail-tag inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-200';
+      chip.className = 'detail-tag';
       chip.textContent = tag;
       captionTags.appendChild(chip);
     });
@@ -593,9 +612,9 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     onError: (kind, error) => {
       if (kind === 'caption_load') setCaptionEmptyVisible(false);
-      showNotification(error.message || 'Title request failed', 'error');
+      TikLocalUI.toast(error.message || 'Title request failed', 'error');
     },
-    confirmCaptionReplace: () => window.confirm('A title already exists. Replace it?'),
+    confirmCaptionReplace: () => TikLocalUI.confirm({ title: 'Replace the existing title?', message: 'The current title and tags will be regenerated.', confirmLabel: 'Replace' }),
   });
 
   const renderEmbeddedGeneration = (data) => {
@@ -631,13 +650,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const openPromptModal = () => {
     if (!promptModal) return;
     promptModal.classList.remove('hidden');
-    promptModal.classList.add('flex');
   };
 
   const closePromptModal = () => {
     if (!promptModal) return;
     promptModal.classList.add('hidden');
-    promptModal.classList.remove('flex');
   };
 
   const loadPromptConfig = async () => {
@@ -662,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
       promptTagsInput.value = Number(source.tags_limit ?? 5);
       openPromptModal();
     } catch (err) {
-      showNotification(err.message || 'Failed to load prompt configuration', 'error');
+      TikLocalUI.toast(err.message || 'Failed to load prompt configuration', 'error');
     }
   };
 
@@ -692,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const result = await mediaActions.generateCaption(imageUri, {
       confirmExisting: !force, force, promptOverride,
     });
-    if (result?.success) showNotification('Title updated', 'success');
+    if (result?.success) TikLocalUI.toast('Title updated', 'success');
   };
 
   captionBtn?.addEventListener('click', () => generateCaption());
@@ -714,7 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
       closePromptModal();
       await generateCaption(false, override);
     } catch (err) {
-      showNotification(err.message || 'Invalid override configuration', 'error');
+      TikLocalUI.toast(err.message || 'Invalid override configuration', 'error');
     }
   });
   mediaActions.loadCaption(imageUri);
@@ -722,6 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Keyboard navigation.
   document.addEventListener('keydown', (e) => {
+    if (e.target.closest('input, textarea, select') || !promptModal.classList.contains('hidden')) return;
     if (fullscreenModal.classList.contains('hidden')) {
       switch(e.key) {
         case ' ':
@@ -734,128 +752,35 @@ document.addEventListener('DOMContentLoaded', () => {
           e.preventDefault();
           fullscreenBtn.click();
           break;
+        case 'ArrowLeft':
+          if (previousUrl) window.location.href = previousUrl;
+          break;
+        case 'ArrowRight':
+          if (nextUrl) window.location.href = nextUrl;
+          break;
       }
     }
   });
 });
 
 // Delete confirmation.
-function confirmDelete() {
-  showModal(
-    'Delete this image?',
-    'This action cannot be undone. The image will be permanently deleted.',
-    async () => {
-      try {
-        const response = await fetch('/delete/{{ uri_path_encoded }}', { method: 'POST' });
-        if (response.ok || response.redirected) {
-          window.location.href = '/library';
-          return;
-        }
-        showNotification('Delete failed. Please try again.', 'error');
-      } catch (error) {
-        showNotification('Delete failed. Please try again.', 'error');
-      }
+async function confirmDelete() {
+  const confirmed = await TikLocalUI.confirm({
+    title: 'Delete this image?',
+    message: 'This action cannot be undone. The image will be permanently deleted.',
+    confirmLabel: 'Delete',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
+  try {
+    const response = await fetch('/delete/{{ uri_path_encoded }}', { method: 'POST' });
+    if (response.ok || response.redirected) {
+      window.location.href = '/library';
+      return;
     }
-  );
-}
-
-// Notification helper shared with Settings.
-function showNotification(message, type = 'info') {
-  const iconMap = {
-    success: 'check-circle',
-    info: 'info',
-    error: 'alert-circle'
-  };
-  const colorMap = {
-    success: 'bg-green-500',
-    info: 'bg-blue-500',
-    error: 'bg-red-500'
-  };
-
-  const notification = document.createElement('div');
-  notification.className = `fixed bottom-20 right-5 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white ${colorMap[type]} transform translate-y-20 opacity-0 transition-all duration-300 ease-out z-50`;
-  notification.innerHTML = `
-    <i data-feather="${iconMap[type]}" class="w-6 h-6"></i>
-    <span class="font-medium">${message}</span>
-  `;
-  
-  document.body.appendChild(notification);
-  feather.replace();
-  
-  setTimeout(() => {
-    notification.classList.remove('translate-y-20', 'opacity-0');
-  }, 10);
-
-  setTimeout(() => {
-    notification.classList.add('opacity-0');
-    setTimeout(() => {
-      notification.remove();
-    }, 300);
-  }, 3000);
-}
-
-// Modal helper shared with Settings.
-function showModal(title, text, onConfirm, options = {}) {
-  const existingModal = document.getElementById('confirmation-modal');
-  if (existingModal) existingModal.remove();
-  const confirmLabel = options.confirmLabel || 'Delete';
-  const confirmTone = options.confirmTone || 'red';
-  const toneClass = confirmTone === 'blue'
-    ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500';
-  const iconToneClass = confirmTone === 'blue'
-    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-    : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
-  const iconName = options.icon || (confirmTone === 'blue' ? 'cpu' : 'alert-triangle');
-
-  const modalHTML = `
-    <div id="confirmation-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md m-4 transform transition-all" role="document">
-        <div class="p-6">
-          <div class="flex items-start gap-4">
-            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${iconToneClass} sm:mx-0 sm:h-10 sm:w-10">
-              <i data-feather="${iconName}" class="h-6 w-6"></i>
-            </div>
-            <div class="mt-0 text-center sm:text-left">
-              <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">${title}</h3>
-              <div class="mt-2">
-                <p class="text-sm text-gray-500 dark:text-gray-400">${text}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-2xl">
-          <button type="button" id="confirm-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 ${toneClass} text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm">
-            ${confirmLabel}
-          </button>
-          <button type="button" id="cancel-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:w-auto sm:text-sm">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', modalHTML);
-  feather.replace();
-
-  const modal = document.getElementById('confirmation-modal');
-  const confirmBtn = document.getElementById('confirm-btn');
-  const cancelBtn = document.getElementById('cancel-btn');
-
-  function closeModal() {
-    modal.remove();
-  }
-
-  confirmBtn.onclick = () => {
-    onConfirm();
-    closeModal();
-  };
-  cancelBtn.onclick = closeModal;
-  modal.onclick = (e) => {
-    if (e.target === modal) {
-      closeModal();
-    }
+    TikLocalUI.toast('Delete failed. Please try again.', 'error');
+  } catch (error) {
+    TikLocalUI.toast('Delete failed. Please try again.', 'error');
   }
 }
 </script>

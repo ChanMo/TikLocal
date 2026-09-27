@@ -1,0 +1,181 @@
+/* Site-wide toast and confirm dialog (TikLocalUI). */
+:root {
+  --ui-bg: #f4f3ef;
+  --ui-ink: #292822;
+  --ui-muted: rgba(41, 40, 34, 0.5);
+  --ui-line: rgba(41, 40, 34, 0.09);
+  --ui-soft: rgba(41, 40, 34, 0.055);
+  --ui-ok: #668b7d;
+  --ui-danger: #b83a3a;
+  --ui-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-theme="dark"] {
+  --ui-bg: #1a1a17;
+  --ui-ink: rgba(255, 255, 255, 0.92);
+  --ui-muted: rgba(255, 255, 255, 0.45);
+  --ui-line: rgba(255, 255, 255, 0.09);
+  --ui-soft: rgba(255, 255, 255, 0.07);
+}
+
+.ui-toast-wrap {
+  position: fixed;
+  right: 14px;
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  z-index: 320;
+  width: min(330px, calc(100vw - 28px));
+  pointer-events: none;
+}
+
+.ui-toast {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  border: 1px solid var(--ui-line);
+  border-radius: 13px;
+  color: var(--ui-ink);
+  background: color-mix(in oklab, var(--ui-bg) 92%, transparent);
+  box-shadow: 0 12px 32px rgba(20, 19, 16, 0.14);
+  font-size: 12px;
+  line-height: 1.45;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: ui-toast-in 180ms var(--ui-ease);
+  pointer-events: auto;
+}
+
+.ui-toast svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--ui-ok);
+}
+
+.ui-toast.error {
+  border-color: rgba(180, 67, 59, 0.28);
+}
+
+.ui-toast.error svg {
+  color: #bd6259;
+}
+
+.ui-toast.is-leaving {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.ui-dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(18, 18, 16, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: ui-fade-in 160ms ease;
+}
+
+.ui-dialog {
+  width: min(100%, 390px);
+  padding: 19px;
+  border: 1px solid var(--ui-line);
+  border-radius: 20px;
+  color: var(--ui-ink);
+  background: var(--ui-bg);
+  box-shadow: 0 24px 70px rgba(20, 19, 16, 0.24);
+  animation: ui-dialog-in 200ms var(--ui-ease) both;
+}
+
+.ui-dialog-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.ui-dialog-copy {
+  margin: 7px 0 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ui-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.ui-button {
+  height: 38px;
+  padding: 0 15px;
+  border: 1px solid var(--ui-line);
+  border-radius: 999px;
+  color: var(--ui-ink);
+  background: var(--ui-soft);
+  font-size: 13px;
+  font-weight: 620;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 120ms ease;
+}
+
+.ui-button:hover {
+  background: color-mix(in srgb, var(--ui-ink) 9%, transparent);
+}
+
+.ui-button:active {
+  transform: scale(0.97);
+}
+
+.ui-button:focus-visible {
+  outline: 2px solid var(--ui-ink);
+  outline-offset: 2px;
+}
+
+.ui-button.is-primary {
+  border-color: transparent;
+  color: var(--ui-bg);
+  background: var(--ui-ink);
+}
+
+.ui-button.is-danger {
+  border-color: transparent;
+  color: #fff;
+  background: var(--ui-danger);
+}
+
+.ui-button.is-danger:hover {
+  background: #9f2929;
+}
+
+@keyframes ui-toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes ui-dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+
+@media (min-width: 768px) {
+  .ui-toast-wrap {
+    bottom: calc(22px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-toast,
+  .ui-dialog-mask,
+  .ui-dialog {
+    animation-duration: 0.01ms;
+  }
+}

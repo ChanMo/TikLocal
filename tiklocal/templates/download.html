@@ -144,10 +144,6 @@
   .download-history-footer { display: flex; justify-content: center; padding-top: 12px; }
   .download-clear { border: 0; background: transparent; color: var(--download-faint); font-size: 10px; cursor: pointer; }
   .download-clear:hover { color: var(--download-muted); }
-  .download-toast-wrap { position: fixed; top: 18px; right: 14px; z-index: 120; display: grid; gap: 7px; width: min(310px, calc(100vw - 28px)); }
-  .download-toast { padding: 11px 13px; border: 1px solid var(--download-line); border-radius: 13px; background: color-mix(in srgb, var(--download-card) 96%, transparent); color: var(--download-ink); font-size: 11px; box-shadow: 0 12px 34px rgba(25,24,20,.12); animation: downloadToastIn 160ms ease both; backdrop-filter: blur(16px); }
-  .download-toast.error { border-color: rgba(181,68,68,.25); }
-  @keyframes downloadToastIn { from { opacity: 0; transform: translateY(-5px); } }
   @media (max-width: 560px) {
     .download-page { padding-top: 22px; }
     .download-input-row { align-items: stretch; flex-direction: column; }
@@ -157,7 +153,7 @@
     .download-job-mark { width: 34px; height: 34px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .download-submit, .download-progress-bar, .download-toast { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    .download-submit, .download-progress-bar { transition-duration: .01ms !important; animation-duration: .01ms !important; }
   }
 
   /* Single-link composer */
@@ -327,7 +323,6 @@
   </section>
 </div>
 
-<div id="toast-wrap" class="download-toast-wrap" aria-live="polite"></div>
 {% endblock %}
 
 {% block extra_body %}

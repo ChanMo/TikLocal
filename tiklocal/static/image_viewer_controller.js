@@ -156,7 +156,11 @@
     zoomInButton && zoomInButton.addEventListener('click', zoomIn);
     zoomOutButton && zoomOutButton.addEventListener('click', zoomOut);
     resetButton && resetButton.addEventListener('click', reset);
-    image.addEventListener('load', reset);
+    // A higher-resolution swap of the same image keeps the current zoom.
+    image.addEventListener('load', function () {
+      if (state.scale <= minScale + 0.001) reset();
+      else applyTransform();
+    });
 
     reset();
 
