@@ -1,20 +1,29 @@
 /*
- * Radio scene — a full-screen fragment shader behind the Radio page.
+ * Radio scene — full-screen fragment shaders behind the Radio page.
  *
- * Plain WebGL 1 with no dependencies: one triangle covering the screen, one shader
- * loaded from a .frag file, and two textures made from the current cover art
- * (a small sharp copy with mipmaps and a heavily blurred copy).
+ * Plain WebGL 1 with no dependencies: one triangle covering the screen and one shader
+ * per room, each loaded from its own .frag file and compiled once. Switching rooms
+ * crossfades the two shaders with constant-alpha blending, so no framebuffers are
+ * needed. Every shader receives the same uniforms and uses what it needs:
  *
- *   var scene = RadioScene.create(canvas, { shaderUrl: '...', onReady: fn, onFail: fn });
+ *   uRes, uTime       canvas size in pixels, scene time in seconds
+ *   uDark             0 = light theme (day), 1 = dark theme (night), eased
+ *   uIntensity        slow 0..1 swell of the weather (rain, snow, fire size ...)
+ *   uEnergy           smoothed loudness of the music, 0.5 when unknown
+ *   uFlash            lightning, for scenes that ask for it
+ *   uSharp, uBlur     the current cover art: 256px with mipmaps, and 64px blurred
+ *
+ *   var scene = RadioScene.create(canvas, { onReady: fn, onFail: fn });
+ *   scene.setShader(url, { lightning: true, immediate: false });
  *   scene.setRunning(true);        // animate; false eases to a stop and holds a still frame
  *   scene.setCover(imgOrNull);     // null falls back to the palette
  *   scene.setPalette(['#466b61', '#a88756', '#d7d2c4']);
  *   scene.setDark(true);
- *   scene.rainLevel();             // current rain amount 0..1, to drive the rain sound
+ *   scene.intensity();             // current uIntensity, e.g. to drive the ambient sound
  *
  * options.onLightning fires when a lightning flash starts.
  * options.energySource() returns the music's loudness 0..1 (or null when unknown); it is
- * smoothed over seconds and makes the lights breathe and the rain run a little faster.
+ * smoothed over seconds and makes the scene breathe and run a little faster.
  *
  * create() returns null when WebGL is unavailable; onFail fires for later failures
  * (shader fetch or compile errors, lost context) so the caller can fall back.
@@ -27,11 +36,13 @@
   var SHARP_SIZE = 256;
   var BLUR_SIZE = 64;
   var COVER_FADE_MS = 2600;
+  var SHADER_FADE_MS = 1500;
   var SPEED_EASE_MS = 1400;
   var DARK_EASE_MS = 900;
   var ENERGY_RISE_MS = 1200;
   var ENERGY_FALL_MS = 2800;
   var NEUTRAL_ENERGY = 0.5;
+  var UNIFORMS = ['uRes', 'uTime', 'uDark', 'uIntensity', 'uFlash', 'uEnergy', 'uSharp', 'uBlur'];
 
   var VERTEX_SHADER = [
     'attribute vec2 aPosition;',
@@ -43,11 +54,14 @@
     var gl = getContext(canvas);
     if (!gl) return null;
 
-    var program = null;
-    var uniforms = {};
+    var shaders = {};
+    var current = null;
+    var previous = null;
+    var shaderFade = null;
+    var requestedUrl = '';
+    var readyNotified = false;
     var sharpTexture = null;
     var blurTexture = null;
-    var shaderSource = '';
     var failed = false;
     var destroyed = false;
 
@@ -76,42 +90,71 @@
 
     renderArt(drawPalette(art.target, palette));
     commitArt(1);
-
-    fetch(options.shaderUrl)
-      .then(function (response) {
-        if (!response.ok) throw new Error('Shader request failed: ' + response.status);
-        return response.text();
-      })
-      .then(function (source) {
-        shaderSource = source;
-        setupGl();
-        if (options.onReady) options.onReady();
-        requestFrame();
-      })
-      .catch(fail);
+    setupGl();
 
     function setupGl() {
-      program = buildProgram(gl, VERTEX_SHADER, shaderSource);
-      gl.useProgram(program);
-
       var buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      var position = gl.getAttribLocation(program, 'aPosition');
-      gl.enableVertexAttribArray(position);
-      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-
-      ['uRes', 'uTime', 'uDark', 'uRain', 'uFlash', 'uEnergy', 'uSharp', 'uBlur'].forEach(function (name) {
-        uniforms[name] = gl.getUniformLocation(program, name);
-      });
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       sharpTexture = createTexture(gl, true);
       blurTexture = createTexture(gl, false);
       uploadArt();
+    }
 
-      gl.uniform1i(uniforms.uSharp, 0);
-      gl.uniform1i(uniforms.uBlur, 1);
+    // Shaders -------------------------------------------------------------------
+
+    function setShader(url, sceneOptions) {
+      sceneOptions = sceneOptions || {};
+      requestedUrl = url;
+      if (current && current.url === url) return;
+      loadShader(url)
+        .then(function (entry) {
+          if (destroyed || failed || requestedUrl !== url) return;
+          if (current && current.url === url) return;
+          var next = { url: url, entry: entry, lightning: Boolean(sceneOptions.lightning) };
+          var fadeIn = current && !sceneOptions.immediate;
+          previous = fadeIn ? current : null;
+          shaderFade = fadeIn ? { start: now() } : null;
+          current = next;
+          if (!current.lightning) flashStart = -1;
+          if (!readyNotified) {
+            readyNotified = true;
+            if (options.onReady) options.onReady();
+          }
+          requestFrame();
+        })
+        .catch(fail);
+    }
+
+    function loadShader(url) {
+      if (!shaders[url]) {
+        shaders[url] = fetch(url)
+          .then(function (response) {
+            if (!response.ok) throw new Error('Shader request failed: ' + response.status);
+            return response.text();
+          })
+          .then(function (source) {
+            var entry = { source: source, program: null, uniforms: {} };
+            compileEntry(entry);
+            return entry;
+          });
+        shaders[url].catch(function () { delete shaders[url]; });
+      }
+      return shaders[url];
+    }
+
+    function compileEntry(entry) {
+      entry.program = buildProgram(gl, VERTEX_SHADER, entry.source);
+      gl.useProgram(entry.program);
+      UNIFORMS.forEach(function (name) {
+        entry.uniforms[name] = gl.getUniformLocation(entry.program, name);
+      });
+      gl.uniform1i(entry.uniforms.uSharp, 0);
+      gl.uniform1i(entry.uniforms.uBlur, 1);
     }
 
     function uploadArt() {
@@ -135,18 +178,19 @@
 
     function onContextLost(event) {
       event.preventDefault();
-      program = null;
       sharpTexture = null;
       blurTexture = null;
       fail(new Error('WebGL context lost'));
     }
 
     function onContextRestored() {
-      if (destroyed || !shaderSource) return;
+      if (destroyed) return;
       try {
         setupGl();
+        Object.keys(shaders).forEach(function (url) {
+          shaders[url].then(compileEntry);
+        });
         failed = false;
-        if (options.onReady) options.onReady();
         requestFrame();
       } catch (error) {
         fail(error);
@@ -223,7 +267,7 @@
 
     function tick(timestamp) {
       frameId = 0;
-      if (!program) return;
+      if (!current || !current.entry.program) return;
 
       var elapsed = lastTick ? Math.min(timestamp - lastTick, 100) : 0;
       if (lastTick && timestamp - lastDraw < 1000 / MAX_FPS - 2 && needsAnotherFrame()) {
@@ -260,18 +304,42 @@
     }
 
     function needsAnotherFrame() {
-      return running || speed > 0.001 || Boolean(fade) || flashStart >= 0 || Math.abs(dark - darkTarget) > 0.001;
+      return running || speed > 0.001 || Boolean(fade) || Boolean(shaderFade) || flashStart >= 0
+        || Math.abs(dark - darkTarget) > 0.001;
     }
 
     function draw(timestamp) {
       resize();
       gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.uniform2f(uniforms.uRes, canvas.width, canvas.height);
-      gl.uniform1f(uniforms.uTime, sceneTime);
-      gl.uniform1f(uniforms.uDark, dark);
-      gl.uniform1f(uniforms.uRain, rainAmount(sceneTime));
-      gl.uniform1f(uniforms.uFlash, lightning(timestamp));
-      gl.uniform1f(uniforms.uEnergy, energy);
+      var flash = current.lightning ? lightning(timestamp) : 0;
+
+      if (!shaderFade) {
+        drawShader(current.entry, flash);
+        return;
+      }
+      var progress = Math.min(1, (now() - shaderFade.start) / SHADER_FADE_MS);
+      gl.disable(gl.BLEND);
+      drawShader(previous.entry, flash);
+      gl.enable(gl.BLEND);
+      gl.blendColor(0, 0, 0, progress * progress * (3 - 2 * progress));
+      gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
+      drawShader(current.entry, flash);
+      gl.disable(gl.BLEND);
+      if (progress >= 1) {
+        shaderFade = null;
+        previous = null;
+      }
+    }
+
+    function drawShader(entry, flash) {
+      var u = entry.uniforms;
+      gl.useProgram(entry.program);
+      gl.uniform2f(u.uRes, canvas.width, canvas.height);
+      gl.uniform1f(u.uTime, sceneTime);
+      gl.uniform1f(u.uDark, dark);
+      gl.uniform1f(u.uIntensity, intensity(sceneTime));
+      gl.uniform1f(u.uFlash, flash);
+      gl.uniform1f(u.uEnergy, energy);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
@@ -288,8 +356,8 @@
       }
     }
 
-    // Rain slowly swells and eases so long sessions never settle into one density.
-    function rainAmount(t) {
+    // Weather slowly swells and eases so long sessions never settle into one state.
+    function intensity(t) {
       return clamp(0.56 + 0.2 * Math.sin(t / 97) + 0.12 * Math.sin(t / 41 + 1.3), 0.2, 0.95);
     }
 
@@ -324,11 +392,12 @@
     }
 
     return {
+      setShader: setShader,
       setRunning: setRunning,
       setCover: setCover,
       setPalette: setPalette,
       setDark: setDark,
-      rainLevel: function () { return rainAmount(sceneTime); },
+      intensity: function () { return intensity(sceneTime); },
       destroy: destroy,
     };
   }
@@ -355,6 +424,7 @@
     var program = gl.createProgram();
     gl.attachShader(program, compileShader(gl, gl.VERTEX_SHADER, vertexSource));
     gl.attachShader(program, compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource));
+    gl.bindAttribLocation(program, 0, 'aPosition');
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       throw new Error('Shader link failed: ' + gl.getProgramInfoLog(program));

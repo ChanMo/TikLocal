@@ -74,7 +74,8 @@ body:has([data-radio-root]) {
   filter: var(--room-video-filter-moving);
 }
 
-.radio-page.is-room-off .radio-atmosphere-video {
+.radio-page.is-room-off .radio-atmosphere-video,
+.radio-page.is-video-hidden .radio-atmosphere-video {
   opacity: 0 !important;
 }
 
@@ -568,7 +569,9 @@ body:has([data-radio-root]) {
   position: absolute;
   top: calc(100% + .45rem);
   right: 0;
-  width: 11.6rem;
+  width: 14.5rem;
+  max-height: min(34rem, calc(100dvh - 7rem));
+  overflow-y: auto;
   padding: .38rem;
   border: 1px solid var(--radio-line);
   border-radius: 1rem;
@@ -586,10 +589,10 @@ body:has([data-radio-root]) {
 .room-option {
   position: relative;
   width: 100%;
-  min-height: 3.15rem;
-  padding: .7rem 1.8rem .7rem .8rem;
+  min-height: 2.7rem;
+  padding: .55rem 1.8rem .55rem .8rem;
   display: grid;
-  grid-template-columns: 3.25rem 1fr;
+  grid-template-columns: 4.3rem 1fr;
   align-items: center;
   gap: .4rem;
   border: 0;
@@ -818,7 +821,8 @@ body:has([data-radio-root]) {
   .signal-status { bottom: -.1rem; }
   .radio-console { width: 100%; gap: clamp(.55rem, 1.4dvh, .9rem); text-align: center; }
   .station-room-bar { width: min(100%, 23rem); margin-inline: auto; }
-  .room-menu { text-align: left; }
+  /* Seven rooms do not fit below the trigger on a phone; there is room above it. */
+  .room-menu { top: auto; bottom: calc(100% + .45rem); text-align: left; }
   .now-playing { min-height: 4.8rem; text-align: center; gap: .15rem; }
   .now-playing-label { display: none; }
   .track-title { font-family: inherit; font-size: clamp(1.15rem, 5vw, 1.55rem); font-weight: 640; line-height: 1.2; letter-spacing: -.025em; -webkit-line-clamp: 2; }

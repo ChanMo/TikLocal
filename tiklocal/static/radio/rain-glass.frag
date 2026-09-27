@@ -8,7 +8,7 @@
 //   room     warm lamp reflection, lightning flash, vignette and grain
 //
 // Uniforms are driven by radio_scene.js. uDark blends between an overcast day (0)
-// and a rainy night (1); uRain (0..1) sets how many drops are on the glass; uEnergy is
+// and a rainy night (1); uIntensity (0..1) sets how many drops are on the glass; uEnergy is
 // the smoothed loudness of the music (0.5 when unknown), which makes the lights breathe.
 
 #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -20,7 +20,7 @@ precision mediump float;
 uniform vec2 uRes;
 uniform float uTime;
 uniform float uDark;
-uniform float uRain;
+uniform float uIntensity;
 uniform float uFlash;
 uniform float uEnergy;
 uniform sampler2D uSharp;
@@ -120,7 +120,7 @@ vec4 restingDrops(vec2 p, float scale, float seed) {
   vec2 f = fract(q) - 0.5;
   vec2 r = hash22(id + seed);
 
-  float present = step(1.0 - uRain * 0.55, hash21(id * 1.31 + seed * 3.3));
+  float present = step(1.0 - uIntensity * 0.55, hash21(id * 1.31 + seed * 3.3));
   float life = fract(uTime * 0.03 + hash21(id * 1.7 + seed));
   float grow = smoothstep(0.0, 0.03, life) * smoothstep(1.0, 0.8, life);
   float radius = mix(0.08, 0.26, r.y) * grow;
@@ -141,7 +141,7 @@ vec4 slidingDrops(vec2 p, float scale, float seed, float t) {
   vec2 st = (fract(g) - 0.5) * cell;
 
   float h = hash21(id + seed);
-  float active = step(1.0 - (0.25 + uRain * 0.45), h);
+  float active = step(1.0 - (0.25 + uIntensity * 0.45), h);
   float h2 = hash21(id * 2.3 + seed);
   float h3 = hash21(id * 3.7 + seed);
 

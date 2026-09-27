@@ -564,7 +564,10 @@
     <canvas
       id="radio-atmosphere-canvas"
       class="radio-atmosphere-canvas"
-      data-shader-src="{{ static_asset('radio/rain-glass.frag') }}"
+      data-shader-glass="{{ static_asset('radio/rain-glass.frag') }}"
+      data-shader-snow="{{ static_asset('radio/snow-window.frag') }}"
+      data-shader-hearth="{{ static_asset('radio/hearth.frag') }}"
+      data-shader-firefly="{{ static_asset('radio/firefly.frag') }}"
     ></canvas>
     <span class="radio-atmosphere-wash"></span>
     <span class="radio-glow radio-glow-a"></span>
@@ -604,7 +607,7 @@
           <span id="station-name">Default Station</span>
         </div>
         <div class="room-picker">
-          <button id="btn-room-sound" class="room-sound" type="button" aria-pressed="true" aria-label="Rain sound: on" title="Rain sound: on">
+          <button id="btn-room-sound" class="room-sound" type="button" aria-pressed="true" aria-label="Ambient sound: on" title="Ambient sound: on">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2"/><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
           </button>
           <button
@@ -623,6 +626,18 @@
             <button class="room-option" type="button" role="option" data-room="glass" aria-selected="false">
               <span class="room-option-key">GLASS</span>
               <span class="room-option-name">Rain on Glass</span>
+            </button>
+            <button class="room-option" type="button" role="option" data-room="snow" aria-selected="false">
+              <span class="room-option-key">SNOW</span>
+              <span class="room-option-name">Snowy Night</span>
+            </button>
+            <button class="room-option" type="button" role="option" data-room="hearth" aria-selected="false">
+              <span class="room-option-key">HEARTH</span>
+              <span class="room-option-name">By the Fire</span>
+            </button>
+            <button class="room-option" type="button" role="option" data-room="firefly" aria-selected="false">
+              <span class="room-option-key">FIREFLY</span>
+              <span class="room-option-name">Summer Night</span>
             </button>
             <button class="room-option" type="button" role="option" data-room="rain" aria-selected="true">
               <span class="room-option-key">RAIN</span>
@@ -684,6 +699,6 @@
 
 {% block extra_body %}
 <script src="{{ static_asset('radio_scene.js') }}"></script>
-<script src="{{ static_asset('radio_rain_sound.js') }}"></script>
+<script src="{{ static_asset('radio_ambience.js') }}"></script>
 <script src="{{ static_asset('radio_controller.js') }}"></script>
 {% endblock %}
