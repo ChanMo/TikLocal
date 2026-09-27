@@ -65,6 +65,8 @@
   var roomSoundOn = localStorage.getItem(ROOM_SOUND_KEY) !== 'off';
   var rainSound = window.RadioRainSound ? window.RadioRainSound.create() : null;
   var sleepFading = false;
+  var trackEnergy = null;
+  var energyTrackName = '';
 
   var els = {};
 
@@ -286,6 +288,7 @@
       updateSignalArt(null);
       updateFavorite();
       updateMediaSession();
+      loadEnergy();
       return;
     }
 
@@ -297,6 +300,7 @@
     transitionTrackInfo(track.title || 'Untitled audio', buildTrackMeta(track));
     setNeedle();
     updateSignalArt(track);
+    loadEnergy();
     updateFavorite();
     updateMediaSession();
     loadTrackMetadata(track);
@@ -588,7 +592,10 @@
     Object.keys(ROOMS).forEach(function (id) {
       els.radioPage.classList.toggle('is-room-' + id, id === roomId);
     });
-    if (usesScene()) ensureScene();
+    if (usesScene()) {
+      ensureScene();
+      loadEnergy();
+    }
     els.radioPage.classList.toggle('is-scene-live', usesScene() && Boolean(scene) && scene.ready);
     updateRoomSound();
     els.roomLabel.textContent = room.label;
@@ -611,6 +618,7 @@
     var created = canvas && window.RadioScene && window.RadioScene.create(canvas, {
       shaderUrl: canvas.dataset.shaderSrc,
       stats: /[?&]scene_stats=1\b/.test(window.location.search),
+      energySource: currentEnergy,
       onLightning: function () {
         if (rainSound) rainSound.thunder();
       },
@@ -635,6 +643,33 @@
     scene.setDark(isDarkTheme());
     if (scenePalette) scene.setPalette(scenePalette);
     if (sceneCover) scene.setCover(sceneCover);
+  }
+
+  // Loudness envelope of the current track, fetched only while a scene room is showing.
+  function loadEnergy() {
+    var name = currentTrack ? currentTrack.name : '';
+    if (name === energyTrackName) return;
+    trackEnergy = null;
+    energyTrackName = '';
+    if (!currentTrack || !currentTrack.energy_url || !usesScene()) return;
+    energyTrackName = name;
+    fetch(currentTrack.energy_url)
+      .then(readApi)
+      .then(function (data) {
+        if (energyTrackName !== name || !data || !data.values || !data.values.length) return;
+        trackEnergy = { hop: Number(data.hop) || 0.25, values: Uint8Array.from(data.values) };
+      })
+      .catch(function () {});
+  }
+
+  function currentEnergy() {
+    if (!trackEnergy || !isPlaying) return null;
+    var values = trackEnergy.values;
+    var position = audio.currentTime / trackEnergy.hop;
+    var index = Math.floor(position);
+    if (!(index >= 0 && index < values.length)) return null;
+    var next = values[Math.min(index + 1, values.length - 1)];
+    return (values[index] + (next - values[index]) * (position - index)) / 255;
   }
 
   function initRainSound() {

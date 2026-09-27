@@ -13,6 +13,8 @@
  *   scene.rainLevel();             // current rain amount 0..1, to drive the rain sound
  *
  * options.onLightning fires when a lightning flash starts.
+ * options.energySource() returns the music's loudness 0..1 (or null when unknown); it is
+ * smoothed over seconds and makes the lights breathe and the rain run a little faster.
  *
  * create() returns null when WebGL is unavailable; onFail fires for later failures
  * (shader fetch or compile errors, lost context) so the caller can fall back.
@@ -27,6 +29,9 @@
   var COVER_FADE_MS = 2600;
   var SPEED_EASE_MS = 1400;
   var DARK_EASE_MS = 900;
+  var ENERGY_RISE_MS = 1200;
+  var ENERGY_FALL_MS = 2800;
+  var NEUTRAL_ENERGY = 0.5;
 
   var VERTEX_SHADER = [
     'attribute vec2 aPosition;',
@@ -51,6 +56,7 @@
     var sceneTime = 180 + Math.random() * 600;
     var dark = 1;
     var darkTarget = 1;
+    var energy = NEUTRAL_ENERGY;
     var frameId = 0;
     var lastTick = 0;
     var lastDraw = 0;
@@ -95,7 +101,7 @@
       gl.enableVertexAttribArray(position);
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 
-      ['uRes', 'uTime', 'uDark', 'uRain', 'uFlash', 'uSharp', 'uBlur'].forEach(function (name) {
+      ['uRes', 'uTime', 'uDark', 'uRain', 'uFlash', 'uEnergy', 'uSharp', 'uBlur'].forEach(function (name) {
         uniforms[name] = gl.getUniformLocation(program, name);
       });
 
@@ -230,7 +236,9 @@
       var target = running ? 1 : 0;
       speed = approach(speed, target, elapsed / SPEED_EASE_MS);
       dark = approach(dark, darkTarget, elapsed / DARK_EASE_MS);
-      sceneTime += (elapsed / 1000) * speed;
+      energy = followEnergy(energy, elapsed);
+      // Louder passages run the scene slightly faster; integrating keeps motion continuous.
+      sceneTime += (elapsed / 1000) * speed * (0.85 + 0.3 * energy);
 
       if (fade) {
         var progress = Math.min(1, (now() - fade.start) / COVER_FADE_MS);
@@ -239,9 +247,16 @@
       }
 
       draw(timestamp);
-      if (stats) stats.frame(canvas);
+      if (stats) stats.frame(energy);
       if (needsAnotherFrame()) frameId = window.requestAnimationFrame(tick);
       else lastTick = 0;
+    }
+
+    function followEnergy(value, elapsed) {
+      var target = options.energySource ? options.energySource() : null;
+      if (typeof target !== 'number' || !isFinite(target)) target = NEUTRAL_ENERGY;
+      var tau = target > value ? ENERGY_RISE_MS : ENERGY_FALL_MS;
+      return value + (clamp(target, 0, 1) - value) * (1 - Math.exp(-elapsed / tau));
     }
 
     function needsAnotherFrame() {
@@ -256,6 +271,7 @@
       gl.uniform1f(uniforms.uDark, dark);
       gl.uniform1f(uniforms.uRain, rainAmount(sceneTime));
       gl.uniform1f(uniforms.uFlash, lightning(timestamp));
+      gl.uniform1f(uniforms.uEnergy, energy);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
@@ -463,11 +479,12 @@
     var frames = 0;
     var windowStart = now();
     return {
-      frame: function () {
+      frame: function (energy) {
         frames += 1;
         var elapsed = now() - windowStart;
         if (elapsed < 1000) return;
-        node.textContent = Math.round((frames * 1000) / elapsed) + ' fps · ' + canvas.width + '×' + canvas.height;
+        node.textContent = Math.round((frames * 1000) / elapsed) + ' fps · ' + canvas.width + '×' + canvas.height
+          + ' · energy ' + energy.toFixed(2);
         frames = 0;
         windowStart = now();
       },

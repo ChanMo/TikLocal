@@ -1,7 +1,10 @@
 import json
+import math
 import os
 import sqlite3
+import struct
 import subprocess
+import wave
 
 import pytest
 
@@ -176,3 +179,51 @@ def test_radio_profile_scores_completion_above_skip(tmp_path):
     assert complete["score"] > 0
     assert skip["score"] < 0
     assert complete["score"] > skip["score"]
+
+
+def _write_tone(path, sections, rate=8000):
+    """Write a mono 16-bit WAV made of (seconds, amplitude) sections of a 440 Hz tone."""
+    frames = bytearray()
+    index = 0
+    for seconds, amplitude in sections:
+        for _ in range(int(seconds * rate)):
+            frames += struct.pack('<h', int(amplitude * math.sin(2 * math.pi * 440 * index / rate)))
+            index += 1
+    with wave.open(str(path), 'wb') as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(rate)
+        handle.writeframes(bytes(frames))
+
+
+def test_radio_energy_follows_track_loudness(client, tmp_path):
+    _write_tone(tmp_path / 'media' / 'dynamics.wav', [(4, 300), (4, 12000)])
+
+    response = client.get('/api/radio/energy?uri=@default/dynamics.wav')
+
+    assert response.status_code == 200
+    data = response.get_json()['data']
+    values = data['values']
+    assert data['hop'] == 0.25 and abs(len(values) - 32) <= 1
+    quiet, loud = values[2:14], values[18:30]
+    assert max(quiet) < 40 and min(loud) > 215
+
+
+def test_radio_energy_is_recomputed_when_the_file_changes(client, tmp_path):
+    track = tmp_path / 'media' / 'swell.wav'
+    _write_tone(track, [(2, 12000), (2, 300)])
+    first = client.get('/api/radio/energy?uri=@default/swell.wav').get_json()['data']['values']
+
+    _write_tone(track, [(2, 300), (2, 12000)])
+    stat = track.stat()
+    os.utime(track, ns=(stat.st_atime_ns, stat.st_mtime_ns + 5_000_000_000))
+    second = client.get('/api/radio/energy?uri=@default/swell.wav').get_json()['data']['values']
+
+    assert first[2] > 215 and second[2] < 40
+
+
+def test_radio_energy_is_unavailable_for_undecodable_audio(client, monkeypatch):
+    monkeypatch.setattr('tiklocal.services.radio_energy.shutil.which', lambda name: None)
+
+    assert client.get('/api/radio/energy?uri=@default/a01.mp3').status_code == 404
+    assert client.get('/api/radio/energy?uri=@default/missing.mp3').status_code == 404

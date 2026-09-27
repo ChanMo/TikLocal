@@ -8,7 +8,8 @@
 //   room     warm lamp reflection, lightning flash, vignette and grain
 //
 // Uniforms are driven by radio_scene.js. uDark blends between an overcast day (0)
-// and a rainy night (1); uRain (0..1) sets how many drops are on the glass.
+// and a rainy night (1); uRain (0..1) sets how many drops are on the glass; uEnergy is
+// the smoothed loudness of the music (0.5 when unknown), which makes the lights breathe.
 
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
@@ -21,6 +22,7 @@ uniform float uTime;
 uniform float uDark;
 uniform float uRain;
 uniform float uFlash;
+uniform float uEnergy;
 uniform sampler2D uSharp;
 uniform sampler2D uBlur;
 
@@ -86,7 +88,7 @@ vec3 bokehLayer(vec2 uv, float scale, float seed, float soft) {
       tint = mix(tint, vec3(1.0, 0.76, 0.48), step(0.78, r.x));
 
       float flicker = 0.78 + 0.22 * sin(uTime * (0.15 + r.y * 0.5) + r.x * 40.0);
-      float level = mix(0.22, 0.85, fract(r.x * 7.3)) * flicker;
+      float level = mix(0.22, 0.85, fract(r.x * 7.3)) * flicker * (0.7 + 0.6 * uEnergy);
       acc += tint * (disc * 0.6 + rim * (0.55 - soft * 0.4)) * level;
     }
   }
@@ -218,7 +220,7 @@ void main() {
   }
 
   vec2 lampPos = (uv - vec2(0.1, 0.06)) * vec2(a, 1.0);
-  col += vec3(1.0, 0.6, 0.28) * 0.08 * smoothstep(0.9, 0.0, length(lampPos)) * uDark;
+  col += vec3(1.0, 0.6, 0.28) * 0.08 * (0.8 + 0.4 * uEnergy) * smoothstep(0.9, 0.0, length(lampPos)) * uDark;
 
   col += uFlash * (vec3(0.72, 0.78, 0.95) * 0.3 + fogView * 0.9) * mix(0.35, 1.0, uDark);
 
