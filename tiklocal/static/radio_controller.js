@@ -11,7 +11,8 @@
   var MAX_ENCORE_COUNT = 3;
   // scene: a live shader room (its .frag URL is on the canvas as data-shader-<room>);
   // sourceKey: the video shown by video rooms, and the fallback when WebGL fails;
-  // sound: the ambience profile mixed beside the music.
+  // sound: the ambience profile mixed beside the music;
+  // event: the scene's rare moment (see radio_scene.js), paired with a sound when it has one.
   var ROOMS = {
     glass: {
       label: 'ROOM · GLASS',
@@ -19,7 +20,7 @@
       sourceKey: 'Rain',
       scene: true,
       sound: 'rain',
-      lightning: true,
+      event: 'lightning',
     },
     snow: {
       label: 'ROOM · SNOW',
@@ -27,6 +28,7 @@
       sourceKey: '',
       scene: true,
       sound: 'snow',
+      event: 'car',
     },
     hearth: {
       label: 'ROOM · HEARTH',
@@ -34,6 +36,7 @@
       sourceKey: '',
       scene: true,
       sound: 'fire',
+      event: 'burst',
     },
     firefly: {
       label: 'ROOM · FIREFLY',
@@ -41,6 +44,7 @@
       sourceKey: '',
       scene: true,
       sound: 'night',
+      event: 'meteor',
     },
     rain: {
       label: 'ROOM · RAIN',
@@ -622,7 +626,7 @@
       if (scene) {
         // A hidden canvas switches at once; a visible one crossfades between rooms.
         scene.setShader(shaderUrl(roomId), {
-          lightning: Boolean(room.lightning),
+          event: room.event || null,
           immediate: !els.radioPage.classList.contains('is-scene-live'),
         });
       }
@@ -656,8 +660,8 @@
     var created = canvas && window.RadioScene && window.RadioScene.create(canvas, {
       stats: /[?&]scene_stats=1\b/.test(window.location.search),
       energySource: currentEnergy,
-      onLightning: function () {
-        if (ambience) ambience.thunder();
+      onEvent: function (type, seed) {
+        if (ambience) ambience.event(type, seed);
       },
       onReady: function () {
         if (!scene) return;

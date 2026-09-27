@@ -7,7 +7,12 @@
 //            the glass; wind is integrated over time so gusts never jump, and flakes
 //            passing through the lamp's cone catch its light
 //   sill     snow piled on the window sill, with glints
-//   glass    frost creeping in from the corners, warm room light, vignette and grain
+//   glass    frost creeping in from the corners, flakes that land on the pane and melt,
+//            warm room light, vignette and grain
+//
+// Houses have chimneys with smoke leaning in the wind. The room's rare event (uEvent,
+// seconds since it began) is a car passing along the street at night: only its lights
+// show, and its beams catch the falling snow.
 //
 // uDark blends an overcast snowy day (0) into night (1); uIntensity sets how hard it
 // snows; uEnergy (0.5 when unknown) lifts the lamp and the windows with the music.
@@ -23,9 +28,14 @@ uniform float uTime;
 uniform float uDark;
 uniform float uIntensity;
 uniform float uEnergy;
+uniform float uEvent;
+uniform float uEventSeed;
 uniform sampler2D uBlur;
 
 const vec3 LAMP_WARM = vec3(1.0, 0.72, 0.42);
+const vec3 HEADLIGHT = vec3(1.0, 0.92, 0.78);
+const float CAR_SECONDS = 8.0;
+const float STREET = 0.165;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(233.34, 851.73));
@@ -90,6 +100,30 @@ float lampLight(vec2 p) {
 }
 
 // A soft, out-of-focus row of houses: pitched roofs, gaps, roof snow and glowing windows.
+// The passing car: heading (+1 right, -1 left), x of its front, and a fade in and out.
+float carHeading() {
+  return uEventSeed < 0.5 ? 1.0 : -1.0;
+}
+
+float carFront() {
+  float a = aspect();
+  float x = mix(-0.25, a + 0.25, clamp(uEvent / CAR_SECONDS, 0.0, 1.0));
+  return carHeading() > 0.0 ? x : a - x;
+}
+
+float carFade() {
+  return step(0.0, uEvent) * smoothstep(0.0, 0.8, uEvent) * smoothstep(CAR_SECONDS, CAR_SECONDS - 0.8, uEvent) * uDark;
+}
+
+// Headlight reaching a point: a beam widening ahead of the car plus a glow at the lamp.
+float carLight(vec2 p) {
+  if (uEvent < 0.0) return 0.0;
+  vec2 d = p - vec2(carFront(), STREET);
+  float ahead = d.x * carHeading();
+  float beam = step(0.0, ahead) * smoothstep(0.55, 0.0, ahead) * smoothstep(ahead * 0.3 + 0.012, 0.0, abs(d.y + ahead * 0.03));
+  return (beam * 0.9 + exp(-length(d) * 28.0) * 0.8) * carFade();
+}
+
 vec3 houses(vec3 col, vec2 uv, vec2 p, float ground, float scale, float seed, float haze) {
   float width = 0.21 * scale;
   float cell = floor(p.x / width + seed);
@@ -115,6 +149,28 @@ vec3 houses(vec3 col, vec2 uv, vec2 p, float ground, float scale, float seed, fl
 
   float snowRoof = roof * smoothstep(roofLine - 0.03, roofLine - 0.006, uv.y);
   col = mix(col, mix(vec3(0.95, 0.96, 0.98), vec3(0.3, 0.32, 0.4), uDark), snowRoof * 0.75);
+
+  // Near houses may have a chimney on the left slope, its smoke leaning with the wind.
+  if (haze < 0.01 && fract(h * 21.7) > 0.4) {
+    float chimneyX = center - half_ * 0.45;
+    float roofAt = mix(peak, eaves, abs(chimneyX - center) / (half_ + 0.02));
+    float top = roofAt + 0.028;
+    float chimney = smoothstep(0.012, 0.008, abs(p.x - chimneyX)) * step(uv.y, top) * step(roofAt - 0.02, uv.y);
+    col = mix(col, mix(dayHouse, nightHouse, uDark), chimney * mix(0.75, 0.92, uDark));
+
+    float rise = uv.y - top;
+    if (rise > 0.0 && rise < 0.3) {
+      float lean = rise * (0.32 + 0.1 * sin(uTime * 0.05 + h * 9.0));
+      float spread = 0.012 + rise * 0.22;
+      float across = (p.x - chimneyX - lean) / spread;
+      // Soft puffs: a wide body textured by billows that rise and drift apart.
+      vec2 puff = vec2(across * 1.6, rise * 10.0 - uTime * 0.4) + h * 10.0;
+      float billow = 0.45 + 0.55 * fbm(puff);
+      float smoke = smoothstep(1.0, 0.0, abs(across)) * billow
+        * smoothstep(0.3, 0.03, rise) * smoothstep(0.0, 0.02, rise);
+      col = mix(col, mix(vec3(0.76, 0.77, 0.8), vec3(0.2, 0.21, 0.26), uDark), smoke * mix(0.45, 0.55, uDark));
+    }
+  }
 
   // Out-of-focus windows: round glows on a loose grid, lit at random.
   vec2 grid = vec2((p.x - center) / (0.05 * scale), (uv.y - ground - 0.012) / (0.045 * scale));
@@ -159,6 +215,24 @@ vec3 street(vec2 uv, vec2 p) {
   float pool = exp(-pow(p.x - head.x, 2.0) * 18.0) * smoothstep(0.0, ground, uv.y) * uDark;
   col = mix(col, snowGround + LAMP_WARM * pool * 0.55 * (0.8 + 0.4 * uEnergy), groundMask);
 
+  // The passing car: a low dark body, a headlight in front, a red tail light behind,
+  // and the snow on the road lit ahead of it.
+  if (uEvent >= 0.0) {
+    float fade = carFade();
+    float heading = carHeading();
+    vec2 c = p - vec2(carFront() - heading * 0.055, STREET + 0.012);
+    vec2 body = abs(c) - vec2(0.055, 0.011);
+    float bodyMask = smoothstep(0.006, 0.0, length(max(body, 0.0)) + min(max(body.x, body.y), 0.0) - 0.006);
+    vec2 cabin = abs(c - vec2(-heading * 0.008, 0.017)) - vec2(0.03, 0.008);
+    bodyMask = max(bodyMask, smoothstep(0.006, 0.0, length(max(cabin, 0.0)) - 0.005));
+    col = mix(col, vec3(0.01, 0.012, 0.018), bodyMask * fade * 0.85);
+    vec2 front = p - vec2(carFront(), STREET + 0.008);
+    vec2 back = p - vec2(carFront() - heading * 0.11, STREET + 0.01);
+    col += HEADLIGHT * exp(-length(front) * 90.0) * 2.0 * fade;
+    col += vec3(1.0, 0.12, 0.08) * exp(-length(back) * 160.0) * 1.2 * fade;
+    col += HEADLIGHT * carLight(p) * groundMask * 0.35;
+  }
+
   // Lamp post with a small head, soft like everything beyond the glass.
   vec2 d = p - head;
   float post = smoothstep(0.006, 0.002, abs(d.x)) * step(d.y, 0.0) * step(ground - 0.01, uv.y);
@@ -194,7 +268,7 @@ float snowLayer(vec2 p, float scale, float fall, float drift, float radius, floa
 vec3 addSnow(vec3 col, vec2 p, float drift, float near) {
   float density = 0.3 + uIntensity * 0.6;
   vec3 ambient = mix(vec3(0.99, 0.995, 1.0), vec3(0.4, 0.44, 0.56), uDark);
-  vec3 lit = ambient + LAMP_WARM * lampLight(p) * 2.4;
+  vec3 lit = ambient + LAMP_WARM * lampLight(p) * 2.4 + HEADLIGHT * carLight(p) * 2.2;
 
   if (near < 0.5) {
     float far = snowLayer(p, 44.0, 0.05, drift * 0.35, 0.1, 0.2, 1.0, density);
@@ -254,6 +328,33 @@ vec3 addFrost(vec3 col, vec2 uv, vec2 p) {
   return mix(col, frostCol, clamp(density, 0.0, 0.85));
 }
 
+// Flakes that land on the pane: a six-armed crystal that slowly melts into a droplet.
+vec3 addGlassFlakes(vec3 col, vec2 p) {
+  float scale = 7.0;
+  vec2 cell = floor(p * scale);
+  float h = hash21(cell + 40.0);
+  if (h > 0.2 + 0.25 * uIntensity) return col;
+
+  vec2 center = (cell + 0.5 + (hash22(cell + 41.0) - 0.5) * 0.6) / scale;
+  vec2 d = p - center;
+  float life = fract(uTime / 30.0 + fract(h * 7.0));
+  float melt = smoothstep(0.08, 0.85, life);
+  float present = smoothstep(0.0, 0.004, life) * smoothstep(1.0, 0.9, life);
+  float size = mix(0.017, 0.006, melt) * (0.7 + 0.6 * fract(h * 3.3));
+
+  float r = length(d);
+  float angle = atan(d.y, d.x) + h * 6.28;
+  float arms = pow(abs(cos(angle * 3.0)), mix(14.0, 0.5, melt));
+  float twigs = 0.45 * pow(abs(cos(angle * 9.0)), 8.0) * step(0.35 * size, r) * (1.0 - melt);
+  float reach = size * (0.18 + 0.82 * max(arms, twigs));
+  float crystal = smoothstep(reach, reach * 0.7, r);
+  float core = smoothstep(size * 0.22, size * 0.1, r);
+
+  vec3 ice = mix(vec3(1.0), vec3(0.72, 0.78, 0.9), uDark);
+  float amount = max(crystal, core) * present * mix(0.75, 0.4, melt);
+  return mix(col, ice, amount);
+}
+
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   float a = aspect();
@@ -265,6 +366,7 @@ void main() {
   col = addSill(col, uv, p);
   col = addSnow(col, p, drift, 1.0);
   col = addFrost(col, uv, p);
+  col = addGlassFlakes(col, p);
 
   vec2 lampPos = (uv - vec2(0.08, 0.05)) * vec2(a, 1.0);
   col += LAMP_WARM * 0.07 * smoothstep(0.9, 0.0, length(lampPos)) * uDark;

@@ -4,8 +4,12 @@
 //   wall     brick firebox lit by the fire's flicker, bent by heat haze, sooty above
 //   fire     tapering flame tongues carved by rising turbulence, coloured along a
 //            blackbody ramp from deep red to a near-white core
-//   logs     charred logs with glowing cracks, over a bed of pulsing coals
+//   logs     charred logs with glowing cracks and two cut ends showing their rings,
+//            over a bed of irregular coals that glow and breathe one by one
 //   sparks   embers drifting upward and fading
+//
+// Where flames leave the wood they burn faintly blue. The room's rare event (uEvent,
+// seconds since it began) is a log settling: the fire flares and throws up sparks.
 //
 // uDark blends a daylit, whitewashed hearth (0) into a dark room lit only by the fire
 // (1); uIntensity swells the fire slowly; uEnergy (0.5 when unknown) lets it roar
@@ -22,6 +26,8 @@ uniform float uTime;
 uniform float uDark;
 uniform float uIntensity;
 uniform float uEnergy;
+uniform float uEvent;
+uniform float uEventSeed;
 
 float hash21(vec2 p) {
   p = fract(p * vec2(233.34, 851.73));
@@ -72,10 +78,15 @@ vec3 fireColor(float heat) {
   return col * smoothstep(0.0, 0.4, heat) * (0.55 + heat * 1.25);
 }
 
+// Flare after a log settles: rises quickly, then dies away over a few seconds.
+float flare() {
+  return uEvent < 0.0 ? 0.0 : smoothstep(0.0, 0.12, uEvent) * exp(-uEvent * 1.3);
+}
+
 // Overall brightness of the fire: slow breathing plus a soft, irregular flicker.
 float fireLevel(float t) {
   float flicker = 0.86 + 0.1 * valueNoise(vec2(t * 6.0, 1.0)) + 0.06 * valueNoise(vec2(t * 13.0, 7.0));
-  return flicker * (0.8 + 0.25 * uIntensity) * (0.85 + 0.3 * uEnergy);
+  return flicker * (0.8 + 0.25 * uIntensity) * (0.85 + 0.3 * uEnergy) * (1.0 + 0.3 * flare());
 }
 
 // Smooth maximum: merges neighbouring tongues into one body of flame.
@@ -87,7 +98,7 @@ float smax(float a, float b, float k) {
 // Heat of the flames at q, where q.x is centred on the fire and q.y = 0 at its base.
 float flames(vec2 q, float t) {
   if (q.y < -0.05 || q.y > 0.8 || abs(q.x) > 0.5) return 0.0;
-  float size = (0.8 + 0.25 * uIntensity) * (0.85 + 0.3 * uEnergy);
+  float size = (0.8 + 0.25 * uIntensity) * (0.85 + 0.3 * uEnergy) * (1.0 + 0.25 * flare());
   // Negative outside every tongue, so the turbulence below only reshapes their edges.
   float heat = -1.0;
   for (int i = 0; i < 7; i++) {
@@ -146,12 +157,14 @@ float capsule(vec2 p, vec2 a, vec2 b, float r) {
   return length(pa - ba * h) - r;
 }
 
-// Voronoi edge distance, for glowing cracks and coals.
-vec2 voronoi(vec2 p) {
+// Voronoi: distance to the nearest point, gap to the second nearest (small along the
+// edges between cells), and a random value for the nearest cell.
+vec3 voronoi(vec2 p) {
   vec2 cell = floor(p);
   vec2 f = fract(p);
   float first = 8.0;
   float second = 8.0;
+  float id = 0.0;
   for (int j = -1; j <= 1; j++) {
     for (int i = -1; i <= 1; i++) {
       vec2 o = vec2(float(i), float(j));
@@ -159,49 +172,102 @@ vec2 voronoi(vec2 p) {
       if (d < first) {
         second = first;
         first = d;
+        id = hash21(cell + o + 13.7);
       } else if (d < second) {
         second = d;
       }
     }
   }
-  return vec2(first, second - first);
+  return vec3(first, second - first, id);
 }
 
-vec3 addLogs(vec3 col, vec2 q, float t, float level) {
+float logs(vec2 q) {
   float d1 = capsule(q, vec2(-0.26, 0.012), vec2(0.2, 0.05), 0.036);
   float d2 = capsule(q, vec2(-0.14, 0.07), vec2(0.28, 0.02), 0.032);
   float d3 = capsule(q, vec2(-0.3, 0.035), vec2(-0.02, 0.1), 0.026);
-  float logs = min(min(d1, d2), d3);
+  return min(min(d1, d2), d3);
+}
+
+// A sawn log end facing us: growth rings, pale wood, a charred rim that glows at night.
+vec3 logEnd(vec3 col, vec2 q, vec2 center, vec2 radius, float level) {
+  vec2 e = (q - center) / radius;
+  float r = length(e);
+  if (r > 1.05) return col;
+  float face = smoothstep(1.0, 0.94, r);
+  float rings = 0.5 + 0.5 * sin(r * 26.0 + fbm(e * 3.0) * 4.0);
+  vec3 wood = mix(vec3(0.3, 0.19, 0.11), vec3(0.45, 0.3, 0.17), rings) * (0.7 + 0.3 * fbm(e * 9.0));
+  wood = mix(wood * 1.6, wood * 0.35, uDark);
+  float rim = smoothstep(0.72, 0.95, r);
+  vec3 ember = fireColor(0.55 + 0.2 * valueNoise(vec2(atan(e.y, e.x) * 3.0, uTime * 0.5))) * level;
+  vec3 charredRim = mix(vec3(0.05, 0.035, 0.03), ember * 0.9, uDark * smoothstep(0.35, 0.7, valueNoise(e * 7.0 + 3.0)));
+  return mix(col, mix(wood, charredRim, rim), face);
+}
+
+vec3 addLogs(vec3 col, vec2 q, float t, float level) {
+  float wood = logs(q);
   float underFire = exp(-q.x * q.x * 9.0);
 
-  // Coal bed: dark crust, with seams that glow in patches that slowly move.
+  // Coal bed: irregular chunks under grey ash. Crevices glow where it is hot, and some
+  // chunks glow right through, each breathing at its own pace.
   float lumpy = 0.012 * (valueNoise(vec2(q.x * 14.0, 2.0)) - 0.5);
   float bed = smoothstep(1.0, 0.92, length(vec2(q.x / 0.36, (q.y + 0.035 + lumpy) / 0.075)));
-  vec2 chunks = voronoi(q * vec2(55.0, 70.0));
-  float seam = smoothstep(0.1, 0.0, chunks.y);
-  float hot = smoothstep(0.45, 0.85, fbm(q * 7.0 + vec2(t * 0.06, -t * 0.04))) * (0.25 + 0.75 * underFire);
-  float crustTone = 0.03 + 0.05 * fbm(q * 60.0);
-  vec3 coals = vec3(crustTone * 1.1, crustTone * 0.8, crustTone * 0.7)
-    + fireColor(0.3 + 0.5 * hot) * (seam * (0.12 + hot * 1.1) + hot * 0.18) * level;
-  coals = mix(coals + vec3(0.35, 0.32, 0.3) * (1.0 - uDark) * 0.4, coals, uDark);
-  col = mix(col, coals, bed);
+  if (bed > 0.0) {
+    vec2 warp = vec2(fbm(q * 7.0), fbm(q * 7.0 + 5.2)) * 2.2;
+    vec3 chunk = voronoi(q * vec2(30.0, 44.0) + warp);
+    float crevice = smoothstep(0.1, 0.0, chunk.y);
+    float breathing = 0.6 + 0.4 * sin(t * (0.3 + chunk.z * 0.6) + chunk.z * 30.0);
+    float glowing = smoothstep(0.6, 1.0, chunk.z) * breathing;
+    float hot = smoothstep(0.45, 0.8, fbm(q * 6.0 + vec2(t * 0.05, -t * 0.03))) * underFire * underFire;
+    float ash = (0.04 + 0.07 * fbm(q * 70.0) + 0.05 * (1.0 - chunk.x)) * (1.0 - crevice * 0.7);
+    vec3 crust = vec3(ash * 1.15, ash * 0.95, ash * 0.85);
+    float glow = crevice * hot * 1.3 + glowing * (0.15 + hot) * (1.1 - chunk.x) * 0.8;
+    vec3 coals = crust + fireColor(0.3 + 0.55 * hot) * glow * level;
+    coals = mix(coals + vec3(0.35, 0.32, 0.3) * (1.0 - uDark) * 0.4, coals, uDark);
+    col = mix(col, coals, bed);
+  }
 
-  float body = smoothstep(0.003, -0.003, logs);
+  float body = smoothstep(0.003, -0.003, wood);
   if (body > 0.0) {
     float grain = fbm(vec2(q.x * 50.0, q.y * 9.0));
     vec3 charred = mix(vec3(0.035, 0.025, 0.022), vec3(0.12, 0.08, 0.06), grain);
     charred = mix(charred * 3.5 + vec3(0.12, 0.09, 0.07), charred, uDark);
     // Cracks glow only on the underside and toward the middle, where the fire is.
-    vec2 cracks = voronoi(q * vec2(30.0, 60.0) + 3.0);
+    vec3 cracks = voronoi(q * vec2(30.0, 60.0) + 3.0);
     float crack = smoothstep(0.06, 0.0, cracks.y) * smoothstep(0.45, 0.75, valueNoise(q * 28.0));
-    float facing = smoothstep(0.01, -0.03, logs + 0.02) * (0.3 + 0.7 * underFire);
+    float facing = smoothstep(0.01, -0.03, wood + 0.02) * (0.3 + 0.7 * underFire);
     float glowAmount = crack * facing * (0.7 + 0.3 * valueNoise(vec2(q.x * 10.0, t * 0.6)));
     vec3 glow = fireColor(0.45 + 0.35 * glowAmount) * glowAmount * level * 1.4;
     // Round the logs: darker toward their silhouettes, firelit along the top edge.
-    float depth = clamp(-logs / 0.03, 0.0, 1.0);
+    float depth = clamp(-wood / 0.03, 0.0, 1.0);
     charred *= 0.45 + 0.55 * sqrt(depth);
-    float rim = smoothstep(-0.014, 0.0, logs) * underFire * step(0.0, q.y - 0.03);
+    float rim = smoothstep(-0.014, 0.0, wood) * underFire * step(0.0, q.y - 0.03);
     col = mix(col, charred + glow + vec3(1.0, 0.45, 0.12) * rim * 0.3 * level, body);
+  }
+  col = logEnd(col, q, vec2(0.214, 0.05), vec2(0.017, 0.036), level);
+  col = logEnd(col, q, vec2(0.293, 0.02), vec2(0.015, 0.032), level);
+  return col;
+}
+
+// Sparks thrown up when a log settles: each flies on its own arc with a short trail.
+vec3 addBurst(vec3 col, vec2 q) {
+  if (uEvent < 0.0) return col;
+  for (int i = 0; i < 28; i++) {
+    float fi = float(i);
+    vec2 r = hash22(vec2(fi, uEventSeed * 91.0));
+    float age = uEvent - r.x * 0.45;
+    float life = 1.1 + r.y * 1.7;
+    if (age < 0.0 || age > life) continue;
+    vec2 launch = vec2((r.x - 0.5) * 0.3, 0.3 + r.y * 0.45);
+    vec2 velocity = launch + vec2(0.0, -0.12) * age;
+    vec2 pos = vec2((r.y - 0.5) * 0.14, 0.07) + launch * age + vec2(0.0, -0.06) * age * age
+      + vec2(sin(age * 6.0 + fi) * 0.012, 0.0);
+    vec2 dir = normalize(velocity);
+    vec2 d = q - pos;
+    float along = dot(d, dir);
+    float across = length(d - dir * along);
+    float trail = smoothstep(0.003, 0.0, across) * smoothstep(-0.035, 0.0, along) * step(along, 0.0);
+    float fade = 1.0 - age / life;
+    col += vec3(1.0, 0.6, 0.22) * (exp(-length(d) * 170.0) * 1.6 + trail * 0.7) * fade * fade;
   }
   return col;
 }
@@ -254,8 +320,16 @@ void main() {
   vec3 overWall = mix(col, flameCol / max(max(flameCol.r, flameCol.g), 0.001) * vec3(1.0, 0.95, 0.9),
     smoothstep(0.02, 0.35, heat) * 0.85);
   col = mix(overWall + flameCol * 0.2, col + flameCol * 1.25, uDark);
+
+  // Blue roots where the flames leave the wood: just outside a log, with a log below.
+  float wood = logs(q);
+  float root = smoothstep(0.022, 0.004, wood) * step(0.0, wood) * step(logs(q - vec2(0.0, 0.025)), 0.0)
+    * smoothstep(0.08, 0.35, heat) * (0.7 + 0.3 * valueNoise(vec2(q.x * 30.0, t * 3.0)));
+  col += vec3(0.1, 0.25, 0.95) * root * mix(0.12, 0.35, uDark);
+
   col = addLogs(col, q, t, level);
   col = addSparks(col, q, t, level);
+  col = addBurst(col, q);
 
   // Soft bloom around the flames.
   col += vec3(1.0, 0.42, 0.12) * exp(-length((q - vec2(0.0, 0.12)) * vec2(1.4, 1.0)) * 5.0) * 0.25 * level * uDark;

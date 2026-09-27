@@ -7,9 +7,10 @@
  * needs a timer to keep going in a background tab, and loops of different lengths
  * never line up audibly:
  *
- *   rain   pink-noise wash, low body, light and heavy drops on glass, thunder on demand
- *   snow   gusting wind, a faint whistle at the window, a quiet room
- *   fire   a breathing low roar, a gas hiss, crackles in bursts with pops and snaps
+ *   rain   pink-noise wash, low body, light and heavy drops on glass; thunder after lightning
+ *   snow   gusting wind, a faint whistle at the window, a quiet room; a car passing
+ *   fire   a breathing low roar, a gas hiss, crackles in bursts with pops and snaps;
+ *          a log settling
  *   night  crickets with their own rhythms and places, a distant trill, a leafy breeze
  *
  *   var ambience = RadioAmbience.create();
@@ -18,7 +19,7 @@
  *   ambience.setActive(true);                // fade in
  *   ambience.setActive(false, { tail: 25 }); // fade out over 25 s, then suspend
  *   ambience.setIntensitySource(fn);         // fn() -> 0..1 or null for a slow drift
- *   ambience.thunder();                      // rain only
+ *   ambience.event('lightning', seed);       // the scene's rare event, if the profile has a sound for it
  *
  * createProfile(context, name, destination) builds one profile on any BaseAudioContext,
  * including an OfflineAudioContext for rendering previews.
@@ -173,10 +174,10 @@
       Object.keys(running).forEach(function (name) { fn(running[name]); });
     }
 
-    function thunder() {
-      var rain = running.rain;
-      if (!active || profileName !== 'rain' || !rain) return;
-      rain.thunder(1.8 + Math.random() * 4.5);
+    function event(type, seed) {
+      var instance = profileName && running[profileName];
+      if (!active || !instance || !instance.event) return;
+      instance.event(type, seed);
     }
 
     return {
@@ -184,7 +185,7 @@
       setProfile: setProfile,
       setActive: setActive,
       setIntensitySource: setIntensitySource,
-      thunder: thunder,
+      event: event,
     };
   }
 
@@ -195,7 +196,7 @@
   // Profiles --------------------------------------------------------------------
   //
   // Each profile owns a bus into `destination` and returns
-  // { setIntensity(amount, seconds), fadeTo(level, seconds), stop(), thunder? }.
+  // { setIntensity(amount, seconds), fadeTo(level, seconds), stop(), event?(type, seed) }.
 
   function profileBase(ctx, destination, cache) {
     var bus = ctx.createGain();
@@ -219,6 +220,21 @@
         });
         gain.connect(bus);
         return gain;
+      },
+      // Play a one-shot buffer through `nodes` into the bus, `delay` seconds from now.
+      oneShot: function (buffer, nodes, delay, rate) {
+        var source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = rate || 1;
+        var last = source;
+        nodes.forEach(function (node) {
+          last.connect(node);
+          last = node;
+        });
+        last.connect(bus);
+        source.start(ctx.currentTime + (delay || 0));
+        source.onended = function () { last.disconnect(); };
+        return source;
       },
       instance: function (setIntensity, extra) {
         var instance = {
@@ -256,22 +272,17 @@
       glide(ctx, heavy.gain, 0.04 + 0.34 * x * x, seconds);
     }
 
-    function thunder(delay) {
+    // Thunder rolls in a few seconds after the flash.
+    function event(type) {
+      if (type !== 'lightning') return;
       var buffer = base.buffer('rain-thunder', function () { return rumble(ctx, 8); });
-      var source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.playbackRate.value = 0.8 + Math.random() * 0.3;
-      var lowpass = filter(ctx, 'lowpass', 160 + Math.random() * 120, 0.7);
       var gain = ctx.createGain();
       gain.gain.value = 1.1 + Math.random() * 0.5;
-      source.connect(lowpass);
-      lowpass.connect(gain);
-      gain.connect(base.bus);
-      source.start(ctx.currentTime + delay);
-      source.onended = function () { gain.disconnect(); };
+      base.oneShot(buffer, [filter(ctx, 'lowpass', 160 + Math.random() * 120, 0.7), gain],
+        1.8 + Math.random() * 4.5, 0.8 + Math.random() * 0.3);
     }
 
-    return base.instance(setIntensity, { thunder: thunder });
+    return base.instance(setIntensity, { event: event });
   }
 
   function snowProfile(ctx, destination, cache) {
@@ -294,7 +305,30 @@
       glide(ctx, room.gain, 0.25, seconds);
     }
 
-    return base.instance(setIntensity);
+    // A car passing on the snowy street: muffled tyre hiss that swells and fades while
+    // it crosses the stereo field, the same way the headlights cross the screen.
+    function event(type, seed) {
+      if (type !== 'car') return;
+      var buffer = base.buffer('snow-car', function () { return tyreHiss(ctx, 8); });
+      var lowpass = filter(ctx, 'lowpass', 700, 0.7);
+      var gain = ctx.createGain();
+      gain.gain.value = 0.9;
+      var nodes = [lowpass, gain];
+      var now = ctx.currentTime;
+      lowpass.frequency.setValueAtTime(450, now);
+      lowpass.frequency.linearRampToValueAtTime(1100, now + 3.6);
+      lowpass.frequency.linearRampToValueAtTime(420, now + 8);
+      if (ctx.createStereoPanner) {
+        var panner = ctx.createStereoPanner();
+        var from = seed < 0.5 ? -0.85 : 0.85;
+        panner.pan.setValueAtTime(from, now);
+        panner.pan.linearRampToValueAtTime(-from, now + 7.5);
+        nodes.push(panner);
+      }
+      base.oneShot(buffer, nodes, 0, 1);
+    }
+
+    return base.instance(setIntensity, { event: event });
   }
 
   function fireProfile(ctx, destination, cache) {
@@ -315,7 +349,16 @@
       glide(ctx, pops.gain, 0.15 + 0.35 * x, seconds);
     }
 
-    return base.instance(setIntensity);
+    // A log settles: a low wooden knock, then a flurry of crackles as sparks fly up.
+    function event(type) {
+      if (type !== 'burst') return;
+      var buffer = base.buffer('fire-settle', function () { return logSettle(ctx, 2.5); });
+      var gain = ctx.createGain();
+      gain.gain.value = 1.5;
+      base.oneShot(buffer, [gain], 0.05, 0.9 + Math.random() * 0.2);
+    }
+
+    return base.instance(setIntensity, { event: event });
   }
 
   function nightProfile(ctx, destination, cache) {
@@ -582,6 +625,52 @@
       out.right[i] += value * 0.6;
     }
     return out.normalize(0.5);
+  }
+
+  // Tyres on snow: brown noise under a slow swell that peaks as the car passes.
+  function tyreHiss(ctx, seconds) {
+    var rate = ctx.sampleRate;
+    var length = Math.round(seconds * rate);
+    var buffer = ctx.createBuffer(1, length, rate);
+    var data = buffer.getChannelData(0);
+    var last = 0;
+    for (var i = 0; i < length; i += 1) {
+      var t = i / length;
+      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+      var swell = Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.05)), 3);
+      data[i] = (last * 3.5 + (Math.random() * 2 - 1) * 0.04) * swell;
+    }
+    var peak = 0;
+    for (var j = 0; j < length; j += 1) peak = Math.max(peak, Math.abs(data[j]));
+    for (var k = 0; k < length; k += 1) data[k] *= peak > 0 ? 0.7 / peak : 1;
+    return buffer;
+  }
+
+  // A log settling: a low knock with a short woody body, then a dense flurry of crackles.
+  function logSettle(ctx, seconds) {
+    var out = stereoBuffer(ctx, seconds);
+    var rate = out.rate;
+    var knock = 0.02 * rate;
+    for (var n = 0; n < knock * 6; n += 1) {
+      var body = Math.sin((2 * Math.PI * 72 * n) / rate) + 0.5 * Math.sin((2 * Math.PI * 180 * n) / rate);
+      out.add(n, body * Math.exp(-n / knock) * 0.9 + (Math.random() * 2 - 1) * Math.exp(-n / (0.004 * rate)) * 0.5, 0);
+    }
+    var at = Math.round(0.08 * rate);
+    var gap = 0.012;
+    for (var c = 0; c < 45; c += 1) {
+      var span = Math.round((0.0005 + Math.random() * 0.002) * rate);
+      var pan = (Math.random() * 2 - 1) * 0.6;
+      var level = (0.3 + Math.random() * 0.7) * Math.exp(-c / 18);
+      var previous = 0;
+      for (var k = 0; k < span; k += 1) {
+        var white = Math.random() * 2 - 1;
+        out.add(at + k, (white - previous * 0.85) * Math.exp(-k / (span * 0.3)) * level, pan);
+        previous = white;
+      }
+      at += Math.round(gap * rate * (0.3 + Math.random() * 1.4));
+      gap *= 1.06;
+    }
+    return out.normalize(0.9);
   }
 
   // Distant thunder: a slow swell of brown noise with a lumpy, rolling decay.
