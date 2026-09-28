@@ -87,6 +87,38 @@
     items.forEach(function (item) { container.appendChild(makeMediaTile(item, extraClass)); });
   }
 
+  // Past years' media from today's date; the section stays hidden when there is nothing to remember.
+  function renderMemories(data) {
+    var years = (data && data.years) || [];
+    if (!years.length) return;
+    var date = new Date(data.date + 'T12:00:00');
+    var day = date.toLocaleDateString('en', { month: 'long', day: 'numeric' });
+    byId('memories-kicker').textContent = years.length === 1
+      ? day + ' · ' + agoLabel(years[0].years_ago)
+      : day + ' · across ' + years.length + ' years';
+    byId('memories-title').textContent = data.window === 'day' ? 'On This Day' : 'This Week, Years Ago';
+    var first = years[0];
+    var month = data.date.slice(5, 7);
+    var link = byId('memories-link');
+    link.href = '/library?view=explore&month=' + first.year + '-' + month;
+    link.firstChild.nodeValue = date.toLocaleDateString('en', { month: 'long' }) + ' ' + first.year + ' ';
+
+    var container = byId('home-memories-list');
+    container.replaceChildren();
+    years.forEach(function (group) {
+      group.items.forEach(function (item) {
+        var tile = makeMediaTile(item, '');
+        tile.querySelector('.media-tile-copy').textContent = agoLabel(group.years_ago) + ' · ' + group.year;
+        container.appendChild(tile);
+      });
+    });
+    byId('home-memories').hidden = false;
+  }
+
+  function agoLabel(years) {
+    return years === 1 ? 'A year ago' : years + ' years ago';
+  }
+
   function renderCollections(items) {
     var container = byId('home-collections');
     if (!container) return;
@@ -174,6 +206,12 @@
     var recentRequest = fetchJson('/api/library/items?scope=all&mode=all&offset=0&limit=12').catch(function () { return { data: { items: [] } }; });
     var randomRequest = fetchJson('/api/library/items?scope=all&mode=image_random&offset=0&limit=12').catch(function () { return { data: { items: [] } }; });
     var collectionsRequest = fetchJson('/api/collections').catch(function () { return { data: { items: [] } }; });
+    var now = new Date();
+    var today = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(function (n) { return String(n).padStart(2, '0'); }).join('-');
+    fetchJson('/api/library/on-this-day?date=' + today).then(function (payload) {
+      renderMemories(apiData(payload));
+      if (window.feather) window.feather.replace();
+    }).catch(function () {});
 
     Promise.all([statsRequest, recentRequest, randomRequest, collectionsRequest]).then(function (results) {
       var stats = apiData(results[0]) || {};

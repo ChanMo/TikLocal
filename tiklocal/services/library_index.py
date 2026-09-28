@@ -146,6 +146,26 @@ class MediaIndexStore:
             ).fetchall()
         return [self._to_library_record(row) for row in rows]
 
+    def on_days(self, month_days: list[str], before_year: str, limit: int = 200) -> list[dict]:
+        """Photos and videos captured on the given MM-DD days in years before `before_year`, newest first."""
+        days = [day for day in month_days if re.fullmatch(r"\d{2}-\d{2}", day)]
+        if not days:
+            return []
+        placeholders = ",".join("?" for _ in days)
+        with self.database.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM media_items
+                WHERE media_type IN ('video', 'image')
+                  AND capture_year < ?
+                  AND substr(captured_local_date, 6, 5) IN ({placeholders})
+                ORDER BY captured_at DESC, uri
+                LIMIT ?
+                """,
+                (before_year, *days, limit),
+            ).fetchall()
+        return [self._to_library_record(row) for row in rows]
+
     def page(
         self,
         *,

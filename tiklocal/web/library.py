@@ -1,5 +1,6 @@
 """Library, favorites and collections share one browsing/query boundary."""
 
+import datetime
 import random
 from urllib.parse import quote
 
@@ -249,6 +250,27 @@ def register_library_routes(
             **_read_page_options(scope),
         )
         return {'success': True, 'data': page}
+
+    @app.route('/api/library/on-this-day')
+    def api_on_this_day():
+        """Past years' media from today's date, widening to the surrounding week when the day is empty."""
+        try:
+            today = datetime.date.fromisoformat(str(request.args.get('date', '')))
+        except ValueError:
+            today = datetime.date.today()
+        window = 'day'
+        records = media_index.on_days([f"{today:%m-%d}"], str(today.year))
+        if not records:
+            window = 'week'
+            week = [today + datetime.timedelta(days=offset) for offset in range(-3, 4)]
+            records = media_index.on_days([f"{day:%m-%d}" for day in week], str(today.year))
+        years = {}
+        for record in records:
+            year = record['captured_local_date'][:4]
+            group = years.setdefault(year, {'year': int(year), 'years_ago': today.year - int(year), 'items': []})
+            if len(group['items']) < 8:
+                group['items'].append(serialize_library_item(record))
+        return {'success': True, 'data': {'date': today.isoformat(), 'window': window, 'years': list(years.values())}}
 
     @app.route('/api/library/timeline')
     def api_library_timeline():
