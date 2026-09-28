@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## v0.8.41 (2026-09-28)
+
+- Moved the video and image detail pages to the warm paper-and-ink design used across the app, with a shared stylesheet, serif titles, quiet labels, and dialogs that sit above the navigation dock.
+- Flow now pages with the finger: the current item follows a vertical drag, springs back when released early, and commits on distance or a quick flick. A single tap plays or pauses a video (or toggles the interface on images) after a short double-tap window, a double tap favorites with a heart, a long press toggles the interface, and horizontal swipes move between gallery groups. Paging also works with the mouse wheel. Flow's palette now follows the warm neutrals and terracotta accent of the rest of the app.
+- Image details support swiping left and right between images, swiping down to close, arrow-key navigation, and a sharp thumbnail that is replaced by the full image once it loads. Zoom is kept when the full image arrives.
+- Opening media from Library, Home, or Flow grows it from where it was tapped using cross-document view transitions, and going back shrinks it into place. Reduced Motion turns the animation off.
+- Added one toast and confirm dialog for the whole app, replacing native `alert` and `confirm` and the per-page variants in Settings, Downloads, and Collections.
+- Deleting media now moves it into a hidden `.tiklocal-trash/` folder inside its media source instead of removing it. The detail page continues to the neighbouring item and offers Undo for a few seconds. Settings has a new Recently Deleted section to restore, permanently delete, or empty the trash, and items older than 30 days are removed automatically. Library scans and `tiklocal dedupe` skip the trash, and download sources and thumbnails are kept until an item is purged.
+- Long videos (one minute or more) resume where they stopped, on any device, with a Start Over action. Positions are stored on the server, saved every few seconds, on pause, when switching items, and when leaving the page. The first 10 seconds and the last 15 seconds are not kept. Library tiles show a progress bar for partly watched videos, and resetting local browsing history also clears resume points.
+- Home shows On This Day: photos and videos from the same date in past years, grouped by year, widening to the surrounding week when the day itself is empty and hidden when there is nothing to show. It links to that month in Library. `/api/library/on-this-day` serves the data.
+
 ## v0.8.40 (2026-09-27)
 
 - Added live ambience rooms to Web Radio, each drawn by a full-screen WebGL shader with a daytime look for the light theme and a night look for the dark theme: **Rain on Glass** (drops that refract the street, slide and leave trails through the fog), **Snowy Night** (snow falling through a street lamp's light, chimney smoke, frost and flakes melting on the pane), **By the Fire** (a log fire with glowing coals and rising sparks), and **Summer Night** (a meadow with fireflies, stars and swaying grass, or pollen in golden-hour light). The existing video rooms remain.
