@@ -328,7 +328,7 @@ def register_flow_routes(
 ):
     @app.route('/flow')
     def flow_view():
-        return render_template('tiktok.html', menu='flow')
+        return render_template('flow.html', menu='flow')
 
     @app.route('/api/feed/mix')
     def api_feed_mix():

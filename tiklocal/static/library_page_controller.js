@@ -46,10 +46,6 @@
   const quickSpeed = document.getElementById('quick-speed');
   const quickCaption = document.getElementById('quick-caption');
   const quickMagnifierToolWrap = document.getElementById('quick-magnifier-tool-wrap');
-  const quickMagnifierToggle = document.getElementById('quick-magnifier-toggle');
-  const quickZoomOptions = document.getElementById('quick-zoom-options');
-  const quickMagBadge = document.getElementById('quick-mag-badge');
-  const quickMagnifier = document.getElementById('quick-magnifier');
   const quickCaptionPanel = document.getElementById('quick-caption-panel');
   const quickCaptionTitle = document.getElementById('quick-caption-title');
   const quickCaptionTags = document.getElementById('quick-caption-tags');
@@ -57,27 +53,12 @@
   const actionsShared = window.FlowActionsShared || {};
 
   const quickFavorite = document.getElementById('quick-favorite');
-  const quickCollection = document.getElementById('quick-collection');
-  const quickCollectionCount = document.getElementById('quick-collection-count');
   const quickSetCover = document.getElementById('quick-set-cover');
   const quickSource = document.getElementById('quick-source');
   const quickDetail = document.getElementById('quick-detail');
-  const quickCollectionModal = document.getElementById('quick-collection-modal');
-  const quickCollectionClose = document.getElementById('quick-collection-close');
-  const quickCollectionMeta = document.getElementById('quick-collection-meta');
-
-  const quickCollectionCreateBtn = document.getElementById('quick-collection-create-btn');
-  const quickCollectionNameInput = document.getElementById('quick-collection-name');
-  const quickCollectionList = document.getElementById('quick-collection-list');
 
   let mode = scope === 'all' ? initialMode : 'all';
   let seed = initialSeed || '';
-  const collectionStateCache = new Map();
-  let collectionCatalog = [];
-  let collectionSelectedIds = new Set();
-  let collectionSelectedNames = [];
-  let collectionModalOpenedAt = 0;
-  const collectionModalGuardMs = 520;
   const flowSession = window.createFlowSession({
     initialItems,
     initialHasMore: !!initialHasMore,
@@ -93,51 +74,56 @@
   let wasPlayingBeforeDrag = false;
   let bodyOverflowBackup = '';
   let bodyScrollLocked = false;
-
-  let isMagnifying = false;
-  let magX = 0;
-  let magY = 0;
-  let zoomLevel = 2.5;
-  let magnifierFrameRequest = null;
   let focusHandled = false;
   let focusLoading = false;
   const speedOptions = [0.75, 1, 1.25, 1.5, 2];
 
-  function formatTime(seconds) {
-    return uiShared.formatTime(seconds);
-  }
+  const { formatTime } = uiShared;
 
   function makeRandomSeed() {
     return `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
   }
 
-  function currentItem() {
-    return flowSession.currentItem();
-  }
+  const currentItem = () => flowSession.currentItem();
+  const getCurrentIndex = () => flowSession.getIndex();
 
-  function getCurrentIndex() {
-    return flowSession.getIndex();
-  }
-
-  function setCurrentIndex(next) {
-    return flowSession.setIndex(next);
-  }
+  const magnifier = uiShared.createMagnifier({
+    lens: document.getElementById('quick-magnifier'),
+    toggle: document.getElementById('quick-magnifier-toggle'),
+    zoomOptions: document.getElementById('quick-zoom-options'),
+    badge: document.getElementById('quick-mag-badge'),
+    zoomButtons: document.querySelectorAll('.quick-zoom-btn'),
+    activeClass: 'is-active',
+    largeClass: 'quick-magnifier-large',
+    settleTransition: 'transform 0.2s ease, width 0.2s ease, height 0.2s ease',
+    setMagnifying: (enabled) => flowState.setMagnifying(enabled),
+    target: () => {
+      const type = currentItem()?.type;
+      if (type === 'video') return { type, el: quickVideo };
+      if (type === 'image') return { type, el: quickImage };
+      return null;
+    },
+  });
 
   const flowState = window.createFlowStateController({
     getMediaType: () => currentItem()?.type || '',
     canMagnifyMedia: (mediaType) => mediaType === 'image' || mediaType === 'video',
-    onImmersiveChange: (enabled) => {
-      quickView.classList.toggle('immersive', !!enabled);
-    },
-    onMagnifyingChange: (enabled) => {
-      isMagnifying = !!enabled;
-      if (!isMagnifying) {
-        cancelMagnifierFrameRequest();
-        quickMagnifierToggle.classList.remove('is-active');
-        quickZoomOptions.classList.remove('show');
-        quickMagnifier.classList.remove('active');
-      }
-    },
+    onImmersiveChange: (enabled) => quickView.classList.toggle('immersive', !!enabled),
+    onMagnifyingChange: (enabled) => magnifier.onStateChange(enabled),
+  });
+
+  const collections = window.TikLocalCollections.createPicker({
+    button: document.getElementById('quick-collection'),
+    countEl: document.getElementById('quick-collection-count'),
+    modal: document.getElementById('quick-collection-modal'),
+    closeBtn: document.getElementById('quick-collection-close'),
+    meta: document.getElementById('quick-collection-meta'),
+    createBtn: document.getElementById('quick-collection-create-btn'),
+    nameInput: document.getElementById('quick-collection-name'),
+    list: document.getElementById('quick-collection-list'),
+    itemClass: 'quick-collection-item',
+    emptyClass: 'quick-collection-empty',
+    currentUri: () => currentItem()?.name,
   });
 
   function showPlayStatus(paused) {
@@ -149,13 +135,7 @@
     setTimeout(() => quickPlayStatus.classList.remove('visible'), 220);
   }
 
-  function setImmersive(enabled) {
-    flowState.setImmersive(enabled);
-  }
-
-  function toggleUI() {
-    flowState.toggleImmersive();
-  }
+  const toggleUI = () => flowState.toggleImmersive();
 
   function activeTab() {
     document.querySelectorAll('.mode-tab').forEach((tab) => {
@@ -541,107 +521,6 @@
     await reloadCurrentMode();
   }
 
-  async function collectionsRequest(url, options = {}) {
-    const response = await fetch(url, options);
-    let payload = null;
-    try {
-      payload = await response.json();
-    } catch (error) {
-      payload = null;
-    }
-    if (!response.ok || !(payload && payload.success)) {
-      throw new Error((payload && payload.error) || 'Request failed');
-    }
-    return payload.data || {};
-  }
-
-  function flashActionButton(buttonEl) {
-    if (!buttonEl) return;
-    buttonEl.classList.add('is-active');
-    setTimeout(() => buttonEl.classList.remove('is-active'), 220);
-  }
-
-  function escapeHtml(value) {
-    return String(value || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function setCollectionMeta(names) {
-    if (!quickCollectionMeta) return;
-    const values = Array.isArray(names) ? names.filter(Boolean) : [];
-    if (!values.length) {
-      quickCollectionMeta.textContent = 'Not in any collections';
-      return;
-    }
-    const preview = values.slice(0, 2).join(', ');
-    const rest = values.length - 2;
-    quickCollectionMeta.textContent = rest > 0 ? `In: ${preview} +${rest}` : `In: ${preview}`;
-  }
-
-  function setCollectionButtonState(names) {
-    const values = Array.isArray(names) ? names.filter(Boolean) : [];
-    const count = values.length;
-    quickCollection.classList.toggle('has-collection', count > 0);
-    quickCollectionCount.textContent = count > 99 ? '99+' : String(count);
-    const preview = values.slice(0, 2).join(', ');
-    const suffix = values.length > 2 ? ` +${values.length - 2}` : '';
-    quickCollection.title = count > 0 ? `In: ${preview}${suffix}` : 'Add to Collection';
-  }
-
-  async function fetchCollectionMembership(uri, force = false) {
-    const key = String(uri || '').trim();
-    if (!key) return { ids: new Set(), names: [] };
-    if (!force && collectionStateCache.has(key)) {
-      const cached = collectionStateCache.get(key) || {};
-      return {
-        ids: new Set(Array.isArray(cached.ids) ? cached.ids : []),
-        names: Array.isArray(cached.names) ? cached.names.slice() : [],
-      };
-    }
-    const encoded = encodeURIComponent(key);
-    const selectedData = await collectionsRequest(`/api/collections/by-media?uri=${encoded}`);
-    const selectedItems = Array.isArray(selectedData.items) ? selectedData.items : [];
-    const ids = [];
-    const names = [];
-    selectedItems.forEach((entry) => {
-      const id = String(entry?.id || '').trim();
-      const name = String(entry?.name || '').trim();
-      if (id) ids.push(id);
-      if (name) names.push(name);
-    });
-    collectionStateCache.set(key, { ids, names });
-    return { ids: new Set(ids), names };
-  }
-
-  async function syncCollectionState(item, force = false) {
-    const expectedName = String(item?.name || '');
-    if (!expectedName) {
-      collectionSelectedIds = new Set();
-      collectionSelectedNames = [];
-      setCollectionButtonState([]);
-      setCollectionMeta([]);
-      return;
-    }
-    try {
-      const state = await fetchCollectionMembership(expectedName, force);
-      if (String(currentItem()?.name || '') !== expectedName) return;
-      collectionSelectedIds = new Set(state.ids);
-      collectionSelectedNames = state.names.slice();
-      setCollectionButtonState(collectionSelectedNames);
-      setCollectionMeta(collectionSelectedNames);
-    } catch (error) {
-      if (String(currentItem()?.name || '') !== expectedName) return;
-      collectionSelectedIds = new Set();
-      collectionSelectedNames = [];
-      setCollectionButtonState([]);
-      setCollectionMeta([]);
-    }
-  }
-
   function updateCollectionCoverButton(item) {
     const shouldShow = scope === 'collection' && !!collectionId && !!item?.name;
     quickSetCover.classList.toggle('is-hidden', !shouldShow);
@@ -682,125 +561,6 @@
     tile.appendChild(image);
     nextCollage.appendChild(tile);
     collectionIdentityCover.replaceChildren(nextCollage);
-  }
-
-  function closeCollectionModal() {
-    if (!quickCollectionModal) return;
-    quickCollectionModal.classList.remove('active');
-    quickCollectionModal.setAttribute('aria-hidden', 'true');
-    quickCollectionCreateBtn.disabled = false;
-    collectionModalOpenedAt = 0;
-  }
-
-  function renderCollectionList(collections, selectedIds) {
-    if (!quickCollectionList) return;
-    if (!Array.isArray(collections) || !collections.length) {
-      quickCollectionList.innerHTML = '<div class="quick-collection-empty">No collections yet. Create one first.</div>';
-      return;
-    }
-    quickCollectionList.innerHTML = collections.map((item) => {
-      const id = String(item.id || '');
-      const safeName = escapeHtml(String(item.name || 'Untitled collection'));
-      const count = Number(item.item_count || 0);
-      const checked = selectedIds.has(id) ? 'checked' : '';
-      const isSelected = selectedIds.has(id) ? 'is-selected' : '';
-      return `
-        <label class="quick-collection-item ${isSelected}" data-id="${id}">
-          <span class="coll-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-          </span>
-          <span class="coll-name">${safeName}</span>
-          <em class="coll-count">${count > 0 ? count : ''}</em>
-          <span class="coll-check">
-            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          </span>
-          <input type="checkbox" ${checked} />
-        </label>
-      `;
-    }).join('');
-  }
-
-  async function openCollectionModal() {
-    const item = currentItem();
-    if (!item || !item.name || !quickCollectionModal) return;
-    collectionModalOpenedAt = Date.now();
-    quickCollectionModal.classList.add('active');
-    quickCollectionModal.setAttribute('aria-hidden', 'false');
-    quickCollectionList.innerHTML = '<div class="quick-collection-empty">Loading...</div>';
-    try {
-      const [allData, selectedState] = await Promise.all([
-        collectionsRequest('/api/collections'),
-        fetchCollectionMembership(item.name, true),
-      ]);
-      const allItems = Array.isArray(allData.items) ? allData.items : [];
-      collectionCatalog = allItems;
-      collectionSelectedIds = new Set(selectedState.ids);
-      collectionSelectedNames = selectedState.names.slice();
-      setCollectionButtonState(collectionSelectedNames);
-      setCollectionMeta(collectionSelectedNames);
-      renderCollectionList(allItems, collectionSelectedIds);
-    } catch (error) {
-      quickCollectionList.innerHTML = '<div class="quick-collection-empty">Failed to load. Please try again.</div>';
-    }
-    feather.replace();
-  }
-
-  async function createCollectionInModal() {
-    const name = String(quickCollectionNameInput?.value || '').trim();
-    if (!name) return;
-    quickCollectionCreateBtn.disabled = true;
-    try {
-      const createdData = await collectionsRequest('/api/collections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const createdId = String(createdData?.item?.id || '').trim();
-      const item = currentItem();
-      if (createdId && item?.name) {
-        await collectionsRequest(`/api/collections/${encodeURIComponent(createdId)}/items`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uris: [item.name] }),
-        });
-        collectionStateCache.delete(item.name);
-      }
-      if (quickCollectionNameInput) quickCollectionNameInput.value = '';
-      await openCollectionModal();
-    } catch (error) {
-      quickCollectionCreateBtn.disabled = false;
-      return;
-    }
-    quickCollectionCreateBtn.disabled = false;
-  }
-
-  async function toggleCollectionMembership(targetCollectionId, checked, rowEl, inputEl) {
-    const item = currentItem();
-    if (!item || !item.name) return;
-    if (!targetCollectionId) return;
-    rowEl?.classList.add('is-pending');
-    if (inputEl) inputEl.disabled = true;
-    try {
-      await collectionsRequest(`/api/collections/${encodeURIComponent(targetCollectionId)}/items`, {
-        method: checked ? 'POST' : 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uris: [item.name] }),
-      });
-      await syncCollectionState(item, true);
-      collectionCatalog = collectionCatalog.map((entry) => {
-        if (String(entry?.id || '') !== targetCollectionId) return entry;
-        const baseCount = Number(entry?.item_count || 0);
-        const nextCount = checked ? (baseCount + 1) : Math.max(0, baseCount - 1);
-        return { ...entry, item_count: nextCount };
-      });
-      renderCollectionList(collectionCatalog, collectionSelectedIds);
-    } catch (error) {
-      if (inputEl) inputEl.checked = !checked;
-      return;
-    } finally {
-      rowEl?.classList.remove('is-pending');
-      if (inputEl) inputEl.disabled = false;
-    }
   }
 
   async function syncFavoriteState(item) {
@@ -891,156 +651,6 @@
     },
   });
 
-
-
-  function currentImageEl() {
-    const item = currentItem();
-    if (!item || item.type !== 'image') return null;
-    return quickImage;
-  }
-
-  function currentVideoEl() {
-    const item = currentItem();
-    if (!item || item.type !== 'video') return null;
-    return quickVideo;
-  }
-
-  function getImageContainRect(imgEl) {
-    return uiShared.getImageContainRect(imgEl);
-  }
-
-  function getVideoContainRect(videoEl) {
-    return uiShared.getVideoContainRect(videoEl);
-  }
-
-  function updateMagnifierPosition() {
-    uiShared.setMagnifierPosition(quickMagnifier, magX, magY);
-  }
-
-  function cancelMagnifierFrameRequest() {
-    if (!magnifierFrameRequest) return;
-    if (magnifierFrameRequest.kind === 'rvfc') {
-      const videoEl = magnifierFrameRequest.videoEl;
-      if (videoEl && typeof videoEl.cancelVideoFrameCallback === 'function') {
-        try {
-          videoEl.cancelVideoFrameCallback(magnifierFrameRequest.id);
-        } catch (error) {
-          // Ignore cancellation failures when media element lifecycle changes.
-        }
-      }
-    } else if (magnifierFrameRequest.kind === 'raf') {
-      cancelAnimationFrame(magnifierFrameRequest.id);
-    } else if (magnifierFrameRequest.kind === 'timeout') {
-      clearTimeout(magnifierFrameRequest.id);
-    }
-    magnifierFrameRequest = null;
-  }
-
-  function scheduleMagnifierFrameLoop(videoEl) {
-    cancelMagnifierFrameRequest();
-    if (!videoEl) return;
-
-    const tick = () => {
-      magnifierFrameRequest = null;
-      if (!isMagnifying) return;
-      const activeVideo = currentVideoEl();
-      if (!activeVideo || activeVideo !== videoEl) return;
-      updateMagnifierContent();
-
-      if (videoEl.paused || videoEl.ended) {
-        const timeoutId = setTimeout(() => {
-          scheduleMagnifierFrameLoop(videoEl);
-        }, 120);
-        magnifierFrameRequest = { kind: 'timeout', id: timeoutId, videoEl };
-        return;
-      }
-      scheduleMagnifierFrameLoop(videoEl);
-    };
-
-    if (typeof videoEl.requestVideoFrameCallback === 'function') {
-      const id = videoEl.requestVideoFrameCallback(() => tick());
-      magnifierFrameRequest = { kind: 'rvfc', id, videoEl };
-    } else {
-      const id = requestAnimationFrame(tick);
-      magnifierFrameRequest = { kind: 'raf', id, videoEl };
-    }
-  }
-
-  function updateMagnifierContent() {
-    const item = currentItem();
-    if (!item) return;
-
-    if (item.type === 'video') {
-      const videoEl = currentVideoEl();
-      if (!videoEl) return;
-      uiShared.updateVideoMagnifierContent({
-        videoEl,
-        lensEl: quickMagnifier,
-        centerX: magX,
-        centerY: magY,
-        zoomLevel,
-        maxPixelRatio: 2,
-      });
-      return;
-    }
-
-    const imgEl = currentImageEl();
-    if (!imgEl) return;
-    uiShared.updateMagnifierContent({
-      imageEl: imgEl,
-      lensEl: quickMagnifier,
-      centerX: magX,
-      centerY: magY,
-      zoomLevel,
-    });
-  }
-
-  function applyZoom(level) {
-    zoomLevel = level;
-    quickMagBadge.textContent = `${level}x`;
-    document.querySelectorAll('.quick-zoom-btn').forEach((btn) => {
-      const btnLevel = Number.parseFloat(btn.dataset.level || '2.5');
-      btn.classList.toggle('active', btnLevel === level);
-    });
-    if (level >= 5) quickMagnifier.classList.add('quick-magnifier-large');
-    else quickMagnifier.classList.remove('quick-magnifier-large');
-    if (isMagnifying) {
-      setTimeout(updateMagnifierContent, 30);
-    }
-  }
-
-  function toggleMagnifier(active) {
-    isMagnifying = flowState.setMagnifying(active);
-    if (isMagnifying) {
-      quickMagnifierToggle.classList.add('is-active');
-      quickZoomOptions.classList.add('show');
-      quickMagnifier.classList.add('active');
-      const item = currentItem();
-      const rect = item?.type === 'video'
-        ? getVideoContainRect(currentVideoEl())
-        : getImageContainRect(currentImageEl());
-      if (rect) {
-        magX = rect.left + rect.width / 2;
-        magY = rect.top + rect.height / 2;
-      } else {
-        magX = window.innerWidth / 2;
-        magY = window.innerHeight / 2;
-      }
-      updateMagnifierPosition();
-      updateMagnifierContent();
-      if (item?.type === 'video') {
-        scheduleMagnifierFrameLoop(currentVideoEl());
-      } else {
-        cancelMagnifierFrameRequest();
-      }
-    } else {
-      cancelMagnifierFrameRequest();
-      quickMagnifierToggle.classList.remove('is-active');
-      quickZoomOptions.classList.remove('show');
-      quickMagnifier.classList.remove('active');
-    }
-  }
-
   function updateControls(item) {
     const isVideo = item?.type === 'video';
     quickControls.classList.toggle('is-hidden', !isVideo);
@@ -1088,7 +698,7 @@
 
   function closeViewer() {
     flowState.reset();
-    closeCollectionModal();
+    collections.close();
     quickView.classList.remove('active');
     quickView.setAttribute('aria-hidden', 'true');
     quickVideo.pause();
@@ -1105,11 +715,10 @@
     quickTimeTotal.textContent = '00:00';
     updateSourceButton(null);
     mediaActions.clearCaption();
-    toggleMagnifier(false);
+    magnifier.toggle(false);
     updateCollectionCoverButton(null);
-    setCollectionButtonState([]);
-    setCollectionMeta([]);
-    setCurrentIndex(-1);
+    collections.sync('');
+    flowSession.setIndex(-1);
     if (bodyScrollLocked) {
       document.body.style.overflow = bodyOverflowBackup;
       bodyOverflowBackup = '';
@@ -1119,11 +728,11 @@
 
   function showItem(index) {
     if (index < 0 || index >= items.length) return;
-    setCurrentIndex(index);
+    flowSession.setIndex(index);
     const item = items[index];
     quickCounter.textContent = `${index + 1} / ${items.length}`;
     quickDetail.href = item.detail_url || '#';
-    toggleMagnifier(false);
+    magnifier.toggle(false);
     flowState.onMediaChanged();
     updateControls(item);
     updateCollectionCoverButton(item);
@@ -1160,7 +769,7 @@
     }
 
     syncFavoriteState(item);
-    syncCollectionState(item);
+    collections.sync(item.name);
     syncSourceState(item);
     if (index >= items.length - 8 && flowSession.hasMore()) loadNextPage();
   }
@@ -1222,7 +831,7 @@
     if (item.name === collectionCoverUri) return;
     quickSetCover.disabled = true;
     try {
-      await collectionsRequest(`/api/collections/${encodeURIComponent(collectionId)}`, {
+      await window.TikLocalCollections.request(`/api/collections/${encodeURIComponent(collectionId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cover_uri: item.name }),
@@ -1236,51 +845,10 @@
     }
   }
 
-  quickCollection.addEventListener('click', async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    await openCollectionModal();
-  });
-  quickCollection.addEventListener('keydown', async (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    await openCollectionModal();
-  });
-
   quickSetCover.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
     await setCurrentAsCollectionCover();
-  });
-
-  quickCollectionClose.addEventListener('click', (event) => {
-    event.preventDefault();
-    closeCollectionModal();
-  });
-
-  quickCollectionModal.addEventListener('click', (event) => {
-    if (collectionModalOpenedAt && (Date.now() - collectionModalOpenedAt) < collectionModalGuardMs) {
-      return;
-    }
-    if (event.target === quickCollectionModal) closeCollectionModal();
-  });
-  quickCollectionCreateBtn.addEventListener('click', async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    await createCollectionInModal();
-  });
-  quickCollectionNameInput.addEventListener('keydown', async (event) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    await createCollectionInModal();
-  });
-  quickCollectionList.addEventListener('change', async (event) => {
-    const inputEl = event.target.closest('input[type="checkbox"]');
-    if (!inputEl) return;
-    const rowEl = inputEl.closest('[data-id]');
-    const targetCollectionId = String(rowEl?.getAttribute('data-id') || '').trim();
-    if (!targetCollectionId) return;
-    await toggleCollectionMembership(targetCollectionId, !!inputEl.checked, rowEl, inputEl);
   });
 
   quickCloseTop.addEventListener('click', (event) => {
@@ -1290,8 +858,8 @@
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && quickCollectionModal.classList.contains('active')) {
-      closeCollectionModal();
+    if (event.key === 'Escape' && collections.isOpen()) {
+      collections.close();
       return;
     }
     if (!quickView.classList.contains('active')) return;
@@ -1345,21 +913,6 @@
     mediaActions.generateCaption(item.name);
   });
 
-  quickMagnifierToggle.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    toggleMagnifier(!isMagnifying);
-  });
-
-  document.querySelectorAll('.quick-zoom-btn').forEach((btn) => {
-    btn.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const level = Number.parseFloat(btn.dataset.level || '2.5');
-      applyZoom(level);
-    });
-  });
-
   quickProgress.addEventListener('input', () => {
     const item = currentItem();
     if (!item || item.type !== 'video') return;
@@ -1394,7 +947,7 @@
         return;
       }
     }
-    if (isMagnifying) return;
+    if (magnifier.isActive()) return;
     const deltaY = event.deltaY || 0;
     if (Math.abs(deltaY) < 24) return;
     event.preventDefault();
@@ -1410,52 +963,24 @@
   const swipe = new Hammer(quickOverlay);
   swipe.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
   swipe.on('swipeup', () => {
-    if (isMagnifying) return;
+    if (magnifier.isActive()) return;
     nextItem();
   });
   swipe.on('swipedown', () => {
-    if (isMagnifying) return;
+    if (magnifier.isActive()) return;
     prevItem();
   });
 
-  const magHammer = new Hammer(quickMagnifier);
-  magHammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 0 });
-  let startMagX = 0;
-  let startMagY = 0;
-  magHammer.on('panstart', () => {
-    startMagX = magX;
-    startMagY = magY;
-    quickMagnifier.style.transition = 'none';
-  });
-  magHammer.on('panmove', (event) => {
-    magX = startMagX + event.deltaX;
-    magY = startMagY + event.deltaY;
-    updateMagnifierPosition();
-    updateMagnifierContent();
-  });
-  magHammer.on('panend', () => {
-    quickMagnifier.style.transition = 'transform 0.2s ease, width 0.2s ease, height 0.2s ease';
-  });
-
-  window.addEventListener('resize', () => {
-    if (isMagnifying) updateMagnifierContent();
-    scheduleWaterfallRelayout();
-  });
+  window.addEventListener('resize', scheduleWaterfallRelayout);
 
   quickVideo.addEventListener('timeupdate', updateVideoProgress);
   quickVideo.addEventListener('loadedmetadata', updateVideoProgress);
   quickVideo.addEventListener('durationchange', updateVideoProgress);
   quickVideo.addEventListener('play', () => {
     quickPlayStatus.classList.remove('visible');
-    if (isMagnifying && currentVideoEl() === quickVideo) {
-      scheduleMagnifierFrameLoop(quickVideo);
-    }
+    magnifier.onVideoPlay(quickVideo);
   });
-  quickVideo.addEventListener('seeked', () => {
-    if (isMagnifying && currentVideoEl() === quickVideo) {
-      updateMagnifierContent();
-    }
-  });
+  quickVideo.addEventListener('seeked', () => magnifier.onVideoSeeked(quickVideo));
   quickVideo.addEventListener('pause', () => {
     const item = currentItem();
     if (item?.type === 'video') showPlayStatus(true);
@@ -1536,7 +1061,6 @@
     const [year, monthNumber] = timelineMonth.split('-');
     monthHeading.textContent = new Intl.DateTimeFormat('en', { year: 'numeric', month: 'long' }).format(new Date(year, Number(monthNumber) - 1, 1));
   }
-  applyZoom(2.5);
   relayoutWaterfall();
   if (!items.length && !flowSession.hasMore()) {
     if (searchQuery) {

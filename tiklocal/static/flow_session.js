@@ -51,28 +51,6 @@
       return index;
     }
 
-    function moveTo(next) {
-      if (!Number.isInteger(next) || next < 0 || next >= items.length) return null;
-      index = next;
-      return currentItem();
-    }
-
-    function next() {
-      if (index < items.length - 1) {
-        index += 1;
-        return currentItem();
-      }
-      return null;
-    }
-
-    function prev() {
-      if (index > 0) {
-        index -= 1;
-        return currentItem();
-      }
-      return null;
-    }
-
     function dropHead(count) {
       var removeCount = Math.max(0, Math.min(Number(count) || 0, items.length));
       if (!removeCount) return [];
@@ -132,15 +110,9 @@
       currentItem: currentItem,
       getIndex: function () { return index; },
       setIndex: setIndex,
-      moveTo: moveTo,
-      next: next,
-      prev: prev,
       hasMore: function () { return hasMore; },
       setHasMore: function (next) { hasMore = !!next; },
       isLoading: function () { return loading; },
-      getCursor: function () { return cursor; },
-      setCursor: function (next) { cursor = next; },
-      appendUnique: appendUnique,
       loadMore: loadMore,
       dropHead: dropHead,
       reset: reset,

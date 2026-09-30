@@ -33,7 +33,7 @@
 - 目的：消除 Flow 与 Library 的重复几何/时间逻辑，避免单点修复失效。
 
 3. 页面适配层（保留页面特有渲染）
-- Flow：`tiklocal/templates/tiktok.html`
+- Flow：`tiklocal/templates/flow.html`
 - Library/Favorites：`tiklocal/templates/library.html`
 - 仅保留页面差异（数据源、DOM 结构、按钮布局），核心状态流与通用算法走共享模块。
 
@@ -59,7 +59,7 @@
 - 只保护同一页面内的生成并发，不提供跨浏览器/多客户端的全局模型请求去重。真实模型输出质量需单独验收。
 
 - 模板：
-1. `tiklocal/templates/tiktok.html`
+1. `tiklocal/templates/flow.html`
 2. `tiklocal/templates/library.html`
 3. `tiklocal/templates/image_detail.html`
 - 静态资源：

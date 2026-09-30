@@ -60,7 +60,7 @@
 
 - `tiklocal/web/flow.py`
 - `tiklocal/web/media_payloads.py`
-- `tiklocal/templates/tiktok.html`
+- `tiklocal/templates/flow.html`
 - `tiklocal/static/flow_state_controller.js`
 - `tiklocal/static/flow_ui_shared.js`
 - `docs/flow-interaction-unification.md`

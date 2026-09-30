@@ -176,12 +176,170 @@
     }
   }
 
+  // A draggable lens over the current image or video. `target()` returns
+  // { type: 'image' | 'video', el } for the media on screen, or null.
+  function createMagnifier(opts) {
+    var lens = opts.lens;
+    var toggleBtn = opts.toggle;
+    var zoomOptions = opts.zoomOptions;
+    var zoomButtons = Array.prototype.slice.call(opts.zoomButtons || []);
+    var activeClass = opts.activeClass || 'active';
+    var active = false;
+    var x = 0;
+    var y = 0;
+    var zoom = 2.5;
+    var frame = null;
+
+    function currentVideo() {
+      var target = opts.target();
+      return target && target.type === 'video' ? target.el : null;
+    }
+
+    function draw() {
+      var target = opts.target();
+      if (!target || !target.el) return;
+      if (target.type === 'video') {
+        updateVideoMagnifierContent({ videoEl: target.el, lensEl: lens, centerX: x, centerY: y, zoomLevel: zoom, maxPixelRatio: 2 });
+      } else {
+        updateMagnifierContent({ imageEl: target.el, lensEl: lens, centerX: x, centerY: y, zoomLevel: zoom });
+      }
+    }
+
+    function cancelFrame() {
+      if (!frame) return;
+      if (frame.kind === 'rvfc') {
+        try {
+          frame.videoEl.cancelVideoFrameCallback(frame.id);
+        } catch (error) {
+          // The element may already be gone.
+        }
+      } else if (frame.kind === 'raf') {
+        cancelAnimationFrame(frame.id);
+      } else {
+        clearTimeout(frame.id);
+      }
+      frame = null;
+    }
+
+    // Redraw a video lens on every presented frame; poll slowly while paused.
+    function followVideo(videoEl) {
+      cancelFrame();
+      if (!videoEl) return;
+      function tick() {
+        frame = null;
+        if (!active || currentVideo() !== videoEl) return;
+        draw();
+        if (videoEl.paused || videoEl.ended) {
+          frame = { kind: 'timeout', id: setTimeout(function () { followVideo(videoEl); }, 120) };
+          return;
+        }
+        followVideo(videoEl);
+      }
+      if (typeof videoEl.requestVideoFrameCallback === 'function') {
+        frame = { kind: 'rvfc', id: videoEl.requestVideoFrameCallback(tick), videoEl: videoEl };
+      } else {
+        frame = { kind: 'raf', id: requestAnimationFrame(tick) };
+      }
+    }
+
+    function showUI(visible) {
+      toggleBtn.classList.toggle(activeClass, visible);
+      zoomOptions.classList.toggle('show', visible);
+      lens.classList.toggle('active', visible);
+    }
+
+    // Mirrors the state controller: another mode turning the lens off hides it here.
+    function onStateChange(enabled) {
+      active = !!enabled;
+      if (active) return;
+      cancelFrame();
+      showUI(false);
+    }
+
+    function toggle(enable) {
+      active = !!opts.setMagnifying(enable);
+      if (!active) {
+        cancelFrame();
+        showUI(false);
+        return;
+      }
+      showUI(true);
+      var target = opts.target();
+      var rect = null;
+      if (target && target.type === 'video') rect = getVideoContainRect(target.el);
+      else if (target) rect = getImageContainRect(target.el);
+      x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+      y = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+      setMagnifierPosition(lens, x, y);
+      draw();
+      if (target && target.type === 'video') followVideo(target.el);
+      else cancelFrame();
+    }
+
+    function applyZoom(level) {
+      zoom = level;
+      opts.badge.textContent = level + 'x';
+      zoomButtons.forEach(function (btn) {
+        btn.classList.toggle('active', Number.parseFloat(btn.dataset.level || '2.5') === level);
+      });
+      lens.classList.toggle(opts.largeClass, level >= 5);
+      if (active) setTimeout(draw, 40);
+    }
+
+    toggleBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggle(!active);
+    });
+    zoomButtons.forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        applyZoom(Number.parseFloat(btn.dataset.level || '2.5'));
+      });
+    });
+
+    var pan = new global.Hammer(lens);
+    pan.get('pan').set({ direction: global.Hammer.DIRECTION_ALL, threshold: 0 });
+    var startX = 0;
+    var startY = 0;
+    pan.on('panstart', function () {
+      startX = x;
+      startY = y;
+      lens.style.transition = 'none';
+    });
+    pan.on('panmove', function (event) {
+      x = startX + event.deltaX;
+      y = startY + event.deltaY;
+      setMagnifierPosition(lens, x, y);
+      draw();
+    });
+    pan.on('panend', function () {
+      lens.style.transition = opts.settleTransition || '';
+    });
+
+    global.addEventListener('resize', function () {
+      if (active) draw();
+    });
+
+    applyZoom(zoom);
+
+    return {
+      isActive: function () { return active; },
+      toggle: toggle,
+      onStateChange: onStateChange,
+      // Video elements call these so a playing or seeking video keeps the lens current.
+      onVideoPlay: function (videoEl) {
+        if (active && currentVideo() === videoEl) followVideo(videoEl);
+      },
+      onVideoSeeked: function (videoEl) {
+        if (active && currentVideo() === videoEl) draw();
+      },
+    };
+  }
+
   global.FlowUIShared = {
     formatTime: formatTime,
-    getImageContainRect: getImageContainRect,
-    getVideoContainRect: getVideoContainRect,
-    setMagnifierPosition: setMagnifierPosition,
-    updateMagnifierContent: updateMagnifierContent,
-    updateVideoMagnifierContent: updateVideoMagnifierContent,
+    createMagnifier: createMagnifier,
   };
 })(window);

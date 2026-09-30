@@ -55,10 +55,6 @@
       return magnifying;
     }
 
-    function toggleMagnifying() {
-      return setMagnifying(!magnifying);
-    }
-
     function onMediaChanged() {
       if (!canMagnify() && magnifying) {
         magnifying = false;
@@ -74,12 +70,9 @@
     }
 
     return {
-      isImmersive: function () { return immersive; },
-      isMagnifying: function () { return magnifying; },
       setImmersive: setImmersive,
       toggleImmersive: toggleImmersive,
       setMagnifying: setMagnifying,
-      toggleMagnifying: toggleMagnifying,
       onMediaChanged: onMediaChanged,
       reset: reset,
     };

@@ -7,20 +7,9 @@
     const speedBtn = document.getElementById('speed-btn');
     const captionBtn = document.getElementById('caption-btn');
     const magnifierToolWrap = document.getElementById('magnifier-tool-wrap');
-    const magnifierToggle = document.getElementById('magnifier-toggle');
-    const zoomOptions = document.getElementById('zoom-options');
-    const magBadge = document.getElementById('mag-badge');
     const favoriteBtn = document.getElementById('favorite-btn');
     const collectionBtn = document.getElementById('collection-btn');
-    const collectionCount = document.getElementById('collection-count');
     const infoBtn = document.getElementById('info-btn');
-    const collectionModal = document.getElementById('collection-modal');
-    const collectionModalClose = document.getElementById('collection-modal-close');
-    const collectionModalMeta = document.getElementById('collection-modal-meta');
-
-    const collectionCreateBtn = document.getElementById('collection-create-btn');
-    const collectionNameInput = document.getElementById('collection-name-input');
-    const collectionList = document.getElementById('collection-list');
 
     const playStatusIcon = document.getElementById('play-status-icon');
     const customControls = document.getElementById('custom-controls');
@@ -29,7 +18,6 @@
     const timeCurrent = document.getElementById('time-current');
     const timeTotal = document.getElementById('time-total');
 
-    const magnifier = document.getElementById('magnifier');
     const captionPanel = document.getElementById('caption-panel');
     const captionTitle = document.getElementById('caption-title');
     const captionTags = document.getElementById('caption-tags');
@@ -133,21 +121,8 @@
     }
 
     let currentSpeedIndex = 1;
-    let isImmersive = false;
     let isDragging = false;
     let wasPlayingBeforeDrag = false;
-
-    let isMagnifying = false;
-    let magX = 0;
-    let magY = 0;
-    let zoomLevel = 2.5;
-    let magnifierFrameRequest = null;
-    const collectionStateCache = new Map();
-    let collectionCatalog = [];
-    let collectionSelectedIds = new Set();
-    let collectionSelectedNames = [];
-    let collectionModalOpenedAt = 0;
-    const collectionModalGuardMs = 520;
     let flowLoadingTimer = null;
     let videoStartCoverTimer = null;
     let videoActivationId = 0;
@@ -203,47 +178,50 @@
       }, 250);
     }
 
-    function formatTime(seconds) {
-      return uiShared.formatTime(seconds);
-    }
+    const { formatTime } = uiShared;
+    const currentItem = () => flowSession.currentItem();
+    const getCurrentIndex = () => flowSession.getIndex();
 
-    function currentItem() {
-      return flowSession.currentItem();
-    }
-
-    function getCurrentIndex() {
-      return flowSession.getIndex();
-    }
-
-    function setCurrentIndex(next) {
-      return flowSession.setIndex(next);
-    }
+    const magnifier = uiShared.createMagnifier({
+      lens: document.getElementById('magnifier'),
+      toggle: document.getElementById('magnifier-toggle'),
+      zoomOptions: document.getElementById('zoom-options'),
+      badge: document.getElementById('mag-badge'),
+      zoomButtons: document.querySelectorAll('.zoom-btn'),
+      largeClass: 'magnifier-large',
+      settleTransition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+      setMagnifying: (enabled) => flowState.setMagnifying(enabled),
+      target: () => {
+        const item = currentItem();
+        if (item?.type === 'video') return { type: 'video', el: item.el };
+        if (item?.type === 'image') return { type: 'image', el: item.el };
+        if (item?.type === 'image_group') return { type: 'image', el: item.el?.querySelector('.image-group-media') };
+        return null;
+      },
+    });
 
     const flowState = window.createFlowStateController({
       getMediaType: () => currentItem()?.type || '',
       canMagnifyMedia: (mediaType) => mediaType === 'image' || mediaType === 'video',
-      onImmersiveChange: (enabled) => {
-        isImmersive = !!enabled;
-        document.body.classList.toggle('immersive-mode', isImmersive);
-      },
-      onMagnifyingChange: (enabled) => {
-        isMagnifying = !!enabled;
-        if (!isMagnifying) {
-          cancelMagnifierFrameRequest();
-          magnifierToggle.classList.remove('active');
-          zoomOptions.classList.remove('show');
-          magnifier.classList.remove('active');
-        }
-      },
+      onImmersiveChange: (enabled) => document.body.classList.toggle('immersive-mode', !!enabled),
+      onMagnifyingChange: (enabled) => magnifier.onStateChange(enabled),
     });
 
-    function setImmersive(enabled) {
-      flowState.setImmersive(enabled);
-    }
+    const toggleUI = () => flowState.toggleImmersive();
 
-    function toggleUI() {
-      flowState.toggleImmersive();
-    }
+    const collections = window.TikLocalCollections.createPicker({
+      button: collectionBtn,
+      countEl: document.getElementById('collection-count'),
+      modal: document.getElementById('collection-modal'),
+      closeBtn: document.getElementById('collection-modal-close'),
+      meta: document.getElementById('collection-modal-meta'),
+      createBtn: document.getElementById('collection-create-btn'),
+      nameInput: document.getElementById('collection-name-input'),
+      list: document.getElementById('collection-list'),
+      itemClass: 'collection-modal-item',
+      emptyClass: 'collection-modal-empty',
+      currentUri: () => (currentItem()?.type === 'theme_strip' ? '' : currentDisplayEntry()?.name),
+    });
 
     function clearCaption() {
       captionTitle.textContent = '';
@@ -312,21 +290,6 @@
     });
 
 
-
-    async function collectionsRequest(url, options = {}) {
-      const response = await fetch(url, options);
-      let payload = null;
-      try {
-        payload = await response.json();
-      } catch (error) {
-        payload = null;
-      }
-      if (!response.ok || !(payload && payload.success)) {
-        throw new Error((payload && payload.error) || 'Request failed');
-      }
-      return payload.data || {};
-    }
-
     function escapeHtml(value) {
       return String(value || '')
         .replace(/&/g, '&amp;')
@@ -334,195 +297,6 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-    }
-
-    function setCollectionMeta(names) {
-      if (!collectionModalMeta) return;
-      const items = Array.isArray(names) ? names.filter(Boolean) : [];
-      if (!items.length) {
-        collectionModalMeta.textContent = 'Not in any collections';
-        return;
-      }
-      const preview = items.slice(0, 2).join(', ');
-      const rest = items.length - 2;
-      collectionModalMeta.textContent = rest > 0 ? `In: ${preview} +${rest}` : `In: ${preview}`;
-    }
-
-    function setCollectionButtonState(names) {
-      const items = Array.isArray(names) ? names.filter(Boolean) : [];
-      const count = items.length;
-      collectionBtn.classList.toggle('has-collection', count > 0);
-      collectionCount.textContent = count > 99 ? '99+' : String(count);
-      const preview = items.slice(0, 2).join(', ');
-      const suffix = items.length > 2 ? ` +${items.length - 2}` : '';
-      collectionBtn.title = count > 0 ? `In: ${preview}${suffix}` : 'Add to Collection';
-    }
-
-    async function fetchCollectionMembership(uri, force = false) {
-      const key = String(uri || '').trim();
-      if (!key) return { ids: new Set(), names: [] };
-      if (!force && collectionStateCache.has(key)) {
-        const cached = collectionStateCache.get(key) || {};
-        return {
-          ids: new Set(Array.isArray(cached.ids) ? cached.ids : []),
-          names: Array.isArray(cached.names) ? cached.names.slice() : [],
-        };
-      }
-      const encoded = encodeURIComponent(key);
-      const selectedData = await collectionsRequest(`/api/collections/by-media?uri=${encoded}`);
-      const selectedItems = Array.isArray(selectedData.items) ? selectedData.items : [];
-      const ids = [];
-      const names = [];
-      selectedItems.forEach((entry) => {
-        const id = String(entry?.id || '').trim();
-        const name = String(entry?.name || '').trim();
-        if (id) ids.push(id);
-        if (name) names.push(name);
-      });
-      collectionStateCache.set(key, { ids, names });
-      return { ids: new Set(ids), names };
-    }
-
-    async function syncCollectionState(item, force = false) {
-      const expectedName = String(item?.name || '');
-      if (!expectedName) {
-        collectionSelectedIds = new Set();
-        collectionSelectedNames = [];
-        setCollectionButtonState([]);
-        setCollectionMeta([]);
-        return;
-      }
-      try {
-        const state = await fetchCollectionMembership(expectedName, force);
-        if (String(currentItem()?.name || '') !== expectedName) return;
-        collectionSelectedIds = new Set(state.ids);
-        collectionSelectedNames = state.names.slice();
-        setCollectionButtonState(collectionSelectedNames);
-        setCollectionMeta(collectionSelectedNames);
-      } catch (error) {
-        if (String(currentItem()?.name || '') !== expectedName) return;
-        collectionSelectedIds = new Set();
-        collectionSelectedNames = [];
-        setCollectionButtonState([]);
-        setCollectionMeta([]);
-      }
-    }
-
-    function closeCollectionModal() {
-      collectionModal.classList.remove('active');
-      collectionModal.setAttribute('aria-hidden', 'true');
-      collectionCreateBtn.disabled = false;
-      collectionModalOpenedAt = 0;
-    }
-
-    function renderCollectionList(items, selectedIds) {
-      if (!Array.isArray(items) || !items.length) {
-        collectionList.innerHTML = '<div class="collection-modal-empty">No collections yet. Create one first.</div>';
-        return;
-      }
-      collectionList.innerHTML = items.map((item) => {
-        const id = String(item.id || '');
-        const safeName = escapeHtml(String(item.name || 'Untitled collection'));
-        const count = Number(item.item_count || 0);
-        const checked = selectedIds.has(id) ? 'checked' : '';
-        const isSelected = selectedIds.has(id) ? 'is-selected' : '';
-        return `
-          <label class="collection-modal-item ${isSelected}" data-id="${id}">
-            <span class="coll-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-            </span>
-            <span class="coll-name">${safeName}</span>
-            <em class="coll-count">${count > 0 ? count : ''}</em>
-            <span class="coll-check">
-              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </span>
-            <input type="checkbox" ${checked} />
-          </label>
-        `;
-      }).join('');
-    }
-
-    async function openCollectionModal() {
-      const item = currentItem();
-      if (!item || !item.name) return;
-      collectionModalOpenedAt = Date.now();
-      collectionModal.classList.add('active');
-      collectionModal.setAttribute('aria-hidden', 'false');
-      collectionList.innerHTML = '<div class="collection-modal-empty">Loading...</div>';
-      try {
-        const [allData, selectedState] = await Promise.all([
-          collectionsRequest('/api/collections'),
-          fetchCollectionMembership(item.name, true),
-        ]);
-        const allItems = Array.isArray(allData.items) ? allData.items : [];
-        collectionCatalog = allItems;
-        collectionSelectedIds = new Set(selectedState.ids);
-        collectionSelectedNames = selectedState.names.slice();
-        setCollectionButtonState(collectionSelectedNames);
-        setCollectionMeta(collectionSelectedNames);
-        renderCollectionList(allItems, collectionSelectedIds);
-      } catch (error) {
-        collectionList.innerHTML = '<div class="collection-modal-empty">Failed to load. Please try again.</div>';
-      }
-      feather.replace();
-    }
-
-    async function createCollectionInModal() {
-      const name = String(collectionNameInput.value || '').trim();
-      if (!name) return;
-      collectionCreateBtn.disabled = true;
-      try {
-        const created = await collectionsRequest('/api/collections', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name }),
-        });
-        const createdId = String(created?.item?.id || '').trim();
-        const item = currentItem();
-        if (createdId && item?.name) {
-          await collectionsRequest(`/api/collections/${encodeURIComponent(createdId)}/items`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uris: [item.name] }),
-          });
-          collectionStateCache.delete(item.name);
-        }
-        collectionNameInput.value = '';
-        await openCollectionModal();
-      } catch (error) {
-        collectionCreateBtn.disabled = false;
-        return;
-      }
-      collectionCreateBtn.disabled = false;
-    }
-
-    async function toggleCollectionMembership(collectionId, checked, rowEl, inputEl) {
-      const item = currentItem();
-      if (!item || !item.name) return;
-      if (!collectionId) return;
-      rowEl?.classList.add('is-pending');
-      if (inputEl) inputEl.disabled = true;
-      try {
-        await collectionsRequest(`/api/collections/${encodeURIComponent(collectionId)}/items`, {
-          method: checked ? 'POST' : 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uris: [item.name] }),
-        });
-        await syncCollectionState(item, true);
-        collectionCatalog = collectionCatalog.map((entry) => {
-          if (String(entry?.id || '') !== collectionId) return entry;
-          const baseCount = Number(entry?.item_count || 0);
-          const nextCount = checked ? (baseCount + 1) : Math.max(0, baseCount - 1);
-          return { ...entry, item_count: nextCount };
-        });
-        renderCollectionList(collectionCatalog, collectionSelectedIds);
-      } catch (error) {
-        if (inputEl) inputEl.checked = !checked;
-        return;
-      } finally {
-        rowEl?.classList.remove('is-pending');
-        if (inputEl) inputEl.disabled = false;
-      }
     }
 
     async function goNext() {
@@ -655,8 +429,7 @@
       if (isThemeStrip) {
         favoriteBtn.dataset.value = '';
         favoriteBtn.classList.remove('is-active');
-        setCollectionButtonState([]);
-        setCollectionMeta([]);
+        collections.sync('');
         infoBtn.removeAttribute('href');
         playStatusIcon.classList.add('hidden');
         playStatusIcon.classList.remove('visible');
@@ -669,7 +442,7 @@
       favoriteBtn.dataset.value = mediaName;
       if (mediaName) {
         updateFavoriteState(mediaName);
-        syncCollectionState({ name: mediaName });
+        collections.sync(mediaName);
       }
 
       if (isVideo) {
@@ -788,39 +561,6 @@
       timeCurrent.textContent = formatTime(videoEl.currentTime);
     }
 
-    function applyZoom(level) {
-      zoomLevel = level;
-      magBadge.textContent = `${level}x`;
-      document.querySelectorAll('.zoom-btn').forEach((btn) => {
-        const btnLevel = Number.parseFloat(btn.getAttribute('data-level') || '2.5');
-        btn.classList.toggle('active', btnLevel === level);
-      });
-      if (level >= 5) {
-        magnifier.classList.add('magnifier-large');
-      } else {
-        magnifier.classList.remove('magnifier-large');
-      }
-      if (isMagnifying) {
-        setTimeout(updateMagnifierContent, 40);
-      }
-    }
-
-    function currentImageEl() {
-      const item = currentItem();
-      if (!item) return null;
-      if (item.type === 'image_group') {
-        return item.el?.querySelector('.image-group-media') || null;
-      }
-      if (item.type !== 'image') return null;
-      return item.el;
-    }
-
-    function currentVideoEl() {
-      const item = currentItem();
-      if (!item || item.type !== 'video') return null;
-      return item.el;
-    }
-
     function currentDisplayEntry() {
       const item = currentItem();
       if (!item) return null;
@@ -832,130 +572,8 @@
       return item;
     }
 
-    function getImageContainRect(imgEl) {
-      return uiShared.getImageContainRect(imgEl);
-    }
-
-    function getVideoContainRect(videoEl) {
-      return uiShared.getVideoContainRect(videoEl);
-    }
-
-    function updateMagnifierPosition() {
-      uiShared.setMagnifierPosition(magnifier, magX, magY);
-    }
-
-    function cancelMagnifierFrameRequest() {
-      if (!magnifierFrameRequest) return;
-      if (magnifierFrameRequest.kind === 'rvfc') {
-        const videoEl = magnifierFrameRequest.videoEl;
-        if (videoEl && typeof videoEl.cancelVideoFrameCallback === 'function') {
-          try {
-            videoEl.cancelVideoFrameCallback(magnifierFrameRequest.id);
-          } catch (error) {
-            // Ignore cancellation failures when media element lifecycle changes.
-          }
-        }
-      } else if (magnifierFrameRequest.kind === 'raf') {
-        cancelAnimationFrame(magnifierFrameRequest.id);
-      } else if (magnifierFrameRequest.kind === 'timeout') {
-        clearTimeout(magnifierFrameRequest.id);
-      }
-      magnifierFrameRequest = null;
-    }
-
-    function scheduleMagnifierFrameLoop(videoEl) {
-      cancelMagnifierFrameRequest();
-      if (!videoEl) return;
-
-      const tick = () => {
-        magnifierFrameRequest = null;
-        if (!isMagnifying) return;
-        const activeVideo = currentVideoEl();
-        if (!activeVideo || activeVideo !== videoEl) return;
-        updateMagnifierContent();
-
-        if (videoEl.paused || videoEl.ended) {
-          const timeoutId = setTimeout(() => {
-            scheduleMagnifierFrameLoop(videoEl);
-          }, 120);
-          magnifierFrameRequest = { kind: 'timeout', id: timeoutId, videoEl };
-          return;
-        }
-        scheduleMagnifierFrameLoop(videoEl);
-      };
-
-      if (typeof videoEl.requestVideoFrameCallback === 'function') {
-        const id = videoEl.requestVideoFrameCallback(() => tick());
-        magnifierFrameRequest = { kind: 'rvfc', id, videoEl };
-      } else {
-        const id = requestAnimationFrame(tick);
-        magnifierFrameRequest = { kind: 'raf', id, videoEl };
-      }
-    }
-
-    function updateMagnifierContent() {
-      const item = currentItem();
-      if (!item) return;
-
-      if (item.type === 'video') {
-        const videoEl = currentVideoEl();
-        if (!videoEl) return;
-        uiShared.updateVideoMagnifierContent({
-          videoEl,
-          lensEl: magnifier,
-          centerX: magX,
-          centerY: magY,
-          zoomLevel,
-          maxPixelRatio: 2,
-        });
-        return;
-      }
-
-      const imgEl = currentImageEl();
-      if (!imgEl) return;
-      uiShared.updateMagnifierContent({
-        imageEl: imgEl,
-        lensEl: magnifier,
-        centerX: magX,
-        centerY: magY,
-        zoomLevel,
-      });
-    }
-
-    function toggleMagnifier(active) {
-      isMagnifying = flowState.setMagnifying(active);
-      if (isMagnifying) {
-        magnifierToggle.classList.add('active');
-        zoomOptions.classList.add('show');
-        magnifier.classList.add('active');
-        const item = currentItem();
-        const contentRect = item?.type === 'video'
-          ? getVideoContainRect(currentVideoEl())
-          : getImageContainRect(currentImageEl());
-        if (contentRect) {
-          magX = contentRect.left + contentRect.width / 2;
-          magY = contentRect.top + contentRect.height / 2;
-        } else {
-          magX = window.innerWidth / 2;
-          magY = window.innerHeight / 2;
-        }
-        updateMagnifierPosition();
-        updateMagnifierContent();
-        if (item?.type === 'video') {
-          scheduleMagnifierFrameLoop(currentVideoEl());
-        } else {
-          cancelMagnifierFrameRequest();
-        }
-      } else {
-        cancelMagnifierFrameRequest();
-        magnifierToggle.classList.remove('active');
-        zoomOptions.classList.remove('show');
-        magnifier.classList.remove('active');
-      }
-    }
-
     function clearPreviousState(prevItem) {
-      toggleMagnifier(false);
+      magnifier.toggle(false);
 
       if (!prevItem) return;
       prevItem.el.classList.remove('active');
@@ -980,7 +598,7 @@
       const previousActivity = finishActivity();
       clearPreviousState(prevItem);
 
-      setCurrentIndex(safeIndex);
+      flowSession.setIndex(safeIndex);
       const item = currentItem();
       if (!item) return;
       const activationId = ++videoActivationId;
@@ -1202,16 +820,8 @@
         };
         video.addEventListener('loadedmetadata', updateDuration);
         video.addEventListener('durationchange', updateDuration);
-        video.addEventListener('play', () => {
-          if (isMagnifying && currentVideoEl() === video) {
-            scheduleMagnifierFrameLoop(video);
-          }
-        });
-        video.addEventListener('seeked', () => {
-          if (isMagnifying && currentVideoEl() === video) {
-            updateMagnifierContent();
-          }
-        });
+        video.addEventListener('play', () => magnifier.onVideoPlay(video));
+        video.addEventListener('seeked', () => magnifier.onVideoSeeked(video));
         return video;
       }
 
@@ -1397,7 +1007,7 @@
     }
 
     overlayLayer.addEventListener('pointerdown', (event) => {
-      if (!event.isPrimary || event.button !== 0 || isMagnifying || settling) return;
+      if (!event.isPrimary || event.button !== 0 || magnifier.isActive() || settling) return;
       overlayLayer.setPointerCapture(event.pointerId);
       gesture = {
         id: event.pointerId,
@@ -1468,7 +1078,7 @@
     let wheelQuietTimer = null;
     overlayLayer.addEventListener('wheel', (event) => {
       event.preventDefault();
-      if (isMagnifying) return;
+      if (magnifier.isActive()) return;
       clearTimeout(wheelQuietTimer);
       wheelQuietTimer = setTimeout(() => { wheelLocked = false; }, 200);
       if (wheelLocked || Math.abs(event.deltaY) < 12) return;
@@ -1524,49 +1134,9 @@
       }]);
     });
 
-    collectionBtn.addEventListener('click', async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      await openCollectionModal();
-    });
-    collectionBtn.addEventListener('keydown', async (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      await openCollectionModal();
-    });
-
-    collectionModalClose.addEventListener('click', (event) => {
-      event.preventDefault();
-      closeCollectionModal();
-    });
-
-    collectionModal.addEventListener('click', (event) => {
-      if (collectionModalOpenedAt && (Date.now() - collectionModalOpenedAt) < collectionModalGuardMs) {
-        return;
-      }
-      if (event.target === collectionModal) closeCollectionModal();
-    });
-    collectionCreateBtn.addEventListener('click', async (event) => {
-      event.preventDefault();
-      await createCollectionInModal();
-    });
-    collectionNameInput.addEventListener('keydown', async (event) => {
-      if (event.key !== 'Enter') return;
-      event.preventDefault();
-      await createCollectionInModal();
-    });
-    collectionList.addEventListener('change', async (event) => {
-      const inputEl = event.target.closest('input[type="checkbox"]');
-      if (!inputEl) return;
-      const rowEl = inputEl.closest('[data-id]');
-      const collectionId = String(rowEl?.getAttribute('data-id') || '').trim();
-      if (!collectionId) return;
-      await toggleCollectionMembership(collectionId, !!inputEl.checked, rowEl, inputEl);
-    });
-
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && collectionModal.classList.contains('active')) {
-        closeCollectionModal();
+      if (event.key === 'Escape' && collections.isOpen()) {
+        collections.close();
         return;
       }
       const target = event.target;
@@ -1639,51 +1209,10 @@
       mediaActions.generateCaption(item.name, { confirmExisting: true });
     });
 
-    magnifierToggle.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleMagnifier(!isMagnifying);
-    });
-
-    document.querySelectorAll('.zoom-btn').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const level = Number.parseFloat(btn.getAttribute('data-level') || '2.5');
-        applyZoom(level);
-      });
-    });
-
-    const magHammer = new Hammer(magnifier);
-    magHammer.get('pan').set({ direction: Hammer.DIRECTION_ALL, threshold: 0 });
-    let startX = 0;
-    let startY = 0;
-
-    magHammer.on('panstart', () => {
-      startX = magX;
-      startY = magY;
-      magnifier.style.transition = 'none';
-    });
-
-    magHammer.on('panmove', (e) => {
-      magX = startX + e.deltaX;
-      magY = startY + e.deltaY;
-      updateMagnifierPosition();
-      updateMagnifierContent();
-    });
-
-    magHammer.on('panend', () => {
-      magnifier.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-    });
-
-    window.addEventListener('resize', () => {
-      if (isMagnifying) updateMagnifierContent();
-    });
-
     window.addEventListener('pagehide', () => {
       postActivity([finishActivity()], true);
     });
 
-    applyZoom(2.5);
 
     await loadFeed();
     if (feedItems.length > 0) {
