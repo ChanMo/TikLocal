@@ -25,6 +25,7 @@
   </div>
 
   <div id="overlay-layer"></div>
+  <div id="flow-hud" aria-live="polite"></div>
 
   <div id="play-status-icon">
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="currentColor" stroke="none">
@@ -43,7 +44,16 @@
   </div>
 
   <div class="controls-sidebar" id="controls">
-    <div class="action-btn speed-btn" id="speed-btn">1x</div>
+    <div class="image-tool-wrap" id="speed-tool-wrap">
+      <div class="zoom-options speed-options" id="speed-options">
+        <button type="button" class="zoom-btn" data-rate="0.75">0.75x</button>
+        <button type="button" class="zoom-btn active" data-rate="1">1x</button>
+        <button type="button" class="zoom-btn" data-rate="1.25">1.25x</button>
+        <button type="button" class="zoom-btn" data-rate="1.5">1.5x</button>
+        <button type="button" class="zoom-btn" data-rate="2">2x</button>
+      </div>
+      <button type="button" class="action-btn speed-btn" id="speed-btn" title="Playback speed" aria-expanded="false">1x</button>
+    </div>
 
     <button type="button" class="action-btn" id="caption-btn" title="Generate Title" hidden>
       <i data-feather="zap"></i>

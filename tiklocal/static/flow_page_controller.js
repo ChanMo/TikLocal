@@ -5,6 +5,9 @@
     const videoStartCover = document.getElementById('video-start-cover');
     const overlayLayer = document.getElementById('overlay-layer');
     const speedBtn = document.getElementById('speed-btn');
+    const speedWrap = document.getElementById('speed-tool-wrap');
+    const speedChoices = document.getElementById('speed-options');
+    const hud = document.getElementById('flow-hud');
     const captionBtn = document.getElementById('caption-btn');
     const magnifierToolWrap = document.getElementById('magnifier-tool-wrap');
     const favoriteBtn = document.getElementById('favorite-btn');
@@ -31,7 +34,11 @@
     const uiShared = window.FlowUIShared || {};
     const actionsShared = window.FlowActionsShared || {};
 
-    const speedOptions = [0.75, 1, 1.25, 1.5, 2];
+    // Holding a video plays it at this rate until the finger lifts.
+    const holdRate = 2;
+    const keySeekSeconds = 5;
+    // A full-width drag covers the whole clip, but never more than this many seconds.
+    const scrubSpanSeconds = 90;
 
     const flowSession = window.createFlowSession({
       initialItems: [],
@@ -120,7 +127,9 @@
       };
     }
 
-    let currentSpeedIndex = 1;
+    let speedRate = 1;
+    let boostedVideo = null;
+    let hudTimer = null;
     let isDragging = false;
     let wasPlayingBeforeDrag = false;
     let flowLoadingTimer = null;
@@ -187,7 +196,7 @@
       toggle: document.getElementById('magnifier-toggle'),
       zoomOptions: document.getElementById('zoom-options'),
       badge: document.getElementById('mag-badge'),
-      zoomButtons: document.querySelectorAll('.zoom-btn'),
+      zoomButtons: document.querySelectorAll('#zoom-options .zoom-btn'),
       largeClass: 'magnifier-large',
       settleTransition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
       setMagnifying: (enabled) => flowState.setMagnifying(enabled),
@@ -421,7 +430,8 @@
       infoBtn.hidden = isThemeStrip;
       favoriteBtn.hidden = isThemeStrip;
       collectionBtn.hidden = isThemeStrip;
-      speedBtn.hidden = !isVideo;
+      speedWrap.hidden = !isVideo;
+      closeSpeedChoices();
       captionBtn.hidden = isVideo || isThemeStrip || isImageGroup;
       magnifierToolWrap.hidden = isThemeStrip || isImageGroup;
       customControls.hidden = !isVideo;
@@ -574,6 +584,7 @@
 
     function clearPreviousState(prevItem) {
       magnifier.toggle(false);
+      endBoost();
 
       if (!prevItem) return;
       prevItem.el.classList.remove('active');
@@ -604,6 +615,8 @@
       const activationId = ++videoActivationId;
       postActivity([previousActivity, beginActivity(item)]);
       flowState.onMediaChanged();
+      // Holding a video speeds it up, so videos have no way to bring the interface back; show it.
+      if (item.type === 'video') flowState.setImmersive(false);
 
       const needsVideoStartCover = item.type === 'video' && !isVideoStartReady(item.el);
       if (needsVideoStartCover) showVideoStartCover(item);
@@ -617,7 +630,7 @@
       if (item.type === 'video') {
         progressBar.disabled = false;
         if (item.el._loadFailed) handleMediaFailure(item.el);
-        item.el.playbackRate = speedOptions[currentSpeedIndex];
+        item.el.playbackRate = speedRate;
         progressBar.value = 0;
         progressFill.style.width = '0%';
         timeCurrent.textContent = '00:00';
@@ -961,7 +974,102 @@
       }
     }
 
-    // One pointer gesture for the stage: drag to page, tap to play or reveal, double-tap to favorite.
+    function currentVideo() {
+      const item = currentItem();
+      return item?.type === 'video' ? item.el : null;
+    }
+
+    function showHud(text, holdMs = 0) {
+      clearTimeout(hudTimer);
+      hud.textContent = text;
+      hud.classList.add('is-visible');
+      if (holdMs) hudTimer = setTimeout(hideHud, holdMs);
+    }
+
+    function hideHud() {
+      clearTimeout(hudTimer);
+      hud.classList.remove('is-visible');
+    }
+
+    function seekLabel(from, to, duration) {
+      const delta = Math.round(to - from);
+      return `${delta < 0 ? '−' : '+'}${Math.abs(delta)}s · ${formatTime(to)} / ${formatTime(duration)}`;
+    }
+
+    function showSeekProgress(time, duration) {
+      const pct = duration > 0 ? (time / duration) * 100 : 0;
+      progressBar.value = pct;
+      progressFill.style.width = `${pct}%`;
+      timeCurrent.textContent = formatTime(time);
+    }
+
+    // Hold a video to play it faster; lifting the finger restores the chosen speed and keeps playing.
+    function beginBoost(video) {
+      boostedVideo = video;
+      video.playbackRate = holdRate;
+      if (video.paused) {
+        video.play().catch(() => {});
+        playStatusIcon.classList.remove('visible');
+      }
+      showHud(`${holdRate}× ▸▸`);
+      navigator.vibrate?.(10);
+    }
+
+    function endBoost() {
+      if (!boostedVideo) return;
+      boostedVideo.playbackRate = speedRate;
+      boostedVideo = null;
+      hideHud();
+    }
+
+    function seekBy(seconds) {
+      const video = currentVideo();
+      const duration = Number(video?.duration);
+      if (!Number.isFinite(duration) || duration <= 0) return;
+      const from = video.currentTime;
+      const to = Math.max(0, Math.min(duration, from + seconds));
+      video.currentTime = to;
+      showSeekProgress(to, duration);
+      showHud(seekLabel(from, to, duration), 900);
+    }
+
+    // Dragging sideways on a video moves through it relative to where the drag began.
+    function beginScrub(state) {
+      const video = currentVideo();
+      state.mode = 'scrub';
+      state.video = video;
+      state.from = video.currentTime;
+      state.to = video.currentTime;
+      isDragging = true;
+      customControls.classList.add('is-seeking');
+    }
+
+    function moveScrub(state, dx) {
+      const duration = Number(state.video.duration);
+      if (!Number.isFinite(duration) || duration <= 0) return;
+      const span = Math.min(duration, scrubSpanSeconds);
+      state.to = Math.max(0, Math.min(duration, state.from + (dx / feedContainer.clientWidth) * span));
+      showSeekProgress(state.to, duration);
+      showHud(seekLabel(state.from, state.to, duration));
+      // Safari and Firefox can show the nearby frame while dragging; elsewhere the seek lands on release.
+      if (typeof state.video.fastSeek === 'function' && !state.frame) {
+        state.frame = requestAnimationFrame(() => {
+          state.frame = null;
+          state.video.fastSeek(state.to);
+        });
+      }
+    }
+
+    function endScrub(state, cancelled) {
+      cancelAnimationFrame(state.frame);
+      isDragging = false;
+      customControls.classList.remove('is-seeking');
+      if (currentVideo() === state.video) state.video.currentTime = cancelled ? state.from : state.to;
+      hideHud();
+    }
+
+    // One pointer gesture for the stage: drag to page, tap to play or reveal, double-tap to favorite,
+    // hold a video to speed it up, drag a video sideways to seek.
     const tapSlop = 10;
     const doubleTapMs = 250;
     const longPressMs = 450;
@@ -1023,7 +1131,9 @@
         if (gesture?.mode !== 'pending') return;
         gesture.longPressed = true;
         clearTimeout(tapTimer);
-        toggleUI();
+        const video = currentVideo();
+        if (video) beginBoost(video);
+        else toggleUI();
       }, longPressMs);
     });
 
@@ -1036,6 +1146,11 @@
         clearTimeout(gesture.timer);
         clearTimeout(tapTimer);
         gesture.mode = gesture.longPressed ? 'none' : (Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal');
+        if (gesture.mode === 'horizontal' && currentVideo()) beginScrub(gesture);
+      }
+      if (gesture.mode === 'scrub') {
+        moveScrub(gesture, dx);
+        return;
       }
       if (gesture.mode === 'horizontal') gesture.dx = dx;
       if (gesture.mode !== 'vertical') return;
@@ -1052,6 +1167,11 @@
       const current = gesture;
       gesture = null;
       clearTimeout(current.timer);
+      endBoost();
+      if (current.mode === 'scrub') {
+        endScrub(current, cancelled);
+        return;
+      }
       if (current.mode === 'vertical' && pager) {
         const height = feedContainer.clientHeight;
         const toward = -current.offset * pager.dir;
@@ -1087,14 +1207,37 @@
       else goPrev();
     }, { passive: false });
 
-    speedBtn.addEventListener('click', () => {
-      currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.length;
-      const rate = speedOptions[currentSpeedIndex];
+    function closeSpeedChoices() {
+      speedChoices.classList.remove('show');
+      speedBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    function setSpeed(rate) {
+      speedRate = rate;
       speedBtn.textContent = `${rate}x`;
-      const item = currentItem();
-      if (item?.type === 'video') {
-        item.el.playbackRate = rate;
-      }
+      speedBtn.classList.toggle('is-changed', rate !== 1);
+      speedChoices.querySelectorAll('[data-rate]').forEach((btn) => {
+        btn.classList.toggle('active', Number(btn.dataset.rate) === rate);
+      });
+      const video = currentVideo();
+      if (video && video !== boostedVideo) video.playbackRate = rate;
+    }
+
+    speedBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const open = !speedChoices.classList.contains('show');
+      speedChoices.classList.toggle('show', open);
+      speedBtn.setAttribute('aria-expanded', String(open));
+    });
+    speedChoices.addEventListener('click', (event) => {
+      const choice = event.target.closest('[data-rate]');
+      if (!choice) return;
+      event.stopPropagation();
+      setSpeed(Number(choice.dataset.rate));
+      closeSpeedChoices();
+    });
+    document.addEventListener('click', (event) => {
+      if (!speedWrap.contains(event.target)) closeSpeedChoices();
     });
 
     favoriteBtn.addEventListener('click', async (e) => {
@@ -1145,6 +1288,11 @@
           return;
         }
       }
+      if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && currentVideo()) {
+        event.preventDefault();
+        seekBy(event.key === 'ArrowRight' ? keySeekSeconds : -keySeekSeconds);
+        return;
+      }
       if (event.key === 'ArrowRight') {
         if (!goGroupNext()) goNext();
       }
@@ -1181,6 +1329,7 @@
         isDragging = true;
         wasPlayingBeforeDrag = !video.paused;
         video.pause();
+        customControls.classList.add('is-seeking');
       }
 
       const seekTime = (progressBar.value / 100) * video.duration;
@@ -1200,6 +1349,7 @@
         playStatusIcon.classList.remove('visible');
       }
       isDragging = false;
+      customControls.classList.remove('is-seeking');
     });
 
     captionBtn.addEventListener('click', (e) => {

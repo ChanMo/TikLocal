@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Flow videos: press and hold to play at 2× until you let go, drag sideways to move back or forward through the video, and use ← and → to skip 5 seconds. A small label at the top shows the speed or the new position.
+- The Flow speed button now opens the speeds in a row so any speed is one tap away, and stays highlighted when it is not 1×. The progress bar is easier to grab and stays clear of the phone's home gesture.
+- Long press on a Flow video no longer hides the interface; Flow shows the interface again when a video comes up.
 - Adding a Flow gallery card to a collection now adds the image on screen, matching favorites.
 - Internal: page styles and scripts moved out of the templates into static files; Flow and Library share one collection picker and one magnifier; the Flow template and controller are named after Flow; the download manager keeps job state while tool commands and source lookup live in their own modules.
 
