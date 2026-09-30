@@ -314,7 +314,7 @@ Android 本地发布门槛已经验证：
   - Pairing / Scanner / Connection / Radio UI：渐进式输入、扫码权限、QR-only、目标确认、错误恢复、离线连接说明、破坏性确认、左上角电台选择、图标播放动作、更多菜单、系统 Sleep Sheet、空库禁用和播放进度语义。
 - 每个阶段记录源码文件数、直接依赖数和最长文件，判断复杂度是否收敛。
 - 服务端全量回归为 119 项通过；TypeScript strict、Expo 配置、原生工程生成以及 iOS / Android production bundle 均通过。此次 Expo Doctor 在线检查因 Expo API TLS 连接中断未完成，不能作为当前绿色证据。
-- 仓库主 GitHub Actions 的独立 `radio` job 使用 Node.js 22 + `npm ci`、TypeScript、客户端测试、固定版 Expo Doctor、双平台 production bundle 与 Demo 音频资源解析构成无真机静态门禁；Python 发布构建依赖该 job。
+- 2026-09-30 起主 GitHub Actions 不再包含 Radio job，Python 发布不依赖原生客户端检查。类型、测试、Expo Doctor 与双平台 bundle 改为本地发布原生客户端前手动执行（命令见 `apps/radio/README.md`）。
 - 当前业务源码为 13 个、共 3967 行；10 个测试文件共 2268 行。Signal Dial 因独立动画与 Reduce Motion 生命周期成为唯一视觉文件，Radio Resume 因文件格式校验与凭证剥离成为唯一会话持久化文件；没有新增 Store、Repository、依赖注入、UI Kit 或通用组件目录。新增运行依赖仅为 Expo SDK 57 对应的 `expo-symbols ~57.0.1` 与 `expo-file-system ~57.0.1`。
 - UI 测试只查询 role、accessible name、state、value 和用户可见文本，不保存结构 Snapshot。测试覆盖配对输入、自定义按钮、播放进度、电台 Action Sheet 与取消切换 Server；视觉几何和动画留给 iPhone 体验验收。
 - 2026-07-25 使用 iPhone 17 / iOS 26.5 模拟器完成 Release 原生构建、安装与首页逐像素复核：SF Symbols、Safe Area、Signal Dial、Station 入口与三枚 Transport 控件均正常；高屏幕采用 300pt 拨盘和更舒展的纵向节奏，小屏幕回退为 282pt，避免为了视觉比例制造首屏滚动。模拟器结果只作为布局证据，不替代后台播放、耳机、相机和触感的真机门禁。
@@ -340,8 +340,7 @@ Android 本地发布门槛已经验证：
 - [x] 完成 Android Debug / release APK 与 release AAB 原生编译和权限核验。
 - [x] 建立 Android 长期 Release 密钥并完成 `0.1.0 (1)` 正式签名 APK / AAB 构建验证。
 - [x] 固化首版版本号、EAS profiles、加密声明、双语隐私政策与商店文案草案。
-- [x] 将 Radio 类型、Expo 依赖健康度和双平台 production bundle 纳入主 CI。
-- [x] 为 Radio Session 增加确定性测试，并纳入主 CI。
+- [x] 为 Radio Session 增加确定性测试。
 - [x] 完成播放器选型，固定 `0.1.x` 的远程媒体能力边界。
 - [x] 修复本机 Xcode 系统组件并完成 iPhone 真机 Release 编译、签名、安装与启动。
 - [x] 将 Radio / Connection / Pairing 收敛为 iOS 原生 Stack，并完成渐进式配对交互。

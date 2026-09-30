@@ -94,7 +94,7 @@ npx expo export:embed --platform ios --dev false --entry-file index.ts --bundle-
 npx expo export:embed --platform android --dev false --entry-file index.ts --bundle-output /tmp/tiklocal-radio-android.bundle
 ```
 
-The main CI workflow uses Node.js 22 and `package-lock.json` to run `npm ci`, TypeScript, client tests, a pinned Expo Doctor, and production iOS/Android bundle builds with Demo audio copied in. These checks require no Expo, Apple, or Google credentials and do not replace device testing for camera, import, deletion, and playback behavior.
+The repository CI does not check this app. Before a native release, run `npm ci`, `npm run typecheck`, `npm test`, `npx expo-doctor`, and the two bundle commands above locally. They do not replace device testing for camera, import, deletion, and playback behavior.
 
 ### Local Android native builds
 
