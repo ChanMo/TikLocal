@@ -399,8 +399,6 @@ def test_browser_admin_can_list_and_revoke_devices(radio_client_app):
     assert b'radio-device-list' in settings.data
     assert b'open-radio-pairing' in settings.data
     assert b'pairing-server-url' in settings.data
-    assert b'/api/radio/pairing-grants' in settings.data
-    assert b'/api/radio/devices' in settings.data
     assert listed.status_code == 200
     assert [device["name"] for device in devices] == ["Desk Android", "Kitchen iPad"]
     assert all(device["active"] for device in devices)

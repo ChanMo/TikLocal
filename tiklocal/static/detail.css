@@ -1,0 +1,20 @@
+.video-stage {
+  min-height: min(calc(100vh - 136px), 820px);
+}
+
+.video-player {
+  width: 100%;
+  max-height: calc(100vh - 156px);
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+@media (max-width: 1023px) {
+  .video-stage {
+    min-height: auto;
+  }
+
+  .video-player {
+    max-height: 72vh;
+  }
+}
