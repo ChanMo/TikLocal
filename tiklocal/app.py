@@ -22,9 +22,9 @@ from tiklocal.services.trash import TrashService
 from tiklocal.services.downloader import (
     DownloadConfigStore,
     DownloadHistoryStore,
-    DownloadSourceStore,
     DownloadManager,
 )
+from tiklocal.services.download_sources import DownloadSourceStore
 from tiklocal.services.collections import CollectionStore
 from tiklocal.services.radio import RadioProfileStore, RadioService
 from tiklocal.services.radio_energy import RadioEnergyService

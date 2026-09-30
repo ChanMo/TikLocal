@@ -1,8 +1,6 @@
-import datetime
 import json
 import os
 from collections import deque
-import re
 import shutil
 import signal
 import subprocess as sp
@@ -11,7 +9,27 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import urlparse
+
+from tiklocal.services.download_sources import (
+    DownloadSourceStore,
+    normalize_file_rel,
+    normalize_source_meta,
+    source_from_filename,
+    source_from_info_json,
+    source_meta_for_url,
+    utc_now_iso,
+)
+from tiklocal.services.download_tools import (
+    collect_gallery_outputs,
+    error_line,
+    gallery_dl_command,
+    next_available_path,
+    parse_output_path,
+    parse_progress,
+    probe_binary,
+    yt_dlp_command,
+)
 
 
 DOWNLOAD_MAX_URL_LENGTH = 2048
@@ -22,7 +40,6 @@ COOKIE_MATCH_MODE = "filename_contains_domain"
 COOKIE_FILE_EXTENSIONS = {".txt", ".cookies"}
 DOWNLOAD_ENGINES = {"yt-dlp", "gallery-dl"}
 DEFAULT_DOWNLOAD_ENGINE = "yt-dlp"
-SOURCE_MAP_VERSION = 1
 
 DEFAULT_DOWNLOAD_CONFIG = {
     "enabled": True,
@@ -37,21 +54,6 @@ DEFAULT_DOWNLOAD_CONFIG = {
 }
 
 TERMINAL_JOB_STATUS = {"success", "failed", "canceled"}
-
-_PROGRESS_RE = re.compile(r"\[download\]\s+(?P<percent>\d+(?:\.\d+)?)%")
-_ETA_RE = re.compile(r"ETA\s+(?P<eta>[0-9:]+)")
-_DESTINATION_PATTERNS = [
-    re.compile(r"^\[download\] Destination: (?P<path>.+)$"),
-    re.compile(r'^\[Merger\] Merging formats into "(?P<path>.+)"$'),
-    re.compile(r'^\[ExtractAudio\] Destination: (?P<path>.+)$'),
-]
-_TRACKING_QUERY_KEYS = {"fbclid", "gclid", "igshid"}
-_OLD_TEMPLATE_ID_RE = re.compile(r"\[(?P<id>[^\]]+)\]")
-
-
-def _utc_now_iso() -> str:
-    return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-
 
 def _to_int(value: Any) -> int | None:
     try:
@@ -216,58 +218,6 @@ def _domain_candidates(host: str) -> list[str]:
     return candidates
 
 
-def _normalize_file_rel(value: str) -> str:
-    text = str(value or "").strip().replace("\\", "/")
-    while text.startswith("./"):
-        text = text[2:]
-    return text
-
-
-def _derive_source_domain(url: str) -> str:
-    parsed = urlparse(url)
-    return (parsed.hostname or "").strip().lower()
-
-
-def _strip_tracking_query(url: str) -> str:
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return url
-    pairs = parse_qsl(parsed.query, keep_blank_values=True)
-    filtered = []
-    for key, value in pairs:
-        lowered = key.lower()
-        if lowered.startswith("utm_"):
-            continue
-        if lowered in _TRACKING_QUERY_KEYS:
-            continue
-        filtered.append((key, value))
-    cleaned = parsed._replace(query=urlencode(filtered, doseq=True), fragment="")
-    return urlunparse(cleaned)
-
-
-def _normalize_source_meta(meta: dict[str, Any], *, resolved_by: str | None = None) -> dict[str, Any] | None:
-    raw = str(meta.get("source_url_raw") or "").strip()
-    display = str(meta.get("source_url_display") or "").strip()
-    if not raw and not display:
-        return None
-
-    raw = raw or display
-    display = display or _strip_tracking_query(raw)
-    domain = str(meta.get("source_domain") or "").strip().lower() or _derive_source_domain(raw)
-    payload = {
-        "source_url_raw": raw,
-        "source_url_display": display,
-        "source_domain": domain,
-        "engine": str(meta.get("engine") or "").strip(),
-        "job_id": str(meta.get("job_id") or "").strip(),
-        "created_at": str(meta.get("created_at") or _utc_now_iso()).strip(),
-    }
-    if resolved_by:
-        payload["resolved_by"] = resolved_by
-    payload["url"] = payload["source_url_display"] or payload["source_url_raw"]
-    return payload
-
-
 class DownloadConfigStore:
     def __init__(self, store_path: Path):
         self.store_path = store_path
@@ -304,7 +254,7 @@ class DownloadConfigStore:
             raise ValueError(error)
 
         payload = dict(validated)
-        payload["updated_at"] = _utc_now_iso()
+        payload["updated_at"] = utc_now_iso()
         self._write(payload)
         return payload
 
@@ -337,94 +287,6 @@ class DownloadHistoryStore:
         with tmp_path.open("w", encoding="utf-8") as f:
             json.dump(jobs[:DOWNLOAD_HISTORY_LIMIT], f, ensure_ascii=False, indent=2)
         os.replace(tmp_path, self.store_path)
-
-
-class DownloadSourceStore:
-    def __init__(self, store_path: Path):
-        self.store_path = store_path
-        self.store_path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
-
-    def _read(self) -> dict[str, Any]:
-        if not self.store_path.exists():
-            return {"version": SOURCE_MAP_VERSION, "items": {}, "updated_at": _utc_now_iso()}
-        try:
-            with self.store_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-        except Exception:
-            return {"version": SOURCE_MAP_VERSION, "items": {}, "updated_at": _utc_now_iso()}
-        return {"version": SOURCE_MAP_VERSION, "items": {}, "updated_at": _utc_now_iso()}
-
-    def _normalized_payload(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        data = payload if isinstance(payload, dict) else self._read()
-        items = data.get("items")
-        if not isinstance(items, dict):
-            items = {}
-        return {
-            "version": _to_int(data.get("version")) or SOURCE_MAP_VERSION,
-            "items": {str(k): v for k, v in items.items() if isinstance(v, dict)},
-            "updated_at": str(data.get("updated_at") or _utc_now_iso()),
-        }
-
-    def _write(self, payload: dict[str, Any]) -> None:
-        tmp_path = self.store_path.with_name(self.store_path.name + ".tmp")
-        with tmp_path.open("w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, self.store_path)
-
-    def get(self, file_rel: str) -> dict[str, Any] | None:
-        key = _normalize_file_rel(file_rel)
-        if not key:
-            return None
-        with self._lock:
-            payload = self._normalized_payload()
-            value = payload["items"].get(key)
-            return dict(value) if isinstance(value, dict) else None
-
-    def get_many(self, file_rels: list[str]) -> dict[str, dict[str, Any] | None]:
-        normalized = [_normalize_file_rel(item) for item in file_rels]
-        normalized = [item for item in normalized if item]
-        result: dict[str, dict[str, Any] | None] = {}
-        if not normalized:
-            return result
-        with self._lock:
-            payload = self._normalized_payload()
-            items = payload["items"]
-            for key in normalized:
-                value = items.get(key)
-                result[key] = dict(value) if isinstance(value, dict) else None
-        return result
-
-    def set_many(self, records: dict[str, dict[str, Any]]) -> int:
-        cleaned: dict[str, dict[str, Any]] = {}
-        for file_rel, meta in records.items():
-            key = _normalize_file_rel(file_rel)
-            if not key or not isinstance(meta, dict):
-                continue
-            cleaned[key] = dict(meta)
-        if not cleaned:
-            return 0
-        with self._lock:
-            payload = self._normalized_payload()
-            payload["items"].update(cleaned)
-            payload["updated_at"] = _utc_now_iso()
-            self._write(payload)
-        return len(cleaned)
-
-    def delete(self, file_rel: str) -> bool:
-        key = _normalize_file_rel(file_rel)
-        if not key:
-            return False
-        with self._lock:
-            payload = self._normalized_payload()
-            if key not in payload["items"]:
-                return False
-            payload["items"].pop(key, None)
-            payload["updated_at"] = _utc_now_iso()
-            self._write(payload)
-        return True
 
 
 class DownloadManager:
@@ -474,7 +336,7 @@ class DownloadManager:
                     self._cancel_events[job_id].set()
                     job['cancel_requested'] = True
                     if job['status'] == 'queued':
-                        job.update(status='canceled', finished_at=_utc_now_iso(),
+                        job.update(status='canceled', finished_at=utc_now_iso(),
                                    error_message='Canceled.', eta_sec=None)
             self._pending.clear()
             processes = list(self._processes.values())
@@ -493,9 +355,9 @@ class DownloadManager:
                 raise RuntimeError('Download jobs did not stop in time; worker threads are still shutting down.')
 
     def probe_dependencies(self) -> dict[str, Any]:
-        yt_dlp_path, yt_dlp_version = self._probe_binary("yt-dlp")
-        gallery_dl_path, gallery_dl_version = self._probe_binary("gallery-dl")
-        ffmpeg_path, _ = self._probe_binary("ffmpeg")
+        yt_dlp_path, yt_dlp_version = probe_binary("yt-dlp")
+        gallery_dl_path, gallery_dl_version = probe_binary("gallery-dl")
+        ffmpeg_path, _ = probe_binary("ffmpeg")
 
         return {
             "yt_dlp_available": bool(yt_dlp_path),
@@ -577,13 +439,13 @@ class DownloadManager:
                 raise RuntimeError("Downloads are disabled.")
 
             job_id = uuid.uuid4().hex[:12]
-            now = _utc_now_iso()
+            now = utc_now_iso()
             job = {
                 "id": job_id,
                 "url": url,
                 "save_mode": save_mode,
                 "engine": engine,
-                "engine_version": self._probe_binary(engine)[1],
+                "engine_version": probe_binary(engine)[1],
                 "status": "queued",
                 "progress_percent": None,
                 "eta_sec": None,
@@ -740,7 +602,7 @@ class DownloadManager:
             return dict(job) if job else None
 
     def resolve_source_for_file(self, file_rel: str) -> dict[str, Any] | None:
-        key = _normalize_file_rel(file_rel)
+        key = normalize_file_rel(file_rel)
         if not key:
             return None
 
@@ -752,10 +614,10 @@ class DownloadManager:
         if info_meta:
             return info_meta
 
-        return self._resolve_source_from_filename(key)
+        return source_from_filename(key)
 
     def resolve_sources_for_files(self, file_rels: list[str]) -> dict[str, dict[str, Any] | None]:
-        normalized = [_normalize_file_rel(item) for item in file_rels]
+        normalized = [normalize_file_rel(item) for item in file_rels]
         normalized = [item for item in normalized if item]
         normalized = list(dict.fromkeys(normalized))
         result: dict[str, dict[str, Any] | None] = {}
@@ -796,7 +658,7 @@ class DownloadManager:
 
     def _load_history(self) -> None:
         history = self.history_store.get()
-        now = _utc_now_iso()
+        now = utc_now_iso()
         with self._lock:
             for item in history[:DOWNLOAD_HISTORY_LIMIT]:
                 job_id = str(item.get("id") or "").strip()
@@ -880,7 +742,7 @@ class DownloadManager:
                     return
 
                 job["status"] = "running"
-                job["started_at"] = _utc_now_iso()
+                job["started_at"] = utc_now_iso()
                 job["progress_percent"] = 0.0
                 index_only = job.get('failure_stage') == 'index'
                 existing_outputs = list(job['output_files_rel'])
@@ -915,14 +777,14 @@ class DownloadManager:
                         "url": str(job.get("url") or ""),
                         "engine": str(job.get("engine") or ""),
                         "job_id": str(job.get("id") or ""),
-                        "created_at": str(job.get("created_at") or _utc_now_iso()),
+                        "created_at": str(job.get("created_at") or utc_now_iso()),
                         "files": list(output_rel_list),
                     }
                     self._persist_locked()
                 else:
                     job["status"] = "failed"
                     job["error_message"] = error_message or "Download failed. Check the URL and network connection."
-                    job["finished_at"] = _utc_now_iso()
+                    job["finished_at"] = utc_now_iso()
                     self._persist_locked()
 
             if source_context:
@@ -942,7 +804,7 @@ class DownloadManager:
                         return
                     job["status"] = "success"
                     job['failure_stage'] = ''
-                    job["finished_at"] = _utc_now_iso()
+                    job["finished_at"] = utc_now_iso()
                     self._persist_locked()
         except Exception as exc:
             with self._lock:
@@ -953,7 +815,7 @@ class DownloadManager:
                     self._mark_canceled_locked(job)
                     return
                 job["status"] = "failed"
-                job["finished_at"] = _utc_now_iso()
+                job["finished_at"] = utc_now_iso()
                 if job.get('failure_stage') == 'index':
                     job['error_message'] = f'The file was downloaded, but media registration failed: {exc}'
                 elif isinstance(exc, FileNotFoundError):
@@ -997,77 +859,24 @@ class DownloadManager:
                 return 1, "Job not found.", []
             url = job["url"]
             allow_playlist = bool(self._config.get("allow_playlist", False))
-            cookie_file = str(job.get("cookie_file") or "")
-            cookie_match_mode = str(job.get("cookie_match_mode") or "none")
+        cookie_path, error = self._job_cookie_path(job)
+        if error:
+            return 1, error, []
 
-        output_template = str(
-            self.media_root
-            / "%(extractor_key|na)s__%(uploader_id|na).24B__%(display_id|na)s__%(id|na)s__%(upload_date|na)s__%(autonumber)02d.%(ext)s"
-        )
+        output_path = ""
 
-        cmd = [
-            yt_dlp_bin,
-            "--newline",
-            "--restrict-filenames",
-            "--merge-output-format",
-            "mp4",
-            "--write-info-json",
-            "--continue",
-            "--retries",
-            "10",
-            "--fragment-retries",
-            "10",
-            "--file-access-retries",
-            "5",
-            "--socket-timeout",
-            "30",
-            "-o",
-            output_template,
-        ]
-        if not allow_playlist:
-            cmd.append("--no-playlist")
+        def on_line(line: str) -> None:
+            nonlocal output_path
+            progress = parse_progress(line)
+            if progress:
+                self._update_progress(job_id, progress)
+            output_path = parse_output_path(line) or output_path
 
-        if cookie_file and cookie_match_mode in {"auto", "manual"}:
-            cookie_path, error = self._resolve_cookie_path(cookie_file)
-            if error:
-                return 1, error, []
-            cmd.extend(["--cookies", str(cookie_path)])
-
-        cmd.append(url)
-
-        process = self._start_process(job_id, cmd)
-
-        cancel_event = self._cancel_events.get(job_id)
-        output_path_abs = ""
-        error_message = ""
-
-        stream = process.stdout
-        if stream is not None:
-            for raw_line in stream:
-                line = raw_line.strip()
-                if not line:
-                    continue
-
-                progress = self._parse_progress(line)
-                if progress:
-                    self._update_progress(job_id, progress)
-
-                found_path = self._parse_output_path(line)
-                if found_path:
-                    output_path_abs = found_path
-
-                extracted_error = self._extract_error_line(line)
-                if extracted_error:
-                    error_message = extracted_error
-
-                if cancel_event and cancel_event.is_set():
-                    self._terminate_process(process)
-
-        return_code = process.wait()
+        cmd = yt_dlp_command(yt_dlp_bin, self.media_root, url, allow_playlist=allow_playlist, cookie_path=cookie_path)
+        return_code, error_message = self._run_tool(job_id, cmd, on_line)
         if not error_message and return_code != 0:
             error_message = f"yt-dlp exited with code {return_code}."
-
-        output_rel = self._to_media_relative(output_path_abs)
+        output_rel = self._to_media_relative(output_path)
         return return_code, error_message, [output_rel] if output_rel else []
 
     def _execute_download_gallery_dl(self, job_id: str) -> tuple[int, str, list[str]]:
@@ -1080,70 +889,29 @@ class DownloadManager:
             if not job:
                 return 1, "Job not found.", []
             url = str(job.get("url") or "")
-            cookie_file = str(job.get("cookie_file") or "")
-            cookie_match_mode = str(job.get("cookie_match_mode") or "none")
             archive_enabled = bool(self._config.get("gallery_archive_enabled", True))
             archive_file_text = str(self._config.get("gallery_archive_file", DEFAULT_DOWNLOAD_CONFIG["gallery_archive_file"])).strip()
+        cookie_path, error = self._job_cookie_path(job)
+        if error:
+            return 1, error, []
 
+        archive_path = None
+        if archive_enabled:
+            archive_path = Path(archive_file_text).expanduser()
+            archive_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # gallery-dl writes into a private folder; only finished files are moved into the library.
         temp_dir = (self.media_root / ".tiklocal-download-tmp" / job_id).resolve()
         temp_dir.mkdir(parents=True, exist_ok=True)
         log_file = temp_dir / "gallery-dl.log"
-
-        cmd = [
-            gallery_dl_bin,
-            "--no-colors",
-            "--directory",
-            str(temp_dir),
-            "--retries",
-            "10",
-            "--http-timeout",
-            "30",
-            "--sleep-429",
-            "8",
-        ]
-
-        if archive_enabled:
-            archive_path = self._expand_user_path(archive_file_text)
-            archive_path.parent.mkdir(parents=True, exist_ok=True)
-            cmd.extend(["--download-archive", str(archive_path)])
-
-        if cookie_file and cookie_match_mode in {"auto", "manual"}:
-            cookie_path, error = self._resolve_cookie_path(cookie_file)
-            if error:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                return 1, error, []
-            cmd.extend(["--cookies", str(cookie_path)])
-
-        cmd.extend(["--write-log", str(log_file), url])
-
-        process = self._start_process(job_id, cmd)
-
-        cancel_event = self._cancel_events.get(job_id)
-        error_message = ""
-
-        stream = process.stdout
-        if stream is not None:
-            for raw_line in stream:
-                line = raw_line.strip()
-                if not line:
-                    continue
-
-                extracted_error = self._extract_error_line(line)
-                if extracted_error:
-                    error_message = extracted_error
-
-                if cancel_event and cancel_event.is_set():
-                    self._terminate_process(process)
-
-        return_code = process.wait()
-
         try:
+            cmd = gallery_dl_command(gallery_dl_bin, temp_dir, log_file, url,
+                                     archive_path=archive_path, cookie_path=cookie_path)
+            return_code, error_message = self._run_tool(job_id, cmd, lambda line: None)
             if return_code != 0:
-                if not error_message:
-                    error_message = f"gallery-dl exited with code {return_code}."
-                return return_code, error_message, []
+                return return_code, error_message or f"gallery-dl exited with code {return_code}.", []
 
-            outputs = self._collect_gallery_outputs(temp_dir, excluded={log_file.resolve()})
+            outputs = collect_gallery_outputs(temp_dir, excluded={log_file.resolve()})
             moved_outputs = [self._move_file_to_media_root(path) for path in outputs]
             moved_outputs = [path for path in moved_outputs if path]
             if not moved_outputs:
@@ -1151,6 +919,28 @@ class DownloadManager:
             return 0, "", moved_outputs
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def _job_cookie_path(self, job: dict[str, Any]) -> tuple[Path | None, str | None]:
+        cookie_file = str(job.get("cookie_file") or "")
+        if cookie_file and str(job.get("cookie_match_mode") or "none") in {"auto", "manual"}:
+            return self._resolve_cookie_path(cookie_file)
+        return None, None
+
+    def _run_tool(self, job_id: str, cmd: list[str], on_line: Callable[[str], None]) -> tuple[int, str]:
+        """Run a download tool to completion, keeping its last error line."""
+        process = self._start_process(job_id, cmd)
+        cancel_event = self._cancel_events.get(job_id)
+        error_message = ""
+        if process.stdout is not None:
+            for raw_line in process.stdout:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                on_line(line)
+                error_message = error_line(line) or error_message
+                if cancel_event and cancel_event.is_set():
+                    self._terminate_process(process)
+        return process.wait(), error_message
 
     def _update_progress(self, job_id: str, progress: dict[str, Any]) -> None:
         with self._lock:
@@ -1171,7 +961,7 @@ class DownloadManager:
 
     def _mark_canceled_locked(self, job: dict[str, Any]) -> None:
         job["status"] = "canceled"
-        job["finished_at"] = _utc_now_iso()
+        job["finished_at"] = utc_now_iso()
         job["error_message"] = "Canceled."
         job["eta_sec"] = None
         self._persist_locked()
@@ -1206,34 +996,6 @@ class DownloadManager:
             pass
         process.wait()
 
-    def _parse_progress(self, line: str) -> dict[str, Any] | None:
-        percent = None
-        eta_sec = None
-
-        percent_match = _PROGRESS_RE.search(line)
-        if percent_match:
-            try:
-                percent = float(percent_match.group("percent"))
-            except (TypeError, ValueError):
-                percent = None
-
-        eta_match = _ETA_RE.search(line)
-        if eta_match:
-            eta_sec = self._parse_eta_to_seconds(eta_match.group("eta"))
-
-        if percent is None and eta_sec is None:
-            return None
-
-        return {"percent": percent, "eta_sec": eta_sec}
-
-    def _parse_output_path(self, line: str) -> str:
-        for pattern in _DESTINATION_PATTERNS:
-            match = pattern.search(line)
-            if match:
-                path = match.group("path").strip().strip('"')
-                return path
-        return ""
-
     def _to_media_relative(self, path_text: str) -> str:
         if not path_text:
             return ""
@@ -1246,21 +1008,6 @@ class DownloadManager:
         except Exception:
             return ""
         return ""
-
-    def _parse_eta_to_seconds(self, value: str) -> int | None:
-        parts = value.split(":")
-        if not parts:
-            return None
-        try:
-            nums = [int(part) for part in parts]
-        except ValueError:
-            return None
-
-        if len(nums) == 2:
-            return nums[0] * 60 + nums[1]
-        if len(nums) == 3:
-            return nums[0] * 3600 + nums[1] * 60 + nums[2]
-        return None
 
     def _normalize_execute_result(self, result: Any) -> tuple[int, str, list[str]]:
         if not isinstance(result, tuple):
@@ -1283,71 +1030,24 @@ class DownloadManager:
         return return_code, error_message, outputs
 
     def _canonical_output_uri(self, value: str) -> str:
-        key = _normalize_file_rel(value)
+        key = normalize_file_rel(value)
         if not key:
             return ""
         if key.startswith("@"):
             return key
         return f"@{self.output_source_id}/{key}"
 
-    def _probe_binary(self, command: str) -> tuple[str | None, str]:
-        binary_path = shutil.which(command)
-        if not binary_path:
-            return None, ""
-        try:
-            out = sp.check_output([binary_path, "--version"], text=True, timeout=3)
-            return binary_path, (out or "").strip().splitlines()[0]
-        except Exception:
-            return binary_path, ""
-
-    def _extract_error_line(self, line: str) -> str:
-        lowered = line.lower()
-        if "error:" in lowered:
-            return line
-        return ""
-
-    def _expand_user_path(self, path_text: str) -> Path:
-        return Path(path_text).expanduser()
-
-    def _collect_gallery_outputs(self, temp_dir: Path, *, excluded: set[Path]) -> list[Path]:
-        outputs: list[Path] = []
-        for entry in temp_dir.rglob("*"):
-            if not entry.is_file():
-                continue
-            resolved = entry.resolve()
-            if resolved in excluded:
-                continue
-            if resolved.name.endswith(".part"):
-                continue
-            outputs.append(resolved)
-        outputs.sort(key=lambda p: str(p))
-        return outputs
-
     def _move_file_to_media_root(self, source_path: Path) -> str:
         if not source_path.exists() or not source_path.is_file():
             return ""
 
         target_name = source_path.name
-        target = (self.media_root / target_name).resolve()
-        target = self._next_available_path(target)
+        target = next_available_path((self.media_root / target_name).resolve())
         try:
             source_path.replace(target)
         except OSError:
             shutil.move(str(source_path), str(target))
         return self._to_media_relative(str(target))
-
-    def _next_available_path(self, path: Path) -> Path:
-        if not path.exists():
-            return path
-        stem = path.stem
-        suffix = path.suffix
-        parent = path.parent
-        idx = 1
-        while True:
-            candidate = parent / f"{stem} ({idx}){suffix}"
-            if not candidate.exists():
-                return candidate
-            idx += 1
 
     def _record_job_sources_on_success(self, context: dict[str, Any]) -> None:
         if not self.source_store:
@@ -1360,23 +1060,19 @@ class DownloadManager:
         if not raw_url:
             return
 
-        base_meta = _normalize_source_meta(
-            {
-                "source_url_raw": raw_url,
-                "source_url_display": _strip_tracking_query(raw_url),
-                "source_domain": _derive_source_domain(raw_url),
-                "engine": str(context.get("engine") or "").strip(),
-                "job_id": str(context.get("job_id") or "").strip(),
-                "created_at": str(context.get("created_at") or _utc_now_iso()),
-            },
+        base_meta = source_meta_for_url(
+            raw_url,
             resolved_by="map",
+            engine=str(context.get("engine") or "").strip(),
+            job_id=str(context.get("job_id") or "").strip(),
+            created_at=str(context.get("created_at") or utc_now_iso()),
         )
         if not base_meta:
             return
 
         records: dict[str, dict[str, Any]] = {}
         for rel in files:
-            key = _normalize_file_rel(str(rel or ""))
+            key = normalize_file_rel(str(rel or ""))
             if not key:
                 continue
             records[key] = dict(base_meta)
@@ -1392,139 +1088,20 @@ class DownloadManager:
             mapped = self.source_store.get(legacy) if legacy != file_rel else None
         if not mapped:
             return None
-        return _normalize_source_meta(mapped, resolved_by="map")
+        return normalize_source_meta(mapped, resolved_by="map")
 
     def _resolve_source_from_info_json(self, file_rel: str) -> dict[str, Any] | None:
         media_file = self._resolve_media_file_path(file_rel)
         if not media_file or not media_file.exists():
             return None
-
-        candidates = [
-            media_file.with_suffix(".info.json"),
-            Path(str(media_file) + ".info.json"),
-        ]
-        data: dict[str, Any] | None = None
-        for path in candidates:
-            if not path.exists() or not path.is_file():
-                continue
-            try:
-                with path.open("r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                if isinstance(loaded, dict):
-                    data = loaded
-                    break
-            except Exception:
-                continue
-        if not data:
-            return None
-
-        raw_url = ""
-        for field in ("webpage_url", "original_url", "url"):
-            value = str(data.get(field) or "").strip()
-            if value:
-                raw_url = value
-                break
-        if not raw_url:
-            return None
-
-        meta = _normalize_source_meta(
-            {
-                "source_url_raw": raw_url,
-                "source_url_display": _strip_tracking_query(raw_url),
-                "source_domain": _derive_source_domain(raw_url),
-                "engine": str(data.get("extractor_key") or "").strip(),
-                "created_at": _utc_now_iso(),
-            },
-            resolved_by="infojson",
-        )
+        meta = source_from_info_json(media_file)
         if meta and self.source_store:
             self.source_store.set_many({file_rel: dict(meta)})
         return meta
 
-    def _resolve_source_from_filename(self, file_rel: str) -> dict[str, Any] | None:
-        name = Path(file_rel).name
-        stem = Path(name).stem
-
-        if "__" in stem:
-            parts = stem.split("__")
-            if len(parts) >= 4:
-                extractor = parts[0].strip().lower()
-                uploader_id = parts[1].strip()
-                display_id = parts[2].strip()
-                media_id = parts[3].strip()
-                display_id = "" if display_id.lower() == "na" else display_id
-                media_id = "" if media_id.lower() == "na" else media_id
-                uploader_id = "" if uploader_id.lower() == "na" else uploader_id
-
-                if extractor in {"twitter", "x"} and display_id:
-                    url = f"https://x.com/i/web/status/{display_id}"
-                    if uploader_id:
-                        url = f"https://x.com/{uploader_id}/status/{display_id}"
-                    return _normalize_source_meta(
-                        {
-                            "source_url_raw": url,
-                            "source_url_display": url,
-                            "source_domain": "x.com",
-                            "engine": "yt-dlp",
-                        },
-                        resolved_by="filename",
-                    )
-
-                if extractor.startswith("youtube") and media_id:
-                    url = f"https://www.youtube.com/watch?v={media_id}"
-                    return _normalize_source_meta(
-                        {
-                            "source_url_raw": url,
-                            "source_url_display": url,
-                            "source_domain": "youtube.com",
-                            "engine": "yt-dlp",
-                        },
-                        resolved_by="filename",
-                    )
-
-                if extractor.startswith("tiktok") and media_id:
-                    url = f"https://www.tiktok.com/@_/video/{media_id}"
-                    return _normalize_source_meta(
-                        {
-                            "source_url_raw": url,
-                            "source_url_display": url,
-                            "source_domain": "tiktok.com",
-                            "engine": "yt-dlp",
-                        },
-                        resolved_by="filename",
-                    )
-
-                if extractor.startswith("instagram") and display_id:
-                    url = f"https://www.instagram.com/p/{display_id}/"
-                    return _normalize_source_meta(
-                        {
-                            "source_url_raw": url,
-                            "source_url_display": url,
-                            "source_domain": "instagram.com",
-                            "engine": "yt-dlp",
-                        },
-                        resolved_by="filename",
-                    )
-
-        old_match = _OLD_TEMPLATE_ID_RE.search(name)
-        if old_match:
-            old_id = old_match.group("id").strip()
-            if old_id.isdigit():
-                url = f"https://x.com/i/web/status/{old_id}"
-                return _normalize_source_meta(
-                    {
-                        "source_url_raw": url,
-                        "source_url_display": url,
-                        "source_domain": "x.com",
-                        "engine": "yt-dlp",
-                    },
-                    resolved_by="filename",
-                )
-        return None
-
     def _resolve_media_file_path(self, file_rel: str) -> Path | None:
         key = self._strip_output_source_prefix(file_rel)
-        key = _normalize_file_rel(key)
+        key = normalize_file_rel(key)
         if not key:
             return None
         path = (self.media_root / key).resolve()
@@ -1535,7 +1112,7 @@ class DownloadManager:
         return path
 
     def _strip_output_source_prefix(self, file_rel: str) -> str:
-        key = _normalize_file_rel(file_rel)
+        key = normalize_file_rel(file_rel)
         prefix = f"@{self.output_source_id}/"
         if key.startswith(prefix):
             return key[len(prefix):]
