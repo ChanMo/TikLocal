@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 - `tiklocal/` contains the Flask app; `app.py` wires routes, `run.py` provides the CLI entrypoint, and helper modules live alongside routes.
 - `tiklocal/templates/` holds Jinja templates (`*.html`); match filenames to view names and use lower-case with hyphens when needed.
-- `tiklocal/static/` stores Tailwind sources (`input.css`), compiled `output.css`, and vendor JS.
+- `tiklocal/static/` stores Tailwind sources (`input.css`), compiled `output.css`, vendor JS, and per-page CSS and controllers.
 - `instance/` is created at runtime for per-machine overrides; keep secrets out of version control.
 
 ## Build, Test, and Development Commands

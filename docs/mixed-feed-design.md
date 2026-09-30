@@ -1,7 +1,7 @@
 # Flow 混合流（视频+图片）设计说明
 
 - 状态: 已落地
-- 更新时间: 2026-09-19
+- 更新时间: 2026-09-30
 
 ## 背景/目标
 
@@ -61,6 +61,7 @@
 - `tiklocal/web/flow.py`
 - `tiklocal/web/media_payloads.py`
 - `tiklocal/templates/flow.html`
+- `tiklocal/static/flow_page_controller.js`、`tiklocal/static/flow.css`
 - `tiklocal/static/flow_state_controller.js`
 - `tiklocal/static/flow_ui_shared.js`
 - `docs/flow-interaction-unification.md`

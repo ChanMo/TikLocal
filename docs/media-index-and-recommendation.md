@@ -1,7 +1,7 @@
 # 媒体索引与本地推荐架构
 
 - 模块: Library Index / Recommendation / Thumbnail
-- 更新时间: 2026-09-19
+- 更新时间: 2026-09-30
 
 ## 现状概述
 
@@ -17,7 +17,7 @@
 
 - 应用每次启动都会扫描可用媒体源并校正索引，覆盖外部新增、修改、删除和重命名。
 - 每个来源一次遍历区分图片、视频、音频，扩展名不区分大小写。目录枚举或必要文件状态读取失败时，整个来源本轮不更新、不清理；其他完整扫描的来源正常同步。所有媒体源均不可用时 CLI 停止启动。
-- 下载的可识别媒体完成索引登记后才发布成功；登记失败保留文件及输出列表，重试仅重新登记，避免重复下载。下载 HTTP 入口集中于 `web/downloads.py`，应用构造不启动任务线程；服务显式启动管理器后接单，正常退出取消未完成任务并保留文件，异常退出仍按旧规则标记中断任务。
+- 下载的可识别媒体完成索引登记后才发布成功；登记失败保留文件及输出列表，重试仅重新登记，避免重复下载。下载 HTTP 入口集中于 `web/downloads.py`，应用构造不启动任务线程；服务显式启动管理器后接单，正常退出取消未完成任务并保留文件，异常退出仍按旧规则标记中断任务。`DownloadManager` 只负责任务状态和进程生命周期；工具命令与输出解析在 `download_tools.py`，来源记录与 info.json/文件名回退在 `download_sources.py`。
 - Flow 与 Library 默认按 24 条分页，避免为首屏提前创建过多媒体节点。
 - 图片和视频列表统一使用 `/thumb`；图片缩略图最长边为 640px，首次访问同步生成并缓存。
 - 缩略图读取时比较源文件 mtime，同名媒体被替换后会自动重建；删除媒体时同步删除对应缩略图。
@@ -112,7 +112,7 @@
 - `tiklocal/services/recommendation.py`：本地推荐权重。
 - `tiklocal/services/radio.py`：音频候选与电台选择。
 - `tiklocal/thumbs.py`：缩略图 CLI 编排。
-- `tiklocal/view_builders.py`
+- `tiklocal/services/downloader.py`、`download_tools.py`、`download_sources.py`：下载任务、工具命令与来源解析。
 - `tiklocal/app.py`
 - `tiklocal/static/flow_page_controller.js`
 - `tiklocal/static/library_page_controller.js`

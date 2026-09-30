@@ -53,23 +53,23 @@ tiklocal --help
 
 ### Core Application Structure
 
-- **`tiklocal/app.py`**: Main Flask application factory with all routes and view functions
+- **`tiklocal/app.py`**: Flask application factory; builds services and registers route modules from `tiklocal/web/`
 - **`tiklocal/run.py`**: CLI entry point with argument parsing, config file loading, and Waitress server startup
 - **`tiklocal/config.py`**: Configuration file (currently empty, configuration handled via config file/env vars)
 
 ### Key Routes and Features
 
-- **`/`** (tiktok.html): TikTok-like vertical scrolling video interface with random shuffle
-- **`/browse`**: Paginated video browser with file management capabilities
-- **`/gallery`**: Pinterest-style image gallery with directory navigation
-- **`/settings`**: Application settings and statistics
-- **`/detail/<name>`**: Individual video detail view with navigation
-- **`/favorite`**: Favorited media management using JSON storage
-- **`/media/<name>`** and **`/media2`**: Media file serving endpoints
+- **`/`** (home.html): Home launchpad with recent media, On This Day and collections
+- **`/flow`** (flow.html): TikTok-like vertical feed mixing videos and images
+- **`/library`**: Year/month timeline and Pinterest-style explore grid with Quick Viewer
+- **`/favorite`**, **`/collections`**, **`/collection/<id>`**: Saved media
+- **`/radio`**, **`/download`**, **`/settings/`**: Audio player, URL downloads, settings
+- **`/detail/<uri>`** and **`/image?uri=`**: Video and image detail pages
+- **`/media/<uri>`** and **`/thumb`**: Media file and thumbnail serving
 
 ### Frontend Structure
 
-- **Templates**: Located in `tiklocal/templates/` using Jinja2
+- **Templates**: Located in `tiklocal/templates/` using Jinja2; page CSS and JS live in `tiklocal/static/` (`<page>.css`, `<page>_page_controller.js`), and templates only pass boot data inline
 - **CSS**: TailwindCSS v4 with custom theme including dark mode support
 - **JavaScript**: Vanilla JS with Feather icons and Hammer.js for touch gestures
 - **Theme System**: Light/dark mode toggle with localStorage persistence

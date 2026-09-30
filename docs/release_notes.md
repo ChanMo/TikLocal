@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Adding a Flow gallery card to a collection now adds the image on screen, matching favorites.
+- Internal: page styles and scripts moved out of the templates into static files; Flow and Library share one collection picker and one magnifier; the Flow template and controller are named after Flow; the download manager keeps job state while tool commands and source lookup live in their own modules.
+
 ## v0.8.41 (2026-09-28)
 
 - Moved the video and image detail pages to the warm paper-and-ink design used across the app, with a shared stylesheet, serif titles, quiet labels, and dialogs that sit above the navigation dock.

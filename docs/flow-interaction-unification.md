@@ -1,7 +1,7 @@
 # Flow 交互统一架构（Flow / Library / Favorites）
 
 - 状态: 已落地
-- 更新时间: 2026-09-19
+- 更新时间: 2026-09-30
 
 ## 背景/目标
 
@@ -25,17 +25,19 @@
 4. 媒体切换时执行 `onMediaChanged()`，确保状态不残留。
 
 2. 共享 UI 工具层：`flow_ui_shared.js`
-- 统一函数：
-1. `formatTime(seconds)`
-2. `getImageContainRect(imgEl)`
-3. `setMagnifierPosition(lensEl, x, y)`
-4. `updateMagnifierContent(...)`
-- 目的：消除 Flow 与 Library 的重复几何/时间逻辑，避免单点修复失效。
+- `FlowUIShared.formatTime(seconds)`
+- `FlowUIShared.createMagnifier(...)`：镜头定位、图片/视频取样、视频逐帧刷新与暂停轮询、缩放档位、拖动与窗口缩放。页面只传入 DOM、样式类名和 `target()`（返回当前 `{ type, el }`），并在状态层回调中调用 `onStateChange`，在视频 `play`/`seeked` 时调用 `onVideoPlay`/`onVideoSeeked`。
+- 目的：消除 Flow 与 Library 的重复几何/时间/帧循环逻辑，避免单点修复失效。
 
-3. 页面适配层（保留页面特有渲染）
-- Flow：`tiklocal/templates/flow.html`
-- Library/Favorites：`tiklocal/templates/library.html`
-- 仅保留页面差异（数据源、DOM 结构、按钮布局），核心状态流与通用算法走共享模块。
+3. 集合选择器：`collection_picker.js`
+- `TikLocalCollections.createPicker(...)` 负责集合弹层的读取、新建并加入、勾选/取消、成员缓存和按钮计数；页面传入 DOM、列表类名和 `currentUri()`。
+- `TikLocalCollections.request(...)` 是集合 API 的统一请求入口，Library 设置集合封面也使用它。
+- Flow 的图集卡片以当前显示的图片作为集合成员，与收藏一致。
+
+4. 页面适配层（保留页面特有渲染）
+- Flow：`tiklocal/templates/flow.html` + `tiklocal/static/flow_page_controller.js`
+- Library/Favorites：`tiklocal/templates/library.html` + `tiklocal/static/library_page_controller.js`
+- 仅保留页面差异（数据源、DOM 结构、按钮布局、分页与手势），核心状态流与通用算法走共享模块。
 
 ## 统一交互约定
 
@@ -65,8 +67,10 @@
 - 静态资源：
 1. `tiklocal/static/flow_state_controller.js`
 2. `tiklocal/static/flow_ui_shared.js`
-3. `tiklocal/static/flow_actions_shared.js`
-4. `tiklocal/static/flow_media_actions_controller.js`
+3. `tiklocal/static/collection_picker.js`
+4. `tiklocal/static/flow_actions_shared.js`
+5. `tiklocal/static/flow_media_actions_controller.js`
+6. `tiklocal/static/flow_page_controller.js`、`tiklocal/static/library_page_controller.js`
 - 测试：
 1. `tests/test_library_upgrade.py`
 2. `tests/test_captions.py`
@@ -75,7 +79,7 @@
 
 - 权衡：引入共享脚本文件会增加少量模块边界，但显著降低模板内重复和状态分叉。
 - 风险：
-1. 模板脚本注入顺序错误会导致运行时找不到共享对象。
+1. 模板脚本注入顺序错误会导致运行时找不到共享对象：共享模块与 `hammer.min.js` 须在页面控制器之前加载。
 2. 共享层改动会同时影响 Flow 与库页，需要明确回归清单。
 
 ## 回归清单（建议固定执行）
@@ -91,4 +95,4 @@
 
 - [ ] 抽取第三层共享（视频进度条与 AI 标题面板渲染助手），进一步减少模板内脚本体积。
 - [ ] 保留“沉浸 ↔ 放大镜 ↔ 媒体切换”人工验收；出现重复回归时再补小规模浏览器测试，不预建完整端到端套件。
-- [ ] 评估将共享脚本迁移到打包流程，减少模板内内联逻辑规模。
+- [x] 模板内联脚本已移入静态文件，模板只保留 boot 数据；未引入打包流程。
