@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-## v0.8.42 (2026-09-30)
+## v0.8.43 (2026-09-30)
 
+- v0.8.42 was tagged but never reached PyPI because the Radio dependency check failed; its changes below ship in v0.8.43, together with Expo patch updates for Radio.
 - Flow videos: press and hold to play at 2× until you let go, drag sideways to move back or forward through the video, and use ← and → to skip 5 seconds. A small label at the top shows the speed or the new position.
 - The Flow speed button now opens the speeds in a row so any speed is one tap away, and stays highlighted when it is not 1×. The progress bar is easier to grab and stays clear of the phone's home gesture.
 - Long press on a Flow video no longer hides the interface; Flow shows the interface again when a video comes up.
