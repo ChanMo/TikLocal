@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.8.44 (2026-10-01)
+
 - Flow no longer stops on a dialog when a video or image cannot be played (often a codec the browser lacks, such as HEVC or AV1). It shows a short note, skips in the direction you were moving, and retries a network failure once first. The full message only appears after three skips in a row.
 - Library opens quickly on large libraries: image and video sizes are read in the background after startup and stored in the database, instead of running ffprobe while the page waits. Tiles without a size yet take the real shape once their thumbnail loads.
 - URL downloads now prefer H.264 video and AAC audio, which play in every browser.
