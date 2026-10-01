@@ -170,3 +170,6 @@ node_modules/
 default/
 
 outputs/
+
+# Local demo media for screenshots (not committed)
+demo-media/
