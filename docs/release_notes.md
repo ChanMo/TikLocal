@@ -6,6 +6,7 @@
 - Library opens quickly on large libraries: image and video sizes are read in the background after startup and stored in the database, instead of running ffprobe while the page waits. Tiles without a size yet take the real shape once their thumbnail loads.
 - URL downloads now prefer H.264 video and AAC audio, which play in every browser.
 - The server runs 8 worker threads instead of 4, so first-time thumbnails queue less.
+- Rewrote the README around a quick start and new screenshots of real-looking media (CC0 and public-domain files from Wikimedia Commons). `scripts/screenshots.mjs` regenerates them with the installed Chrome.
 
 ## v0.8.43 (2026-09-30)
 
