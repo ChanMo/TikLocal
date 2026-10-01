@@ -48,6 +48,9 @@
     });
     const feedItems = flowSession.items;
     let seed = '';
+    // /flow?mode=forgotten plays only old media that has not been shown for a long time.
+    const feedMode = new URLSearchParams(window.location.search).get('mode') === 'forgotten' ? 'forgotten' : '';
+    document.getElementById('flow-mode').hidden = !feedMode;
     const activitySessionId = globalThis.crypto?.randomUUID?.()
       || `flow-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     let activeActivity = null;
@@ -234,7 +237,7 @@
       list: document.getElementById('collection-list'),
       itemClass: 'collection-modal-item',
       emptyClass: 'collection-modal-empty',
-      currentUri: () => (currentItem()?.type === 'theme_strip' ? '' : currentDisplayEntry()?.name),
+      currentUri: () => currentDisplayEntry()?.name,
     });
 
     function clearCaption() {
@@ -333,7 +336,7 @@
     function setPeek(item, visible) {
       if (!item) return;
       item.el.classList.toggle('active', visible);
-      item.el.style.display = visible ? (item.type === 'theme_strip' ? '' : 'block') : 'none';
+      item.el.style.display = visible ? 'block' : 'none';
       item.el.style.removeProperty('transition');
       item.el.style.translate = '';
     }
@@ -429,27 +432,13 @@
 
     function updateControls(item) {
       const isVideo = item.type === 'video';
-      const isThemeStrip = item.type === 'theme_strip';
       const isImageGroup = item.type === 'image_group';
       const displayEntry = currentDisplayEntry();
-      infoBtn.hidden = isThemeStrip;
-      favoriteBtn.hidden = isThemeStrip;
-      collectionBtn.hidden = isThemeStrip;
       speedWrap.hidden = !isVideo;
       closeSpeedChoices();
-      captionBtn.hidden = isVideo || isThemeStrip || isImageGroup;
-      magnifierToolWrap.hidden = isThemeStrip || isImageGroup;
+      captionBtn.hidden = isVideo || isImageGroup;
+      magnifierToolWrap.hidden = isImageGroup;
       customControls.hidden = !isVideo;
-
-      if (isThemeStrip) {
-        favoriteBtn.dataset.value = '';
-        favoriteBtn.classList.remove('is-active');
-        collections.sync('');
-        infoBtn.removeAttribute('href');
-        playStatusIcon.classList.add('hidden');
-        playStatusIcon.classList.remove('visible');
-        return;
-      }
 
       const detailUrl = String(displayEntry?.detail_url || item.detail_url || '#');
       const mediaName = String(displayEntry?.name || item.name || '');
@@ -597,13 +586,6 @@
       if (prevItem.type === 'video') {
         prevItem.el.pause();
         prevItem.el.muted = true;
-        return;
-      }
-      if (prevItem.type === 'theme_strip') {
-        const previewVideo = prevItem.el.querySelector('.theme-strip-preview-media');
-        if (previewVideo && previewVideo.tagName === 'VIDEO') previewVideo.pause();
-        const groupVideo = prevItem.el.querySelector('.theme-strip-group-media');
-        if (groupVideo && groupVideo.tagName === 'VIDEO') groupVideo.pause();
       }
     }
 
@@ -630,7 +612,7 @@
       if (needsVideoStartCover) showVideoStartCover(item);
       else hideVideoStartCover();
 
-      item.el.style.display = item.type === 'theme_strip' ? '' : 'block';
+      item.el.style.display = 'block';
       requestAnimationFrame(() => item.el.classList.add('active'));
       updateControls(item);
       preloadNextVideo();
@@ -684,10 +666,6 @@
         }
         playStatusIcon.classList.add('hidden');
         playStatusIcon.classList.remove('visible');
-      } else if (item.type === 'theme_strip') {
-        mediaActions.clearCaption();
-        playStatusIcon.classList.add('hidden');
-        playStatusIcon.classList.remove('visible');
       } else {
         playStatusIcon.classList.remove('visible');
         mediaActions.loadCaption(item.name);
@@ -700,38 +678,6 @@
     }
 
     function buildMediaElement(item) {
-      if (item.type === 'theme_strip') {
-        const panel = document.createElement('section');
-        panel.className = 'feed-media feed-theme-strip';
-        panel.dataset.name = item.name;
-        panel.innerHTML = `
-          <div class="theme-strip-header">
-            <h2>${escapeHtml(item.title || 'Featured Theme')}</h2>
-          </div>
-          <div class="theme-strip-rail"></div>
-        `;
-        const rail = panel.querySelector('.theme-strip-rail');
-        const children = Array.isArray(item.items) ? item.items : [];
-        children.forEach((entry, index) => {
-          if (!rail || !entry || !entry.name || !entry.thumb_url) return;
-          const card = document.createElement('button');
-          card.type = 'button';
-          card.className = 'theme-strip-card';
-          card.innerHTML = `
-            <div class="theme-strip-thumb">
-              <img src="${escapeHtml(entry.thumb_url)}" alt="${escapeHtml(entry.name)}" loading="lazy" decoding="async">
-            </div>
-          `;
-          card.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            window.location.href = entry.focus_url || item.target_url || entry.detail_url || '/library';
-          });
-          rail.appendChild(card);
-        });
-        return panel;
-      }
-
       if (item.type === 'image_group') {
         const panel = document.createElement('section');
         panel.className = 'feed-media feed-image-group';
@@ -739,7 +685,8 @@
         panel.innerHTML = `
           <div class="image-group-stage"></div>
           <div class="image-group-overlay">
-            <div class="image-group-counter"></div>
+            ${item.caption ? `<span>${escapeHtml(item.caption)}</span>` : ''}
+            <span class="image-group-counter"></span>
           </div>
         `;
         const stage = panel.querySelector('.image-group-stage');
@@ -880,6 +827,7 @@
             size: '24',
           });
           if (seed) query.set('seed', seed);
+          if (feedMode) query.set('mode', feedMode);
 
           const res = await fetch(`/api/feed/mix?${query.toString()}`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -897,11 +845,6 @@
               media_url: item.media_url || '',
               detail_url: item.detail_url || '#',
               thumb_url: item.thumb_url || '',
-              title: item.title || '',
-              subtitle: item.subtitle || '',
-              target_url: item.target_url || '',
-              target_label: item.target_label || '',
-              recommendation_reason: item.recommendation_reason || '',
               items: Array.isArray(item.items) ? item.items : [],
               renderChild: typeof mediaEl._renderImageGroup === 'function' ? (index, force = false) => {
                 mediaEl._renderImageGroup(index, force);
@@ -932,7 +875,8 @@
         if (feedItems.length) {
           hideFlowStatus();
         } else if (!flowSession.hasMore()) {
-          showFlowStatus('empty', 'There is nothing to browse yet', 'Add media and refresh the index to see it here.');
+          if (feedMode) showFlowStatus('empty', 'Nothing forgotten yet', 'Media older than six months that you have not seen for as long shows up here.');
+          else showFlowStatus('empty', 'There is nothing to browse yet', 'Add media and refresh the index to see it here.');
         }
         return result;
       } catch (error) {

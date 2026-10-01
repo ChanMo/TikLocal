@@ -5,6 +5,23 @@ import random
 from tiklocal.services.library import LibraryService, VIDEO_EXTENSIONS
 from tiklocal.services.favorites import FavoriteService
 
+# Media this old, and not shown for as long, counts as forgotten.
+FORGOTTEN_DAYS = 180
+
+
+def _parse_shown_at(value: object) -> datetime.datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
+    except (TypeError, ValueError):
+        return None
+
+
+def shown_within(profile: dict | None, days: float, now: datetime.datetime) -> bool:
+    shown = _parse_shown_at((profile or {}).get('last_shown_at'))
+    return bool(shown and (now - shown).total_seconds() < days * 86400)
+
 
 class RecommendService:
     def __init__(
@@ -53,7 +70,7 @@ class RecommendService:
                 is_fav = self.library.is_uri_in_set(rel_path, favs)
                 base_score = 2.0 if is_fav else 1.0
                 age_days = max((now - datetime.datetime.fromtimestamp(mtime)).total_seconds() / 86400, 0.0)
-                time_score = math.exp(-age_days / 90.0)
+                time_score = math.exp(-age_days / 180.0)
                 profile = profiles.get(rel_path) or {}
                 affinity = max(-1.0, min(float(profile.get('affinity_score') or 0.0), 1.8))
                 revisit_score = max(0.65, 1.0 + affinity * 0.2)
@@ -63,7 +80,7 @@ class RecommendService:
                 preference_weight = max(0.8, min(1.25, 1.0 + preference_score * 0.08))
                 weighted_pool.append({
                     'uri': rel_path,
-                    'weight': base_score * (0.1 + time_score) * revisit_score * recent_penalty * preference_weight,
+                    'weight': base_score * (0.25 + time_score) * revisit_score * recent_penalty * preference_weight,
                     'impressions': int(profile.get('impressions') or 0),
                     'dimensions': dict(dimensions),
                 })
@@ -103,6 +120,30 @@ class RecommendService:
             recent_dimensions = (recent_dimensions + [chosen['dimensions']])[-3:]
             pool.remove(chosen)
         return result
+
+    def get_forgotten_selection(self, file_type='video', limit=20, seed=None) -> list[str]:
+        """Old media not shown for a long time; what was once finished, replayed or favorited comes first."""
+        if not self.media_index:
+            return []
+        now = datetime.datetime.now()
+        cutoff = now.timestamp() - FORGOTTEN_DAYS * 86400
+        names = [
+            item['name'] for item in self.media_index.records(media_type=file_type)
+            if 0 < float(item.get('mtime_ts') or 0) <= cutoff
+        ]
+        profiles = self.activity_store.profiles_for(names) if self.activity_store else {}
+        favs = self.favorites.load()
+        rng = random.Random(seed) if seed else random
+        keyed = []
+        for name in names:
+            profile = profiles.get(name) or {}
+            if shown_within(profile, FORGOTTEN_DAYS, now):
+                continue
+            loved = profile.get('completes') or profile.get('replays') or self.library.is_uri_in_set(name, favs)
+            # Weighted shuffle: a larger weight pulls the random key toward 1.
+            keyed.append((rng.random() ** (1 / (3.0 if loved else 1.0)), name))
+        keyed.sort(reverse=True)
+        return [name for _, name in keyed[:limit]]
 
     @staticmethod
     def _diversity_weight(candidate: dict, recent: list[dict[str, str]]) -> float:
@@ -148,13 +189,10 @@ class RecommendService:
 
     @staticmethod
     def _recent_exposure_weight(value: object, now: datetime.datetime) -> float:
-        if not value:
+        shown = _parse_shown_at(value)
+        if not shown:
             return 1.0
-        try:
-            shown = datetime.datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
-            hours = max((now - shown).total_seconds() / 3600, 0.0)
-        except (TypeError, ValueError):
-            return 1.0
+        hours = max((now - shown).total_seconds() / 3600, 0.0)
         if hours < 6:
             return 0.12
         if hours < 48:

@@ -1,10 +1,11 @@
 """Flow HTTP entry points and media/card composition."""
 
+import datetime
 import random
-from urllib.parse import quote
 
 from flask import render_template, request
 
+from tiklocal.services.recommendation import FORGOTTEN_DAYS, shown_within
 from tiklocal.web import read_int_arg
 from tiklocal.web.media_payloads import build_feed_media_item
 
@@ -105,52 +106,30 @@ def collect_source_media_groups(
     return results
 
 
-def build_theme_strip_candidates(
-    records: list[dict],
-) -> list[dict]:
-    candidates: list[dict] = []
-
-    favorite_records = [
-        item for item in records
-        if item.get('is_favorite') and item.get('media_type') in {'video', 'image'}
-    ]
-    favorite_records.sort(key=lambda item: item.get('mtime_ts') or 0, reverse=True)
-    favorite_items = [
-        build_feed_media_item(item['name'], item['media_type'])
-        for item in favorite_records[:8]
-    ]
-    if len(favorite_items) >= 3:
-        candidates.append({
-            'type': 'theme_strip',
-            'name': 'theme:favorite-picks',
-            'title': 'Favorite Picks',
-            'subtitle': 'Jump to your favorites and keep watching.',
-            'target_url': '/favorite',
-            'target_label': 'Open Favorites',
-            'items': favorite_items,
-        })
-
-    recent_records = [
-        item for item in records
-        if item.get('name') and item.get('media_type') in {'video', 'image'}
-    ]
-    recent_records.sort(key=lambda item: (float(item.get('mtime_ts') or 0), str(item.get('name') or '')), reverse=True)
-    recent_items = [
-        build_feed_media_item(str(item['name']), str(item['media_type']))
-        for item in recent_records[:8]
-    ]
-    if len(recent_items) >= 3:
-        candidates.append({
-            'type': 'theme_strip',
-            'name': 'theme:recent-added',
-            'title': 'Recently Added',
-            'subtitle': 'Jump to your library and keep watching.',
-            'target_url': '/library',
-            'target_label': 'Open Library',
-            'items': recent_items,
-        })
-
-    return candidates
+def build_memory_card(records: list[dict], profiles: dict, rng: random.Random, now: datetime.datetime) -> dict | None:
+    """Images from one past week that have not been shown for a while; callers pass year-old images."""
+    weeks: dict[tuple[int, int], list[dict]] = {}
+    for record in records:
+        if shown_within(profiles.get(record['name']), FORGOTTEN_DAYS, now):
+            continue
+        week = datetime.date.fromtimestamp(record['mtime_ts']).isocalendar()[:2]
+        weeks.setdefault(week, []).append(record)
+    weeks = {week: items for week, items in weeks.items() if len(items) >= 3}
+    if not weeks:
+        return None
+    # The same week in an earlier year reads as an anniversary; otherwise any week will do.
+    same_week = sorted(week for week in weeks if week[1] == now.isocalendar()[1])
+    items = weeks[rng.choice(same_week or sorted(weeks))]
+    if len(items) > 8:
+        items = rng.sample(items, 8)
+    items.sort(key=lambda item: item['mtime_ts'])
+    first = datetime.date.fromtimestamp(items[0]['mtime_ts'])
+    return {
+        'type': 'image_group',
+        'name': f"memory:{items[0]['name']}",
+        'caption': f"This week in {first.year}" if same_week else first.strftime('%B %Y'),
+        'items': [build_feed_media_item(item['name'], 'image') for item in items],
+    }
 
 
 def build_mix_feed_page(
@@ -160,8 +139,9 @@ def build_mix_feed_page(
     seed: str,
     recommend_service,
     media_index,
-    favorite_service,
     download_source_store,
+    activity_store=None,
+    mode: str = '',
 ) -> dict:
     video_ratio = 4
     image_ratio = 1
@@ -172,12 +152,14 @@ def build_mix_feed_page(
     # Either media type must be able to fill the page when the other runs out.
     request_window = end + 1
 
-    videos = recommend_service.get_weighted_selection(
+    forgotten = mode == 'forgotten'
+    select = recommend_service.get_forgotten_selection if forgotten else recommend_service.get_weighted_selection
+    videos = select(
         file_type='video',
         limit=request_window,
         seed=f"{seed}:video",
     )
-    images = recommend_service.get_weighted_selection(
+    images = select(
         file_type='image',
         limit=request_window,
         seed=f"{seed}:image",
@@ -243,16 +225,13 @@ def build_mix_feed_page(
             image_streak += 1
             video_streak = 0
 
-    records = media_index.records()
-    favorites = favorite_service.load()
-    for record in records:
-        record['is_favorite'] = record['name'] in favorites
-    theme_candidates = build_theme_strip_candidates(records) if page == 1 else []
     page_media = mixed[start:end]
     page_names = {name for _, name in page_media}
+    # The forgotten feed stays plain media; cards belong to the everyday Flow.
+    records = [] if forgotten else media_index.records()
     source_groups = collect_source_media_groups([
         record for record in records if record['name'] in page_names
-    ], download_source_store)
+    ], download_source_store) if records else []
     image_group_candidate = None
     image_group_names: set[str] = set()
     for group in source_groups:
@@ -283,13 +262,25 @@ def build_mix_feed_page(
         insert_ceil = min(max(insert_floor, 6), len(mixed_entries))
         insert_at = insert_floor if insert_ceil <= insert_floor else group_rng.randint(insert_floor, insert_ceil)
         mixed_entries.insert(insert_at, image_group_candidate)
-    if page == 1 and theme_candidates and mixed_entries:
-        theme_rng = random.Random(f"{seed}:theme-strip")
-        candidate = theme_rng.choice(theme_candidates)
-        insert_floor = min(6, len(mixed_entries))
-        insert_ceil = min(max(insert_floor, 10), len(mixed_entries))
-        insert_at = insert_floor if insert_ceil <= insert_floor else theme_rng.randint(insert_floor, insert_ceil)
-        mixed_entries.insert(insert_at, candidate)
+    # A memory every other page keeps it a small surprise rather than a pattern.
+    memory = None
+    if records and page % 2 == 1:
+        now = datetime.datetime.now()
+        year_ago = now.timestamp() - 365 * 86400
+        old_images = [
+            record for record in records
+            if record.get('media_type') == 'image' and 0 < float(record.get('mtime_ts') or 0) <= year_ago
+        ]
+        profiles = activity_store.profiles_for([record['name'] for record in old_images]) if activity_store else {}
+        memory = build_memory_card(old_images, profiles, random.Random(f"{seed}:memory:{page}"), now)
+    if memory and mixed_entries:
+        memory_names = {child['name'] for child in memory['items']}
+        mixed_entries = [entry for entry in mixed_entries if entry['name'] not in memory_names]
+        memory_rng = random.Random(f"{seed}:memory-slot:{page}")
+        insert_floor = min(8, len(mixed_entries))
+        insert_ceil = min(max(insert_floor, 14), len(mixed_entries))
+        insert_at = insert_floor if insert_ceil <= insert_floor else memory_rng.randint(insert_floor, insert_ceil)
+        mixed_entries.insert(insert_at, memory)
 
     recommendation_reasons = recommend_service.reasons_for([
         str(entry.get('name') or '')
@@ -299,12 +290,8 @@ def build_mix_feed_page(
     items = []
     for entry in mixed_entries:
         item_type = str(entry.get('type') or '')
-        if item_type in {'theme_strip', 'image_group'}:
-            item = {**entry, 'items': [dict(child) for child in entry['items']]}
-            if item_type == 'theme_strip':
-                for child in item['items']:
-                    child['focus_url'] = f"{item['target_url']}?focus={quote(child['name'], safe='')}"
-            items.append(item)
+        if item_type == 'image_group':
+            items.append({**entry, 'items': [dict(child) for child in entry['items']]})
             continue
 
         name = str(entry.get('name') or '')
@@ -323,7 +310,7 @@ def build_mix_feed_page(
 
 
 def register_flow_routes(
-    app, *, media_index, recommend_service, favorite_service,
+    app, *, media_index, recommend_service,
     download_source_store, activity_store,
 ):
     @app.route('/flow')
@@ -338,8 +325,9 @@ def register_flow_routes(
             seed=request.args.get('seed') or str(random.randint(1, 999999)),
             recommend_service=recommend_service,
             media_index=media_index,
-            favorite_service=favorite_service,
             download_source_store=download_source_store,
+            activity_store=activity_store,
+            mode=request.args.get('mode', ''),
         )
         if request.args.get('snapshot') == '1':
             result['has_more'] = False

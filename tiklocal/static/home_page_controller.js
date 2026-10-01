@@ -204,7 +204,7 @@
 
     var statsRequest = fetchJson('/api/library/stats').catch(function () { return {}; });
     var recentRequest = fetchJson('/api/library/items?scope=all&mode=all&offset=0&limit=12').catch(function () { return { data: { items: [] } }; });
-    var randomRequest = fetchJson('/api/library/items?scope=all&mode=image_random&offset=0&limit=12').catch(function () { return { data: { items: [] } }; });
+    var forgottenRequest = fetchJson('/api/feed/mix?mode=forgotten&size=8&snapshot=1').catch(function () { return { items: [] }; });
     var collectionsRequest = fetchJson('/api/collections').catch(function () { return { data: { items: [] } }; });
     var now = new Date();
     var today = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(function (n) { return String(n).padStart(2, '0'); }).join('-');
@@ -213,7 +213,7 @@
       if (window.feather) window.feather.replace();
     }).catch(function () {});
 
-    Promise.all([statsRequest, recentRequest, randomRequest, collectionsRequest]).then(function (results) {
+    Promise.all([statsRequest, recentRequest, forgottenRequest, collectionsRequest]).then(function (results) {
       var stats = apiData(results[0]) || {};
       var recent = ((apiData(results[1]) || {}).items || []).filter(function (item) {
         return item.type === 'image' || item.type === 'video';

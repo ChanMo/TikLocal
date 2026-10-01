@@ -1,4 +1,6 @@
 import json
+import os
+import time
 import sqlite3
 
 import pytest
@@ -45,10 +47,6 @@ def test_mix_feed_returns_typed_items(client):
 
     for item in items:
         assert "name" in item
-        if item.get("type") == "theme_strip":
-            assert item["items"]
-            assert item["target_url"]
-            continue
         assert "media_url" in item
         assert "detail_url" in item
         assert item["recommendation_reason"]
@@ -86,7 +84,7 @@ def test_feed_cards_and_groups_preserve_all_media_across_pages(tmp_path, monkeyp
         }))
     client = create_app({'TESTING': True, 'MEDIA_ROOT': media_root}).test_client()
 
-    seen, theme_count, group_count = [], 0, 0
+    seen, group_count = [], 0
     pages = max(1, (count + 7) // 8)
     for page in range(1, pages + 1):
         response = client.get('/api/feed/mix', query_string={'page': page, 'size': 8, 'seed': 'fixed'})
@@ -94,11 +92,7 @@ def test_feed_cards_and_groups_preserve_all_media_across_pages(tmp_path, monkeyp
         payload = response.get_json()
         page_names = []
         for item in payload['items']:
-            if item['type'] == 'theme_strip':
-                theme_count += 1
-                assert page == 1
-                assert client.get(item['target_url']).status_code == 200
-            elif item['type'] == 'image_group':
+            if item['type'] == 'image_group':
                 group_count += 1
                 page_names.extend(child['name'] for child in item['items'])
                 assert all(client.get(child['media_url']).data == b'media' for child in item['items'])
@@ -109,8 +103,49 @@ def test_feed_cards_and_groups_preserve_all_media_across_pages(tmp_path, monkeyp
         assert payload['has_more'] is (page < pages)
         seen.extend(page_names)
     assert set(seen) == {f'@default/{name}' for name in names}
-    assert theme_count == (1 if count else 0)
     assert group_count == (3 if grouped else 0)
+
+
+def _age(path, days):
+    stamp = time.time() - days * 86400
+    os.utime(path, (stamp, stamp))
+
+
+def test_memory_card_gathers_one_old_week_of_unseen_images(tmp_path):
+    media_root = tmp_path / 'media'
+    media_root.mkdir()
+    for index in range(4):
+        (media_root / f'old-{index}.jpg').write_bytes(b'img')
+        _age(media_root / f'old-{index}.jpg', 400)
+    for index in range(10):
+        (media_root / f'new-{index}.mp4').write_bytes(b'vid')
+    client = create_app({'TESTING': True, 'MEDIA_ROOT': media_root}).test_client()
+
+    items = client.get('/api/feed/mix', query_string={'page': 1, 'size': 24, 'seed': 'm'}).get_json()['items']
+    memories = [item for item in items if item['name'].startswith('memory:')]
+    assert len(memories) == 1
+    assert memories[0]['type'] == 'image_group'
+    assert memories[0]['caption']
+    assert {child['name'] for child in memories[0]['items']} == {f'@default/old-{i}.jpg' for i in range(4)}
+    assert not [item for item in items if item['name'].startswith('@default/old-')]
+
+    page_two = client.get('/api/feed/mix', query_string={'page': 2, 'size': 8, 'seed': 'm'}).get_json()['items']
+    assert not [item for item in page_two if item['name'].startswith('memory:')]
+
+
+def test_forgotten_feed_skips_new_and_recently_shown_media(tmp_path):
+    media_root = tmp_path / 'media'
+    media_root.mkdir()
+    for name in ('old-seen.mp4', 'old-unseen.mp4', 'old.jpg'):
+        (media_root / name).write_bytes(b'x')
+        _age(media_root / name, 300)
+    (media_root / 'new.mp4').write_bytes(b'x')
+    client = create_app({'TESTING': True, 'MEDIA_ROOT': media_root}).test_client()
+    client.post('/api/activity', json={'uri': '@default/old-seen.mp4', 'media_type': 'video', 'event': 'impression'})
+
+    payload = client.get('/api/feed/mix', query_string={'mode': 'forgotten', 'seed': 'f', 'snapshot': 1}).get_json()
+    assert {item['name'] for item in payload['items']} == {'@default/old-unseen.mp4', '@default/old.jpg'}
+    assert all(item['type'] in {'video', 'image'} for item in payload['items'])
 
 
 def test_flow_activity_builds_and_clears_local_profile(client, tmp_path):

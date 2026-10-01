@@ -2,7 +2,7 @@
 // Detail pages name their own media `media-hero` in CSS; this names the matching element on other pages.
 (function () {
   var HERO = 'media-hero';
-  var PAGE_SOURCES = '.quick-media.active, #feed-container .feed-media.active:not(.feed-theme-strip)';
+  var PAGE_SOURCES = '.quick-media.active, #feed-container .feed-media.active';
   var clicked = null;
   var named = null;
 

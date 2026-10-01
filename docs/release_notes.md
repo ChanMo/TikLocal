@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Flow now and then shows a memory: photos from one week at least a year ago that you have not seen in a while, swiped through sideways and labelled only with their month, or "This week in 2023" when the week lines up. It replaces the Recently Added and Favorite Picks grid, which led out of Flow.
+- New Forgotten mode, `/flow?mode=forgotten`, opened from Rediscover on Home: only media older than six months that has not been shown for as long, with what you once finished, replayed or favorited first.
+- The everyday Flow leans a little less on new files, so older media comes up more often.
+- Gallery position now sits at the bottom left instead of under the top-right button.
+
 ## v0.8.44 (2026-10-01)
 
 - Flow no longer stops on a dialog when a video or image cannot be played (often a codec the browser lacks, such as HEVC or AV1). It shows a short note, skips in the direction you were moving, and retries a network failure once first. The full message only appears after three skips in a row.

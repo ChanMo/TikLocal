@@ -256,7 +256,7 @@ def create_app(test_config=None):
 
     register_flow_routes(
         app, media_index=media_index, recommend_service=recommend_service,
-        favorite_service=favorite_service, download_source_store=download_source_store,
+        download_source_store=download_source_store,
         activity_store=activity_store,
     )
 
