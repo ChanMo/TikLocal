@@ -357,8 +357,8 @@ Examples:
             print("⚠️  Development mode is enabled; do not use it in production")
             app.run(host=host, port=port, debug=True, use_reloader=True)
         else:
-            # Production mode uses Waitress.
-            serve(app, host=host, port=port)
+            # Production mode uses Waitress. Cold thumbnails run ffmpeg, so allow a few more workers than the default 4.
+            serve(app, host=host, port=port, threads=8)
     finally:
         signal.signal(signal.SIGTERM, previous_sigterm)
         download_manager.close()

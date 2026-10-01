@@ -53,24 +53,28 @@ def test_caption_update_preserves_dimensions_written_after_old_snapshot(tmp_path
     assert store.get(uri) == {'title': 'new', 'media_meta': dimensions}
 
 
-def test_dimension_cache_preserves_legacy_caption_and_degrades_on_write_failure(tmp_path, monkeypatch):
+def test_dimensions_are_probed_in_background_and_refreshed_after_change(tmp_path):
     media = tmp_path / 'media'
     media.mkdir()
-    Image.new('RGB', (120, 80)).save(media / 'photo.jpg')
-    client = create_app({'TESTING': True, 'MEDIA_ROOT': media}).test_client()
-    path = tmp_path / 'tiklocal-data' / 'metadata.json'
-    store = ImageMetadataStore(path)
-    store.set('photo.jpg', {'title': 'Existing title', 'tags': ['saved']})
-    before = path.read_bytes()
-    with monkeypatch.context() as fault:
-        def fail_replace(source, destination):
-            raise PermissionError('read-only storage')
-        fault.setattr(os, 'replace', fail_replace)
-        item = client.get('/api/library/items').get_json()['data']['items'][0]
-        assert (item['width'], item['height']) == (120, 80)
-        assert path.read_bytes() == before
+    photo = media / 'photo.jpg'
+    Image.new('RGB', (120, 80)).save(photo)
+    (media / 'broken.jpg').write_bytes(b'not an image')
+    app = create_app({'TESTING': True, 'MEDIA_ROOT': media})
+    client = app.test_client()
+    probe = app.extensions['media_probe']
 
-    client.get('/api/library/items')
-    metadata = client.get('/api/image/metadata?uri=@default/photo.jpg').get_json()['data']
-    assert metadata['title'] == 'Existing title' and metadata['tags'] == ['saved']
-    assert (metadata['media_meta']['width'], metadata['media_meta']['height']) == (120, 80)
+    def sizes():
+        items = client.get('/api/library/items').get_json()['data']['items']
+        return {item['name']: (item['width'], item['height']) for item in items}
+
+    assert sizes()['@default/photo.jpg'] == (None, None)
+    assert probe.run_once() == 2
+    assert sizes() == {'@default/photo.jpg': (120, 80), '@default/broken.jpg': (None, None)}
+    assert probe.run_once() == 0
+
+    Image.new('RGB', (60, 90)).save(photo)
+    os.utime(photo, (1, 1))
+    client.post('/api/library/sync')
+    assert probe.run_once() == 1
+    assert sizes()['@default/photo.jpg'] == (60, 90)
+

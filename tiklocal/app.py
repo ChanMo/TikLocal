@@ -17,7 +17,7 @@ from tiklocal.web.captions import register_caption_routes
 from tiklocal.web.downloads import register_download_routes
 from tiklocal.web.library import register_library_routes
 from tiklocal.services.database import AppDatabase, MediaActivityStore
-from tiklocal.services.library_index import LibraryIndexer, MediaIndexStore
+from tiklocal.services.library_index import LibraryIndexer, MediaIndexStore, MediaProbeWorker
 from tiklocal.services.trash import TrashService
 from tiklocal.services.downloader import (
     DownloadConfigStore,
@@ -190,6 +190,11 @@ def create_app(test_config=None):
     library_indexer = LibraryIndexer(library_service, media_index)
     index_sync_result = library_indexer.sync()
     app.extensions["media_index_sync"] = index_sync_result
+    media_probe = MediaProbeWorker(library_service, media_index)
+    library_indexer.on_change = media_probe.wake
+    app.extensions["media_probe"] = media_probe
+    if not app.config.get('TESTING'):
+        media_probe.start()
     if index_sync_result["unavailable_sources"]:
         app.logger.warning(
             "Media source unavailable; preserving its existing index: %s",
@@ -245,7 +250,7 @@ def create_app(test_config=None):
     register_library_routes(
         app, library_service=library_service, media_index=media_index,
         library_indexer=library_indexer, favorite_service=favorite_service,
-        collection_store=collection_store, metadata_store=metadata_store, activity_store=activity_store,
+        collection_store=collection_store, activity_store=activity_store,
         similarity_active=similarity_active,
     )
 

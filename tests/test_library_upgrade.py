@@ -327,6 +327,7 @@ def test_library_images_use_bounded_cached_thumbnails(tmp_path, monkeypatch):
     data_root = tmp_path / "tiklocal-data"
     monkeypatch.setenv("MEDIA_ROOT", str(media_root))
     app = create_app({"TESTING": True, "MEDIA_ROOT": media_root})
+    app.extensions["media_probe"].run_once()
     local_client = app.test_client()
 
     payload = local_client.get("/api/library/items?scope=all").get_json()["data"]

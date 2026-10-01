@@ -280,6 +280,13 @@ def _migrate_009_create_playback_positions(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_010_add_media_dimensions(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(media_items)").fetchall()}
+    for name, kind in (("width", "INTEGER"), ("height", "INTEGER"), ("probed_mtime", "REAL")):
+        if name not in columns:
+            conn.execute(f"ALTER TABLE media_items ADD COLUMN {name} {kind}")
+
+
 MIGRATIONS = [
     Migration(1, "create_image_vectors", _migrate_001_create_image_vectors),
     Migration(2, "create_media_similarity_groups", _migrate_002_create_media_similarity_groups),
@@ -290,6 +297,7 @@ MIGRATIONS = [
     Migration(7, "add_capture_calendar_buckets", _migrate_007_add_capture_calendar_buckets),
     Migration(8, "add_time_metadata_version", _migrate_008_add_time_metadata_version),
     Migration(9, "create_playback_positions", _migrate_009_create_playback_positions),
+    Migration(10, "add_media_dimensions", _migrate_010_add_media_dimensions),
 ]
 
 

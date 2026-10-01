@@ -1,12 +1,14 @@
 import datetime
 import re
 import random
+import threading
 from pathlib import Path
 
 from PIL import Image
 
 from tiklocal.services.library import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 from tiklocal.services.database import AppDatabase
+from tiklocal.services.media_info import probe_media_dims
 
 
 class MediaIndexStore:
@@ -136,6 +138,29 @@ class MediaIndexStore:
                     "UPDATE media_index_state SET item_count = MAX(0, item_count - 1) WHERE id = 1"
                 )
         return bool(deleted)
+
+    def unprobed(self, limit: int = 50) -> list[dict]:
+        """Media whose dimensions were never read, or were read before the file changed."""
+        with self.database.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT uri, media_type, mtime FROM media_items
+                WHERE media_type IN ('video', 'image')
+                  AND (probed_mtime IS NULL OR probed_mtime != mtime)
+                ORDER BY mtime DESC
+                LIMIT ?
+                """,
+                (int(limit),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def set_dimensions(self, rows: list[tuple]) -> None:
+        """Store (width, height, probed_mtime, uri) rows; a failed probe stores no size."""
+        with self.database.connect() as conn:
+            conn.executemany(
+                "UPDATE media_items SET width = ?, height = ?, probed_mtime = ? WHERE uri = ?",
+                rows,
+            )
 
     def records(self, *, search: str = "", media_type: str = "") -> list[dict]:
         where, params = self._filters(search=search, media_type=media_type)
@@ -374,6 +399,8 @@ class MediaIndexStore:
             "time_source": str(row["time_source"] or "filesystem_mtime"),
             "time_confidence": str(row["time_confidence"] or "fallback"),
             "size_bytes": int(row["size_bytes"]),
+            "width": row["width"],
+            "height": row["height"],
             "is_favorite": False,
         }
 
@@ -537,6 +564,7 @@ class LibraryIndexer:
     def __init__(self, library_service, store: MediaIndexStore):
         self.library = library_service
         self.store = store
+        self.on_change = lambda: None
 
     def sync(self) -> dict:
         time_states = self.store.time_states()
@@ -560,6 +588,7 @@ class LibraryIndexer:
         )
         result['unavailable_sources'] = list(failures)
         result['source_errors'] = failures
+        self.on_change()
         return result
 
     def register_uris(self, uris: list[str]) -> int:
@@ -575,7 +604,9 @@ class LibraryIndexer:
             if record is None:
                 raise ValueError(f'Unable to register media output: {uri}')
             records.append(record)
-        return self.store.upsert(records)
+        count = self.store.upsert(records)
+        self.on_change()
+        return count
 
     def _record_for_path(self, path: Path, time_states: dict[str, dict] | None = None) -> dict | None:
         stat = path.stat()
@@ -618,3 +649,39 @@ class LibraryIndexer:
             "mtime": float(stat.st_mtime),
             **capture,
         }
+
+
+class MediaProbeWorker:
+    """Reads media dimensions in the background so pages never wait on ffprobe."""
+
+    def __init__(self, library_service, store: MediaIndexStore):
+        self.library = library_service
+        self.store = store
+        self._wake = threading.Event()
+
+    def start(self) -> None:
+        threading.Thread(target=self._loop, name="media-probe", daemon=True).start()
+
+    def wake(self) -> None:
+        self._wake.set()
+
+    def run_once(self, batch: int = 50) -> int:
+        """Probe until nothing is left; return how many files were read."""
+        done = 0
+        while rows := self.store.unprobed(batch):
+            results = []
+            for row in rows:
+                width, height = probe_media_dims(self.library, row["uri"], row["media_type"])
+                results.append((width, height, row["mtime"], row["uri"]))
+            self.store.set_dimensions(results)
+            done += len(results)
+        return done
+
+    def _loop(self) -> None:
+        while True:
+            self._wake.clear()
+            try:
+                self.run_once()
+            except Exception:
+                pass  # Dimensions are optional; the next wake retries.
+            self._wake.wait()

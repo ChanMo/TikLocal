@@ -32,8 +32,8 @@
 - `LibraryIndexer.sync()`：仅提交完整扫描来源的快照，以 `unavailable_sources` 和 `source_errors` 报告失败来源。全部失败时保留所有旧索引；完整扫描得到空库时允许正常清理。
 - `LibraryIndexer.register_uris()`：登记下载输出，缺失或不可访问的可识别媒体必须报错；忽略不属于媒体类型的附件。
 - `MediaIndexStore.page()`：统一普通、收藏和集合列表查询。SQL 处理常规筛选与分页，大文件按大小降序，再按 mtime 和 URI 确保稳定次序；集合保留成员次序；随机图片沿用固定候选排序和 seed 洗牌。
-- `enrich_media_dimensions()`：列表查询后按页批量读取尺寸缓存，按需探测，再批量合并写入；序列化不再执行 IO。时间线封面不探测尺寸。
-- `ImageMetadataStore.update_many()`：在同一实例锁内重新读取、合并字段并原子写入；尺寸与标题更新互不覆盖，不在远程标题生成期间持锁。旧裸路径标题在尺寸规范化时保留。
+- `MediaProbeWorker`：后台单线程读取图片和视频宽高，写入 `media_items.width/height`，以 `probed_mtime` 记录探测时的 mtime；文件变化后重新探测，探测失败也记录，不反复重试。启动、同步和下载登记后唤醒；列表请求只读 SQLite，不再在请求中运行 ffprobe。尚未探测的项返回空尺寸，Library 按默认比例占位，图片加载后改用实际比例。旧 `metadata.json` 中的尺寸缓存不再读取。
+- `ImageMetadataStore.update_many()`：在同一实例锁内重新读取、合并字段并原子写入，不在远程标题生成期间持锁。
 - `FavoriteService`：读改写在同一实例锁内完成，原子替换防止半写入；损坏或不可写文件不得转换为成功。收藏 API 失败返回 503，Flow/Gallery 回滚乐观状态并允许重试。
 - `RecommendService.get_weighted_selection()`：从媒体索引读取候选并执行轻量加权选择。
 - `ThumbnailService.get_thumbnail()`：读取有效缓存或同步生成单规格缩略图。

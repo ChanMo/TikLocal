@@ -323,6 +323,14 @@
       tile.appendChild(img);
     }
 
+    if (!(item.width && item.height)) {
+      // Sizes are filled in the background; until then take the real ratio once loaded.
+      const img = tile.querySelector('img');
+      img.addEventListener('load', () => {
+        if (img.naturalWidth && img.naturalHeight) img.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+      }, { once: true });
+    }
+
     tile.addEventListener('click', () => openViewer(index));
     return tile;
   }

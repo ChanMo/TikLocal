@@ -8,14 +8,13 @@ from flask import redirect, render_template, request, url_for
 
 from tiklocal.services.collections import normalize_collection_mutation_uris
 from tiklocal.services.library import IMAGE_EXTENSIONS
-from tiklocal.services.media_info import enrich_media_dimensions
 from tiklocal.web.media_payloads import build_feed_media_item, media_urls, serialize_library_item
 from tiklocal.web import read_int_arg
 
 
 def register_library_routes(
     app, *, library_service, media_index, library_indexer, favorite_service,
-    collection_store, metadata_store, activity_store, similarity_active: bool,
+    collection_store, activity_store, similarity_active: bool,
 ):
     def _read_page_options(scope: str = 'all') -> dict:
         mode = str(request.args.get('mode', 'all')).strip()
@@ -133,7 +132,6 @@ def register_library_routes(
             offset=offset, limit=limit, uris=uris, preserve_order=bool(collection_id),
         )
         records = page.pop('records')
-        enrich_media_dimensions(records, metadata_store, library_service)
         items = [serialize_library_item(record) for record in records]
         positions = activity_store.positions_for([item['name'] for item in items if item['type'] == 'video'])
         for item in items:
