@@ -25,6 +25,8 @@ def yt_dlp_command(binary: str, media_root: Path, url: str, *, allow_playlist: b
         "--newline",
         "--restrict-filenames",
         "--merge-output-format", "mp4",
+        # H.264/AAC plays in every browser; AV1, VP9 and HEVC do not.
+        "-S", "vcodec:h264,acodec:aac",
         "--write-info-json",
         "--continue",
         "--retries", "10",

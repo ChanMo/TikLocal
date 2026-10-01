@@ -135,6 +135,11 @@
     let flowLoadingTimer = null;
     let videoStartCoverTimer = null;
     let videoActivationId = 0;
+    // Unplayable media is skipped with a short note; the full status only shows when skips repeat.
+    const maxQuietSkips = 3;
+    let quietSkips = 0;
+    let skipTimer = null;
+    let lastStep = 1;
 
     function isVideoStartReady(videoEl) {
       return videoEl?._startReady === true
@@ -606,6 +611,9 @@
       if (!feedItems.length) return;
       const safeIndex = Math.max(0, Math.min(nextIndex, feedItems.length - 1));
       const prevItem = currentItem();
+      if (safeIndex !== getCurrentIndex()) lastStep = safeIndex < getCurrentIndex() ? -1 : 1;
+      clearTimeout(skipTimer);
+      skipTimer = null;
       const previousActivity = finishActivity();
       clearPreviousState(prevItem);
 
@@ -683,6 +691,7 @@
       } else {
         playStatusIcon.classList.remove('visible');
         mediaActions.loadCaption(item.name);
+        if (item.el._loadFailed) handleMediaFailure(item.el);
       }
 
       if (getCurrentIndex() >= feedItems.length - 4 && flowSession.hasMore()) {
@@ -802,6 +811,9 @@
         video.addEventListener('loadeddata', () => {
           video._loadFailed = false;
         });
+        video.addEventListener('playing', () => {
+          quietSkips = 0;
+        });
         video.addEventListener('timeupdate', () => {
           updateVideoProgress(video);
           const duration = Number(video.duration || 0);
@@ -843,7 +855,14 @@
       img.loading = 'lazy';
       img.decoding = 'async';
       img.alt = item.name;
-      img.addEventListener('error', () => handleMediaFailure(img));
+      img.addEventListener('error', () => {
+        img._loadFailed = true;
+        handleMediaFailure(img);
+      });
+      img.addEventListener('load', () => {
+        img._loadFailed = false;
+        quietSkips = 0;
+      });
       img.src = item.media_url;
       img.dataset.name = item.name;
       return img;
@@ -928,8 +947,31 @@
     }
 
     function handleMediaFailure(mediaEl) {
-      if (currentItem()?.el !== mediaEl) return;
-      showFlowStatus('media-error', 'This media cannot be opened', 'The file may have moved, be offline, or use an unsupported format.');
+      const item = currentItem();
+      if (item?.el !== mediaEl || skipTimer) return;
+      const code = mediaEl.error?.code;
+      if (code === 1) return;
+      if (code === 2 && !mediaEl._networkRetried) {
+        mediaEl._networkRetried = true;
+        retryCurrentMedia();
+        return;
+      }
+      if (quietSkips >= maxQuietSkips) {
+        showFlowStatus('media-error', 'This media cannot be opened', 'The file may have moved, be offline, or use an unsupported format.');
+        return;
+      }
+      if (item.type === 'image_group') {
+        showHud("Can't show this image", 1600);
+        return;
+      }
+      quietSkips += 1;
+      showHud(`Can't play this ${item.type === 'video' ? 'video' : 'image'} here · skipped`, 1600);
+      skipTimer = setTimeout(() => {
+        skipTimer = null;
+        if (currentItem() !== item) return;
+        if (lastStep < 0 && getCurrentIndex() > 0) goPrev();
+        else goNext();
+      }, 700);
     }
 
     async function retryCurrentMedia() {
@@ -946,6 +988,7 @@
         item.el.load();
         await showItem(getCurrentIndex());
       } else if (item.type === 'image') {
+        item.el._loadFailed = false;
         item.el.src = retryUrl;
       } else if (item.type === 'image_group' && typeof item.renderChild === 'function') {
         item.activeChildIndex = item.renderChild(Number(item.activeChildIndex) || 0, true);
